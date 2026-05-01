@@ -1,0 +1,27 @@
+using LMS.Application.Common.Models;
+using LMS.Domain.Enums;
+using MediatR;
+
+namespace LMS.Application.Features.Users;
+
+public sealed record UserDto(Guid Id, string Email, UserStatus Status, IReadOnlyCollection<string> Roles);
+
+public sealed record UsersPingCommand : IRequest<Result<string>>;
+
+public sealed class UsersPingCommandHandler : IRequestHandler<UsersPingCommand, Result<string>>
+{
+    public Task<Result<string>> Handle(UsersPingCommand request, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(Result<string>.Ok("Users module ready"));
+    }
+}
+
+public sealed record GetUsersQuery : IRequest<Result<IReadOnlyCollection<UserDto>>>;
+
+public sealed record GetUserByIdQuery(Guid UserId) : IRequest<Result<UserDto>>;
+
+public sealed record CreateUserCommand(string Email, string Password, UserStatus Status) : IRequest<Result<UserDto>>;
+
+public sealed record UpdateUserCommand(Guid UserId, string Email, UserStatus Status) : IRequest<Result<UserDto>>;
+
+public sealed record DeactivateUserCommand(Guid UserId) : IRequest<Result>;

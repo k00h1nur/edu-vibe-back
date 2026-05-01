@@ -1,0 +1,11 @@
+C:\Users\PlumTech\OneDrive\Desktop\backend\edu-vibe-back\LMS.Domain\bin\Debug\net8.0\LMS.Domain.deps.json
+C:\Users\PlumTech\OneDrive\Desktop\backend\edu-vibe-back\LMS.Domain\bin\Debug\net8.0\LMS.Domain.dll
+C:\Users\PlumTech\OneDrive\Desktop\backend\edu-vibe-back\LMS.Domain\bin\Debug\net8.0\LMS.Domain.pdb
+C:\Users\PlumTech\OneDrive\Desktop\backend\edu-vibe-back\LMS.Domain\obj\Debug\net8.0\LMS.Domain.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\PlumTech\OneDrive\Desktop\backend\edu-vibe-back\LMS.Domain\obj\Debug\net8.0\LMS.Domain.AssemblyInfoInputs.cache
+C:\Users\PlumTech\OneDrive\Desktop\backend\edu-vibe-back\LMS.Domain\obj\Debug\net8.0\LMS.Domain.AssemblyInfo.cs
+C:\Users\PlumTech\OneDrive\Desktop\backend\edu-vibe-back\LMS.Domain\obj\Debug\net8.0\LMS.Domain.csproj.CoreCompileInputs.cache
+C:\Users\PlumTech\OneDrive\Desktop\backend\edu-vibe-back\LMS.Domain\obj\Debug\net8.0\LMS.Domain.dll
+C:\Users\PlumTech\OneDrive\Desktop\backend\edu-vibe-back\LMS.Domain\obj\Debug\net8.0\refint\LMS.Domain.dll
+C:\Users\PlumTech\OneDrive\Desktop\backend\edu-vibe-back\LMS.Domain\obj\Debug\net8.0\LMS.Domain.pdb
+C:\Users\PlumTech\OneDrive\Desktop\backend\edu-vibe-back\LMS.Domain\obj\Debug\net8.0\ref\LMS.Domain.dll
