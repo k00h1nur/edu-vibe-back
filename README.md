@@ -10,7 +10,7 @@
 3. `dotnet ef database update -p LMS.Infrastructure -s LMS.WebApi`
 
 ## Run API
-1. Configure connection string and JWT key in `LMS.WebApi/appsettings.json`
+1. Configure connection string and JWT key in `LMS.WebApi/appsettings.json` (JWT key must be at least 32 bytes for HS256)
 2. Run: `dotnet run --project LMS.WebApi`
 
 ## Default admin login (seeded and usable)

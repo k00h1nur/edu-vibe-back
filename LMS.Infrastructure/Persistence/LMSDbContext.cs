@@ -12,6 +12,8 @@ public sealed class LMSDbContext : DbContext, IApplicationDbContext
 
     public DbSet<User> Users => Set<User>();
     public DbSet<Role> Roles => Set<Role>();
+    public DbSet<Permission> Permissions => Set<Permission>();
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<StaffProfile> StaffProfiles => Set<StaffProfile>();
     public DbSet<StudentProfile> StudentProfiles => Set<StudentProfile>();
@@ -30,6 +32,10 @@ public sealed class LMSDbContext : DbContext, IApplicationDbContext
     public DbSet<Badge> Badges => Set<Badge>();
     public DbSet<StudentBadge> StudentBadges => Set<StudentBadge>();
     public DbSet<XpLedger> XpLedger => Set<XpLedger>();
+    public DbSet<ResultEntry> Results => Set<ResultEntry>();
+    public DbSet<ResultScoreBreakdown> ResultScoreBreakdowns => Set<ResultScoreBreakdown>();
+    public DbSet<ResultImage> ResultImages => Set<ResultImage>();
+    public DbSet<ResultView> ResultViews => Set<ResultView>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

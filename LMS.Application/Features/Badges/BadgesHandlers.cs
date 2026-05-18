@@ -15,13 +15,20 @@ public sealed class BadgesHandlers(IApplicationDbContext db) :
 {
     public async Task<Result> Handle(AwardBadgeCommand request, CancellationToken cancellationToken)
     {
-        var list = await db.StudentBadges.Where(x => x.StudentProfileId == request.StudentProfileId)
-            .ToListAsync(cancellationToken);
-        var sb = StudentBadge.Award(request.StudentProfileId, request.BadgeId, list);
-        await db.StudentBadges.AddAsync(sb, cancellationToken);
         var badge = await db.Badges.FirstOrDefaultAsync(x => x.Id == request.BadgeId, cancellationToken);
         var sp = await db.StudentProfiles.FirstOrDefaultAsync(x => x.Id == request.StudentProfileId, cancellationToken);
-        if (badge is not null && sp is not null && badge.XpReward > 0)
+        if (badge is null) return Result.Fail("NOT_FOUND", "Badge not found.");
+        if (sp is null) return Result.Fail("NOT_FOUND", "Student profile not found.");
+
+        var alreadyAwarded = await db.StudentBadges.AnyAsync(
+            x => x.StudentProfileId == request.StudentProfileId && x.BadgeId == request.BadgeId,
+            cancellationToken);
+        if (alreadyAwarded) return Result.Fail("ALREADY_AWARDED", "Student already has this badge.");
+
+        var sb = StudentBadge.Award(request.StudentProfileId, request.BadgeId, Array.Empty<StudentBadge>());
+        await db.StudentBadges.AddAsync(sb, cancellationToken);
+
+        if (badge.XpReward > 0)
         {
             sp.AddXp(badge.XpReward);
             await db.XpLedger.AddAsync(

@@ -7,6 +7,8 @@ public interface IApplicationDbContext
 {
     DbSet<User> Users { get; }
     DbSet<Role> Roles { get; }
+    DbSet<Permission> Permissions { get; }
+    DbSet<RolePermission> RolePermissions { get; }
     DbSet<UserRole> UserRoles { get; }
     DbSet<StaffProfile> StaffProfiles { get; }
     DbSet<StudentProfile> StudentProfiles { get; }
@@ -25,5 +27,9 @@ public interface IApplicationDbContext
     DbSet<Badge> Badges { get; }
     DbSet<StudentBadge> StudentBadges { get; }
     DbSet<XpLedger> XpLedger { get; }
+    DbSet<ResultEntry> Results { get; }
+    DbSet<ResultScoreBreakdown> ResultScoreBreakdowns { get; }
+    DbSet<ResultImage> ResultImages { get; }
+    DbSet<ResultView> ResultViews { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }

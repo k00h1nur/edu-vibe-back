@@ -2,6 +2,8 @@ namespace LMS.Application.Common.Security;
 
 public static class RoleCodes
 {
+    public const string SuperAdmin = "SuperAdmin";
+    public const string Admin = "Admin";
     public const string AcademyDirector = "AcademyDirector";
     public const string OfficeAdmin = "OfficeAdmin";
     public const string Teacher = "Teacher";

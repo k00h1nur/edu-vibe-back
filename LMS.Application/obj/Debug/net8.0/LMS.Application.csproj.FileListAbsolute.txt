@@ -13,3 +13,4 @@ C:\Users\PlumTech\OneDrive\Desktop\backend\edu-vibe-back\LMS.Application\obj\Deb
 C:\Users\PlumTech\OneDrive\Desktop\backend\edu-vibe-back\LMS.Application\obj\Debug\net8.0\refint\LMS.Application.dll
 C:\Users\PlumTech\OneDrive\Desktop\backend\edu-vibe-back\LMS.Application\obj\Debug\net8.0\LMS.Application.pdb
 C:\Users\PlumTech\OneDrive\Desktop\backend\edu-vibe-back\LMS.Application\obj\Debug\net8.0\ref\LMS.Application.dll
+C:\Users\PlumTech\OneDrive\Desktop\backend\edu-vibe-back\LMS.Application\obj\Debug\net8.0\LMS.Application.sourcelink.json

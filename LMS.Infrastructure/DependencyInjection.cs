@@ -12,6 +12,8 @@ namespace LMS.Infrastructure;
 
 public static class DependencyInjection
 {
+    private const string FallbackJwtKey = "EduVibe-Fallback-Secret-Key-At-Least-32-Chars";
+
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDbContext<LMSDbContext>(opt =>
@@ -21,6 +23,7 @@ public static class DependencyInjection
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
+        services.AddScoped<IResultImageService, ResultImageService>();
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
         services.AddHttpContextAccessor();
         return services;
@@ -29,7 +32,15 @@ public static class DependencyInjection
     public static IServiceCollection AddJwtAuthentication(this IServiceCollection services,
         IConfiguration configuration)
     {
-        var key = Encoding.UTF8.GetBytes(configuration["Jwt:Key"] ?? "replace");
+        var configuredKey = configuration["Jwt:Key"];
+        var jwtKey = string.IsNullOrWhiteSpace(configuredKey) ? FallbackJwtKey : configuredKey;
+        var keyBytes = Encoding.UTF8.GetBytes(jwtKey);
+        if (keyBytes.Length < 32)
+        {
+            throw new InvalidOperationException(
+                "JWT key must be at least 32 bytes for HS256. Update Jwt:Key in configuration.");
+        }
+
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
@@ -41,7 +52,7 @@ public static class DependencyInjection
                     ValidateIssuerSigningKey = true,
                     ValidIssuer = configuration["Jwt:Issuer"],
                     ValidAudience = configuration["Jwt:Audience"],
-                    IssuerSigningKey = new SymmetricSecurityKey(key)
+                    IssuerSigningKey = new SymmetricSecurityKey(keyBytes)
                 };
             });
         return services;

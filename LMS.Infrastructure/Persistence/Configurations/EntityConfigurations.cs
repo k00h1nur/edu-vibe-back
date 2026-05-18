@@ -29,6 +29,33 @@ public sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
     }
 }
 
+public sealed class PermissionConfiguration : IEntityTypeConfiguration<Permission>
+{
+    public void Configure(EntityTypeBuilder<Permission> b)
+    {
+        b.ToTable("permissions");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).IsRequired().HasMaxLength(128);
+        b.Property(x => x.Module).IsRequired().HasMaxLength(64);
+        b.Property(x => x.Description).HasMaxLength(512);
+        b.HasIndex(x => x.Code).IsUnique();
+    }
+}
+
+public sealed class RolePermissionConfiguration : IEntityTypeConfiguration<RolePermission>
+{
+    public void Configure(EntityTypeBuilder<RolePermission> b)
+    {
+        b.ToTable("role_permissions");
+        b.HasKey(x => x.Id);
+        b.HasIndex(x => new { x.RoleId, x.PermissionId }).IsUnique();
+        b.HasOne(x => x.Role).WithMany(x => x.RolePermissions).HasForeignKey(x => x.RoleId)
+            .OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(x => x.Permission).WithMany(x => x.RolePermissions).HasForeignKey(x => x.PermissionId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 public sealed class UserRoleConfiguration : IEntityTypeConfiguration<UserRole>
 {
     public void Configure(EntityTypeBuilder<UserRole> b)
@@ -218,5 +245,63 @@ public sealed class XpLedgerConfiguration : IEntityTypeConfiguration<XpLedger>
     {
         b.ToTable("xp_ledger");
         b.HasKey(x => x.Id);
+    }
+}
+
+public sealed class ResultEntryConfiguration : IEntityTypeConfiguration<ResultEntry>
+{
+    public void Configure(EntityTypeBuilder<ResultEntry> b)
+    {
+        b.ToTable("results");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.StudentFullName).IsRequired().HasMaxLength(256);
+        b.Property(x => x.MainImageUrl).HasMaxLength(1024);
+        b.Property(x => x.OverallScore).HasPrecision(10, 2);
+        b.Property(x => x.Description).HasMaxLength(4000);
+        b.Property(x => x.ImprovementText).HasMaxLength(1000);
+        b.Property(x => x.DurationText).HasMaxLength(500);
+        b.Property(x => x.Notes).HasMaxLength(2000);
+        b.Property(x => x.BadgeIcon).HasMaxLength(512);
+        b.Property(x => x.Language).IsRequired().HasMaxLength(10);
+        b.HasIndex(x => new { x.IsPublished, x.IsFeatured, x.ExamType });
+    }
+}
+
+public sealed class ResultScoreBreakdownConfiguration : IEntityTypeConfiguration<ResultScoreBreakdown>
+{
+    public void Configure(EntityTypeBuilder<ResultScoreBreakdown> b)
+    {
+        b.ToTable("result_score_breakdowns");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Key).IsRequired().HasMaxLength(128);
+        b.Property(x => x.Value).IsRequired().HasMaxLength(128);
+        b.HasOne(x => x.Result).WithMany(x => x.ScoreBreakdowns).HasForeignKey(x => x.ResultId)
+            .OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.ResultId, x.Key }).IsUnique();
+    }
+}
+
+public sealed class ResultImageConfiguration : IEntityTypeConfiguration<ResultImage>
+{
+    public void Configure(EntityTypeBuilder<ResultImage> b)
+    {
+        b.ToTable("result_images");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.ImageUrl).IsRequired().HasMaxLength(1024);
+        b.Property(x => x.ThumbnailUrl).HasMaxLength(1024);
+        b.HasOne(x => x.Result).WithMany(x => x.Images).HasForeignKey(x => x.ResultId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public sealed class ResultViewConfiguration : IEntityTypeConfiguration<ResultView>
+{
+    public void Configure(EntityTypeBuilder<ResultView> b)
+    {
+        b.ToTable("result_views");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.IpAddress).HasMaxLength(64);
+        b.Property(x => x.UserAgent).HasMaxLength(1024);
+        b.HasOne(x => x.Result).WithMany(x => x.Views).HasForeignKey(x => x.ResultId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => x.ResultId);
     }
 }

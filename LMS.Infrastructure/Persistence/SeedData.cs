@@ -17,6 +17,8 @@ public static class SeedData
         var teacherRoleId = Guid.Parse("10000000-0000-0000-0000-000000000003");
         var supportRoleId = Guid.Parse("10000000-0000-0000-0000-000000000004");
         var studentRoleId = Guid.Parse("10000000-0000-0000-0000-000000000005");
+        var adminRoleId = Guid.Parse("10000000-0000-0000-0000-000000000006");
+        var superAdminRoleId = Guid.Parse("10000000-0000-0000-0000-000000000007");
 
         b.Entity<Role>().HasData(
             new
@@ -34,7 +36,13 @@ public static class SeedData
                 Id = supportRoleId, Code = RoleCodes.SupportTeacher, Name = "Support Teacher", CreatedAt = now,
                 UpdatedAt = now
             },
-            new { Id = studentRoleId, Code = RoleCodes.Student, Name = "Student", CreatedAt = now, UpdatedAt = now }
+            new { Id = studentRoleId, Code = RoleCodes.Student, Name = "Student", CreatedAt = now, UpdatedAt = now },
+            new { Id = adminRoleId, Code = RoleCodes.Admin, Name = "Admin", CreatedAt = now, UpdatedAt = now },
+            new
+            {
+                Id = superAdminRoleId, Code = RoleCodes.SuperAdmin, Name = "Super Admin", CreatedAt = now,
+                UpdatedAt = now
+            }
         );
 
         var adminUserId = Guid.Parse("20000000-0000-0000-0000-000000000001");
@@ -54,6 +62,10 @@ public static class SeedData
         b.Entity<UserRole>().HasData(new
         {
             Id = Guid.Parse("30000000-0000-0000-0000-000000000001"), UserId = adminUserId, RoleId = directorRoleId,
+            CreatedAt = now, UpdatedAt = now
+        }, new
+        {
+            Id = Guid.Parse("30000000-0000-0000-0000-000000000002"), UserId = adminUserId, RoleId = superAdminRoleId,
             CreatedAt = now, UpdatedAt = now
         });
 

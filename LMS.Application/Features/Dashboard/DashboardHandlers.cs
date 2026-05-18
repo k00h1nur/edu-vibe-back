@@ -15,7 +15,8 @@ public sealed class DashboardHandlers(IApplicationDbContext db) :
     public async Task<Result<DirectorDashboardDto>> Handle(GetDirectorDashboardQuery request,
         CancellationToken cancellationToken)
     {
-        var monthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+        var nowUtc = DateTime.UtcNow;
+        var monthStart = new DateTime(nowUtc.Year, nowUtc.Month, 1, 0, 0, 0, DateTimeKind.Utc);
         var dto = new DirectorDashboardDto(
             await db.StudentProfiles.CountAsync(cancellationToken),
             await db.UserRoles.Join(db.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => new { ur, r })

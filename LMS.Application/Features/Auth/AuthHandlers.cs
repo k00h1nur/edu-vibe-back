@@ -46,7 +46,10 @@ public sealed class RegisterUserCommandHandler(
         }
 
         var roles = new[] { role.Code };
-        var permissions = PermissionMatrix.ForRoles(roles);
+        var permissions = await dbContext.RolePermissions
+            .Where(rp => rp.RoleId == role.Id)
+            .Join(dbContext.Permissions, rp => rp.PermissionId, p => p.Id, (rp, p) => p.Code)
+            .ToArrayAsync(cancellationToken);
         var accessToken = jwtTokenGenerator.Generate(user.Id, user.Email, roles, permissions);
         var refreshToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
         var refreshHash = passwordHasher.Hash(refreshToken);
@@ -78,7 +81,11 @@ public sealed class LoginCommandHandler(
 
         var roles = await dbContext.UserRoles.Where(x => x.UserId == user.Id)
             .Join(dbContext.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => r.Code).ToArrayAsync(cancellationToken);
-        var permissions = PermissionMatrix.ForRoles(roles);
+        var permissions = await dbContext.UserRoles.Where(x => x.UserId == user.Id)
+            .Join(dbContext.RolePermissions, ur => ur.RoleId, rp => rp.RoleId, (ur, rp) => rp.PermissionId)
+            .Join(dbContext.Permissions, pid => pid, p => p.Id, (pid, p) => p.Code)
+            .Distinct()
+            .ToArrayAsync(cancellationToken);
 
         var accessToken = jwtTokenGenerator.Generate(user.Id, user.Email, roles, permissions);
         var refreshToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
@@ -112,7 +119,11 @@ public sealed class RefreshTokenCommandHandler(
 
         var roles = await dbContext.UserRoles.Where(x => x.UserId == user.Id)
             .Join(dbContext.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => r.Code).ToArrayAsync(cancellationToken);
-        var permissions = PermissionMatrix.ForRoles(roles);
+        var permissions = await dbContext.UserRoles.Where(x => x.UserId == user.Id)
+            .Join(dbContext.RolePermissions, ur => ur.RoleId, rp => rp.RoleId, (ur, rp) => rp.PermissionId)
+            .Join(dbContext.Permissions, pid => pid, p => p.Id, (pid, p) => p.Code)
+            .Distinct()
+            .ToArrayAsync(cancellationToken);
         var accessToken = jwtTokenGenerator.Generate(user.Id, user.Email, roles, permissions);
 
         var newRefreshToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));

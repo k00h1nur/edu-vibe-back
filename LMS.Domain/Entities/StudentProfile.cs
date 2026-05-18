@@ -5,6 +5,10 @@ namespace LMS.Domain.Entities;
 
 public sealed class StudentProfile : BaseEntity
 {
+    private StudentProfile()
+    {
+        
+    }
     public StudentProfile(Guid userId, User user)
     {
         if (userId == Guid.Empty) throw new DomainException("Student user id is required.");

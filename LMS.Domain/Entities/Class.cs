@@ -6,6 +6,11 @@ namespace LMS.Domain.Entities;
 
 public sealed class Class : BaseEntity
 {
+    private Class()
+    {
+        
+    }
+    
     public Class(string title, int maxStudents, Modality modality)
     {
         if (string.IsNullOrWhiteSpace(title)) throw new DomainException("Class title is required.");

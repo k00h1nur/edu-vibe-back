@@ -6,6 +6,9 @@ namespace LMS.Domain.Entities;
 
 public sealed class Assignment : BaseEntity
 {
+    private Assignment()
+    {
+    }
     public Assignment(Guid classId, string title, User createdByTeacher)
     {
         if (classId == Guid.Empty) throw new DomainException("Class id is required.");

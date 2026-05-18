@@ -9,3 +9,4 @@ C:\Users\PlumTech\OneDrive\Desktop\backend\edu-vibe-back\LMS.Domain\obj\Debug\ne
 C:\Users\PlumTech\OneDrive\Desktop\backend\edu-vibe-back\LMS.Domain\obj\Debug\net8.0\refint\LMS.Domain.dll
 C:\Users\PlumTech\OneDrive\Desktop\backend\edu-vibe-back\LMS.Domain\obj\Debug\net8.0\LMS.Domain.pdb
 C:\Users\PlumTech\OneDrive\Desktop\backend\edu-vibe-back\LMS.Domain\obj\Debug\net8.0\ref\LMS.Domain.dll
+C:\Users\PlumTech\OneDrive\Desktop\backend\edu-vibe-back\LMS.Domain\obj\Debug\net8.0\LMS.Domain.sourcelink.json
