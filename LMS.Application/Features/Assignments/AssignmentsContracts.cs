@@ -34,3 +34,12 @@ public sealed record GetClassAssignmentsQuery(Guid ClassId) : IRequest<Result<IR
 
 public sealed record GetStudentAssignmentsQuery(Guid StudentProfileId)
     : IRequest<Result<IReadOnlyCollection<AssignmentDto>>>;
+
+/// <summary>
+/// Lists assignments, optionally filtered. Used by the teacher Homework page and admin views.
+/// </summary>
+public sealed record GetAssignmentsQuery(
+    Guid? TeacherUserId = null,
+    Guid? ClassId = null,
+    AssignmentStatus? Status = null)
+    : IRequest<Result<IReadOnlyCollection<AssignmentDto>>>;

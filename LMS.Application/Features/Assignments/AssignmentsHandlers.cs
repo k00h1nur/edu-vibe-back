@@ -12,7 +12,8 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db) :
     IRequestHandler<PublishAssignmentCommand, Result<AssignmentDto>>,
     IRequestHandler<CloseAssignmentCommand, Result<AssignmentDto>>,
     IRequestHandler<GetClassAssignmentsQuery, Result<IReadOnlyCollection<AssignmentDto>>>,
-    IRequestHandler<GetStudentAssignmentsQuery, Result<IReadOnlyCollection<AssignmentDto>>>
+    IRequestHandler<GetStudentAssignmentsQuery, Result<IReadOnlyCollection<AssignmentDto>>>,
+    IRequestHandler<GetAssignmentsQuery, Result<IReadOnlyCollection<AssignmentDto>>>
 {
     public async Task<Result<AssignmentDto>> Handle(CloseAssignmentCommand request, CancellationToken cancellationToken)
     {
@@ -71,6 +72,24 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db) :
         typeof(Assignment).GetProperty(nameof(Assignment.Title))!.SetValue(a, request.Title.Trim());
         await db.SaveChangesAsync(cancellationToken);
         return Result<AssignmentDto>.Ok(Map(a));
+    }
+
+    public async Task<Result<IReadOnlyCollection<AssignmentDto>>> Handle(GetAssignmentsQuery request,
+        CancellationToken cancellationToken)
+    {
+        var q = db.Assignments.AsQueryable();
+        if (request.TeacherUserId is { } teacherId)
+            q = q.Where(x => x.CreatedByTeacherId == teacherId);
+        if (request.ClassId is { } classId)
+            q = q.Where(x => x.ClassId == classId);
+        if (request.Status is { } status)
+            q = q.Where(x => x.Status == status);
+
+        var data = await q
+            .OrderByDescending(x => x.CreatedAt)
+            .Select(a => new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId))
+            .ToListAsync(cancellationToken);
+        return Result<IReadOnlyCollection<AssignmentDto>>.Ok(data);
     }
 
     private static AssignmentDto Map(Assignment a)

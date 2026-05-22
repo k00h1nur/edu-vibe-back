@@ -31,3 +31,11 @@ public sealed record GetSessionAttendanceQuery(Guid SessionId) : IRequest<Result
 
 public sealed record GetStudentAttendanceQuery(Guid StudentProfileId)
     : IRequest<Result<IReadOnlyCollection<AttendanceDto>>>;
+
+/// <summary>Lists attendance records with optional filters; used by admin overview screens.</summary>
+public sealed record GetAttendanceQuery(
+    Guid? ClassId = null,
+    Guid? SessionId = null,
+    Guid? StudentProfileId = null,
+    AttendanceStatus? Status = null)
+    : IRequest<Result<IReadOnlyCollection<AttendanceDto>>>;

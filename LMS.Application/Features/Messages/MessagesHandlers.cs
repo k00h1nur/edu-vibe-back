@@ -9,7 +9,8 @@ namespace LMS.Application.Features.Messages;
 public sealed class MessagesHandlers(IApplicationDbContext db) :
     IRequestHandler<SendMessageCommand, Result<MessageDto>>,
     IRequestHandler<GetConversationMessagesQuery, Result<IReadOnlyCollection<MessageDto>>>,
-    IRequestHandler<MarkMessageAsReadCommand, Result<MessageDto>>
+    IRequestHandler<MarkMessageAsReadCommand, Result<MessageDto>>,
+    IRequestHandler<GetUnreadMessageCountQuery, Result<int>>
 {
     public async Task<Result<IReadOnlyCollection<MessageDto>>> Handle(GetConversationMessagesQuery request,
         CancellationToken cancellationToken)
@@ -38,6 +39,21 @@ public sealed class MessagesHandlers(IApplicationDbContext db) :
         await db.Messages.AddAsync(m, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return Result<MessageDto>.Ok(Map(m));
+    }
+
+    public async Task<Result<int>> Handle(GetUnreadMessageCountQuery request, CancellationToken cancellationToken)
+    {
+        var convIds = await db.ConversationParticipants
+            .Where(p => p.UserId == request.UserId)
+            .Select(p => p.ConversationId)
+            .ToListAsync(cancellationToken);
+
+        var count = await db.Messages
+            .Where(m => convIds.Contains(m.ConversationId)
+                        && m.SenderUserId != request.UserId
+                        && m.ReadAt == null)
+            .CountAsync(cancellationToken);
+        return Result<int>.Ok(count);
     }
 
     private static MessageDto Map(Message m)

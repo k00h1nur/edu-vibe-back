@@ -9,7 +9,8 @@ public sealed class AttendanceHandlers(IApplicationDbContext db) :
     IRequestHandler<MarkAttendanceCommand, Result<AttendanceDto>>,
     IRequestHandler<UpdateAttendanceCommand, Result<AttendanceDto>>,
     IRequestHandler<GetSessionAttendanceQuery, Result<IReadOnlyCollection<AttendanceDto>>>,
-    IRequestHandler<GetStudentAttendanceQuery, Result<IReadOnlyCollection<AttendanceDto>>>
+    IRequestHandler<GetStudentAttendanceQuery, Result<IReadOnlyCollection<AttendanceDto>>>,
+    IRequestHandler<GetAttendanceQuery, Result<IReadOnlyCollection<AttendanceDto>>>
 {
     public async Task<Result<IReadOnlyCollection<AttendanceDto>>> Handle(GetSessionAttendanceQuery request,
         CancellationToken cancellationToken)
@@ -54,6 +55,22 @@ public sealed class AttendanceHandlers(IApplicationDbContext db) :
         a.Mark(request.Status);
         await db.SaveChangesAsync(cancellationToken);
         return Result<AttendanceDto>.Ok(Map(a));
+    }
+
+    public async Task<Result<IReadOnlyCollection<AttendanceDto>>> Handle(GetAttendanceQuery request,
+        CancellationToken cancellationToken)
+    {
+        var q = db.Attendance.AsQueryable();
+        if (request.ClassId is { } classId) q = q.Where(x => x.ClassId == classId);
+        if (request.SessionId is { } sessionId) q = q.Where(x => x.SessionId == sessionId);
+        if (request.StudentProfileId is { } studentId) q = q.Where(x => x.StudentProfileId == studentId);
+        if (request.Status is { } status) q = q.Where(x => x.Status == status);
+
+        var data = await q
+            .OrderByDescending(x => x.CreatedAt)
+            .Select(a => new AttendanceDto(a.Id, a.ClassId, a.SessionId, a.StudentProfileId, a.Status))
+            .ToListAsync(cancellationToken);
+        return Result<IReadOnlyCollection<AttendanceDto>>.Ok(data);
     }
 
     private static AttendanceDto Map(Domain.Entities.Attendance a)

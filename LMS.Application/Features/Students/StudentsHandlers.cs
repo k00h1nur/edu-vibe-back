@@ -66,3 +66,27 @@ public sealed class UpdateStudentProfileCommandHandler(IApplicationDbContext db)
         return Result<StudentDto>.Ok(new StudentDto(sp.Id, sp.UserId, user.Email, sp.XP, sp.Streak));
     }
 }
+
+public sealed class GetMyStudentProfileQueryHandler(IApplicationDbContext db, ICurrentUserService currentUser)
+    : IRequestHandler<GetMyStudentProfileQuery, Result<StudentDto>>
+{
+    public async Task<Result<StudentDto>> Handle(GetMyStudentProfileQuery request, CancellationToken cancellationToken)
+    {
+        if (currentUser.UserId is null)
+            return Result<StudentDto>.Fail("UNAUTHENTICATED", "No authenticated user.");
+
+        // Prefer the JWT claim (free lookup); fall back to UserId scan if not yet enriched.
+        var query = db.StudentProfiles
+            .Join(db.Users, s => s.UserId, u => u.Id, (s, u) => new { s, u });
+
+        var match = currentUser.StudentProfileId is { } profileId
+            ? await query.FirstOrDefaultAsync(x => x.s.Id == profileId, cancellationToken)
+            : await query.FirstOrDefaultAsync(x => x.s.UserId == currentUser.UserId, cancellationToken);
+
+        if (match is null)
+            return Result<StudentDto>.Fail("NOT_FOUND", "No student profile is linked to this account.");
+
+        return Result<StudentDto>.Ok(
+            new StudentDto(match.s.Id, match.s.UserId, match.u.Email, match.s.XP, match.s.Streak));
+    }
+}

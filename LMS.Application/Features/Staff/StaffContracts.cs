@@ -22,3 +22,6 @@ public sealed record UpdateStaffProfileCommand(Guid StaffProfileId, EmploymentTy
     : IRequest<Result<StaffDto>>;
 
 public sealed record GetStaffQuery : IRequest<Result<IReadOnlyCollection<StaffDto>>>;
+
+/// <summary>Returns the staff profile linked to the currently authenticated user.</summary>
+public sealed record GetMyStaffProfileQuery : IRequest<Result<StaffDto>>;

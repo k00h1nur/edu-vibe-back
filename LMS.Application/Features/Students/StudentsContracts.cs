@@ -23,3 +23,9 @@ public sealed record UpdateStudentProfileCommand(Guid StudentProfileId, int Xp, 
 public sealed record GetStudentsQuery : IRequest<Result<IReadOnlyCollection<StudentDto>>>;
 
 public sealed record GetStudentDetailQuery(Guid StudentProfileId) : IRequest<Result<StudentDto>>;
+
+/// <summary>
+/// Returns the student profile linked to the currently authenticated user.
+/// Resolved via the <c>studentProfileId</c> JWT claim, falling back to a UserId lookup.
+/// </summary>
+public sealed record GetMyStudentProfileQuery : IRequest<Result<StudentDto>>;

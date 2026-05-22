@@ -25,3 +25,12 @@ public sealed record CreateUserCommand(string Email, string Password, UserStatus
 public sealed record UpdateUserCommand(Guid UserId, string Email, UserStatus Status) : IRequest<Result<UserDto>>;
 
 public sealed record DeactivateUserCommand(Guid UserId) : IRequest<Result>;
+
+/// <summary>Returns the currently authenticated user.</summary>
+public sealed record GetMyUserQuery : IRequest<Result<UserDto>>;
+
+/// <summary>Updates the currently authenticated user's profile.</summary>
+public sealed record UpdateMyUserCommand(string Email) : IRequest<Result<UserDto>>;
+
+/// <summary>Lets the current user change their own password.</summary>
+public sealed record ChangeMyPasswordCommand(string CurrentPassword, string NewPassword) : IRequest<Result>;

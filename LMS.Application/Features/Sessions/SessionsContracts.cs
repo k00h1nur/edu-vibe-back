@@ -40,3 +40,10 @@ public sealed record CancelClassSessionCommand(Guid SessionId) : IRequest<Result
 public sealed record GetClassSessionsQuery(Guid ClassId) : IRequest<Result<IReadOnlyCollection<SessionDto>>>;
 
 public sealed record GetMyScheduleQuery(Guid UserId) : IRequest<Result<IReadOnlyCollection<SessionDto>>>;
+
+/// <summary>
+/// Upcoming sessions for the given user. Resolves both teaching schedule (for staff/teachers)
+/// and enrolled classes (for students), starting from today.
+/// </summary>
+public sealed record GetUpcomingSessionsQuery(Guid UserId, int Take = 20)
+    : IRequest<Result<IReadOnlyCollection<SessionDto>>>;

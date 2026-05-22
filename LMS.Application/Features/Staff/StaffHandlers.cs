@@ -49,3 +49,26 @@ public sealed class UpdateStaffProfileCommandHandler(IApplicationDbContext db)
         return Result<StaffDto>.Ok(new StaffDto(sp.Id, sp.UserId, user.Email, sp.EmploymentType));
     }
 }
+
+public sealed class GetMyStaffProfileQueryHandler(IApplicationDbContext db, ICurrentUserService currentUser)
+    : IRequestHandler<GetMyStaffProfileQuery, Result<StaffDto>>
+{
+    public async Task<Result<StaffDto>> Handle(GetMyStaffProfileQuery request, CancellationToken cancellationToken)
+    {
+        if (currentUser.UserId is null)
+            return Result<StaffDto>.Fail("UNAUTHENTICATED", "No authenticated user.");
+
+        var query = db.StaffProfiles
+            .Join(db.Users, s => s.UserId, u => u.Id,
+                (s, u) => new { s, u });
+
+        var match = currentUser.StaffProfileId is { } profileId
+            ? await query.FirstOrDefaultAsync(x => x.s.Id == profileId, cancellationToken)
+            : await query.FirstOrDefaultAsync(x => x.s.UserId == currentUser.UserId, cancellationToken);
+
+        if (match is null)
+            return Result<StaffDto>.Fail("NOT_FOUND", "No staff profile is linked to this account.");
+
+        return Result<StaffDto>.Ok(new StaffDto(match.s.Id, match.s.UserId, match.u.Email, match.s.EmploymentType));
+    }
+}

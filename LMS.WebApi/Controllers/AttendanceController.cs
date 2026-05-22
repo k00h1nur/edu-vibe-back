@@ -1,4 +1,5 @@
 using LMS.Application.Features.Attendance;
+using LMS.Domain.Enums;
 using LMS.WebApi.Common;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -11,6 +12,19 @@ namespace LMS.WebApi.Controllers;
 [Authorize]
 public sealed class AttendanceController(ISender sender) : ControllerBase
 {
+    /// <summary>Lists attendance records, optionally filtered. Powers the admin attendance view.</summary>
+    [HttpGet]
+    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<AttendanceDto>>>> GetAll(
+        [FromQuery] Guid? classId,
+        [FromQuery] Guid? sessionId,
+        [FromQuery] Guid? studentProfileId,
+        [FromQuery] AttendanceStatus? status,
+        CancellationToken ct)
+    {
+        var r = await sender.Send(new GetAttendanceQuery(classId, sessionId, studentProfileId, status), ct);
+        return Ok(ApiResponse<IReadOnlyCollection<AttendanceDto>>.Ok(r.Data, r.Message));
+    }
+
     [HttpGet("session/{sessionId:guid}")]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<AttendanceDto>>>> Session(Guid sessionId,
         CancellationToken ct)

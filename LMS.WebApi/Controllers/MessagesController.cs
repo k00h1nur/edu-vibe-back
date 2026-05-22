@@ -37,4 +37,12 @@ public sealed class MessagesController(ISender sender) : ControllerBase
             ? Ok(ApiResponse<MessageDto>.Ok(r.Data, r.Message))
             : BadRequest(ApiResponse<MessageDto>.Fail(r.Message ?? "Failed"));
     }
+
+    /// <summary>Number of unread messages addressed to the user across all their conversations.</summary>
+    [HttpGet("unread-count/{userId:guid}")]
+    public async Task<ActionResult<ApiResponse<int>>> UnreadCount(Guid userId, CancellationToken ct)
+    {
+        var r = await sender.Send(new GetUnreadMessageCountQuery(userId), ct);
+        return Ok(ApiResponse<int>.Ok(r.Data, r.Message));
+    }
 }

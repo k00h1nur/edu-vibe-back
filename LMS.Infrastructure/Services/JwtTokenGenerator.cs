@@ -11,7 +11,13 @@ public sealed class JwtTokenGenerator(IConfiguration configuration) : IJwtTokenG
 {
     private const string FallbackJwtKey = "EduVibe-Fallback-Secret-Key-At-Least-32-Chars";
 
-    public string Generate(Guid userId, string email, IEnumerable<string> roles, IEnumerable<string> permissions)
+    public string Generate(
+        Guid userId,
+        string email,
+        IEnumerable<string> roles,
+        IEnumerable<string> permissions,
+        Guid? studentProfileId = null,
+        Guid? staffProfileId = null)
     {
         var claims = new List<Claim>
         {
@@ -20,6 +26,11 @@ public sealed class JwtTokenGenerator(IConfiguration configuration) : IJwtTokenG
         };
         claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
         claims.AddRange(permissions.Select(p => new Claim("permission", p)));
+
+        if (studentProfileId.HasValue)
+            claims.Add(new Claim("studentProfileId", studentProfileId.Value.ToString()));
+        if (staffProfileId.HasValue)
+            claims.Add(new Claim("staffProfileId", staffProfileId.Value.ToString()));
 
         var configuredKey = configuration["Jwt:Key"];
         var jwtKey = string.IsNullOrWhiteSpace(configuredKey) ? FallbackJwtKey : configuredKey;
