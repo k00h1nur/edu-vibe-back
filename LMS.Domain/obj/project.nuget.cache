@@ -1,12 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "bBYAyyf2X7w=",
+  "dgSpecHash": "2+80I8euTtI=",
   "success": true,
-  "projectFilePath": "C:\\Users\\PlumTech\\OneDrive\\Desktop\\backend\\edu-vibe-back\\LMS.Domain\\LMS.Domain.csproj",
-  "expectedPackageFiles": [
-    "C:\\Users\\PlumTech\\.nuget\\packages\\microsoft.netcore.app.ref\\8.0.22\\microsoft.netcore.app.ref.8.0.22.nupkg.sha512",
-    "C:\\Users\\PlumTech\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\8.0.22\\microsoft.windowsdesktop.app.ref.8.0.22.nupkg.sha512",
-    "C:\\Users\\PlumTech\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\8.0.22\\microsoft.aspnetcore.app.ref.8.0.22.nupkg.sha512"
-  ],
+  "projectFilePath": "C:\\Users\\Sevinch\\RiderProjects\\edu-vibe-back\\LMS.Domain\\LMS.Domain.csproj",
+  "expectedPackageFiles": [],
   "logs": []
 }

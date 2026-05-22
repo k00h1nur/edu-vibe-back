@@ -1,40 +1,33 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\PlumTech\\OneDrive\\Desktop\\backend\\edu-vibe-back\\LMS.Application\\LMS.Application.csproj": {}
+    "C:\\Users\\Sevinch\\RiderProjects\\edu-vibe-back\\LMS.Application\\LMS.Application.csproj": {}
   },
   "projects": {
-    "C:\\Users\\PlumTech\\OneDrive\\Desktop\\backend\\edu-vibe-back\\LMS.Application\\LMS.Application.csproj": {
+    "C:\\Users\\Sevinch\\RiderProjects\\edu-vibe-back\\LMS.Application\\LMS.Application.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\PlumTech\\OneDrive\\Desktop\\backend\\edu-vibe-back\\LMS.Application\\LMS.Application.csproj",
+        "projectUniqueName": "C:\\Users\\Sevinch\\RiderProjects\\edu-vibe-back\\LMS.Application\\LMS.Application.csproj",
         "projectName": "LMS.Application",
-        "projectPath": "C:\\Users\\PlumTech\\OneDrive\\Desktop\\backend\\edu-vibe-back\\LMS.Application\\LMS.Application.csproj",
-        "packagesPath": "C:\\Users\\PlumTech\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\PlumTech\\OneDrive\\Desktop\\backend\\edu-vibe-back\\LMS.Application\\obj\\",
+        "projectPath": "C:\\Users\\Sevinch\\RiderProjects\\edu-vibe-back\\LMS.Application\\LMS.Application.csproj",
+        "packagesPath": "C:\\Users\\Sevinch\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\Sevinch\\RiderProjects\\edu-vibe-back\\LMS.Application\\obj\\",
         "projectStyle": "PackageReference",
-        "fallbackFolders": [
-          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
-        ],
         "configFilePaths": [
-          "C:\\Users\\PlumTech\\AppData\\Roaming\\NuGet\\NuGet.Config",
-          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
-          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+          "C:\\Users\\Sevinch\\AppData\\Roaming\\NuGet\\NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net8.0"
         ],
         "sources": {
-          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
-          "C:\\Program Files\\dotnet\\library-packs": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
           "net8.0": {
             "targetAlias": "net8.0",
             "projectReferences": {
-              "C:\\Users\\PlumTech\\OneDrive\\Desktop\\backend\\edu-vibe-back\\LMS.Domain\\LMS.Domain.csproj": {
-                "projectPath": "C:\\Users\\PlumTech\\OneDrive\\Desktop\\backend\\edu-vibe-back\\LMS.Domain\\LMS.Domain.csproj"
+              "C:\\Users\\Sevinch\\RiderProjects\\edu-vibe-back\\LMS.Domain\\LMS.Domain.csproj": {
+                "projectPath": "C:\\Users\\Sevinch\\RiderProjects\\edu-vibe-back\\LMS.Domain\\LMS.Domain.csproj"
               }
             }
           }
@@ -91,52 +84,31 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
-          "downloadDependencies": [
-            {
-              "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
-            },
-            {
-              "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
-            },
-            {
-              "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
-            }
-          ],
           "frameworkReferences": {
             "Microsoft.NETCore.App": {
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.308/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.314/PortableRuntimeIdentifierGraph.json"
         }
       }
     },
-    "C:\\Users\\PlumTech\\OneDrive\\Desktop\\backend\\edu-vibe-back\\LMS.Domain\\LMS.Domain.csproj": {
+    "C:\\Users\\Sevinch\\RiderProjects\\edu-vibe-back\\LMS.Domain\\LMS.Domain.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\PlumTech\\OneDrive\\Desktop\\backend\\edu-vibe-back\\LMS.Domain\\LMS.Domain.csproj",
+        "projectUniqueName": "C:\\Users\\Sevinch\\RiderProjects\\edu-vibe-back\\LMS.Domain\\LMS.Domain.csproj",
         "projectName": "LMS.Domain",
-        "projectPath": "C:\\Users\\PlumTech\\OneDrive\\Desktop\\backend\\edu-vibe-back\\LMS.Domain\\LMS.Domain.csproj",
-        "packagesPath": "C:\\Users\\PlumTech\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\PlumTech\\OneDrive\\Desktop\\backend\\edu-vibe-back\\LMS.Domain\\obj\\",
+        "projectPath": "C:\\Users\\Sevinch\\RiderProjects\\edu-vibe-back\\LMS.Domain\\LMS.Domain.csproj",
+        "packagesPath": "C:\\Users\\Sevinch\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\Sevinch\\RiderProjects\\edu-vibe-back\\LMS.Domain\\obj\\",
         "projectStyle": "PackageReference",
-        "fallbackFolders": [
-          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
-        ],
         "configFilePaths": [
-          "C:\\Users\\PlumTech\\AppData\\Roaming\\NuGet\\NuGet.Config",
-          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
-          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+          "C:\\Users\\Sevinch\\AppData\\Roaming\\NuGet\\NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net8.0"
         ],
         "sources": {
-          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
-          "C:\\Program Files\\dotnet\\library-packs": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
@@ -171,26 +143,12 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
-          "downloadDependencies": [
-            {
-              "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
-            },
-            {
-              "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
-            },
-            {
-              "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
-            }
-          ],
           "frameworkReferences": {
             "Microsoft.NETCore.App": {
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.308/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.314/PortableRuntimeIdentifierGraph.json"
         }
       }
     }
