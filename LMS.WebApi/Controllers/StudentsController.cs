@@ -11,11 +11,22 @@ namespace LMS.WebApi.Controllers;
 [Authorize]
 public sealed class StudentsController(ISender sender) : ControllerBase
 {
+    /// <summary>Lists every student profile.</summary>
     [HttpGet]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<StudentDto>>>> GetAll(CancellationToken ct)
     {
         var r = await sender.Send(new GetStudentsQuery(), ct);
         return Ok(ApiResponse<IReadOnlyCollection<StudentDto>>.Ok(r.Data, r.Message));
+    }
+
+    /// <summary>Returns the student profile linked to the authenticated user.</summary>
+    [HttpGet("me")]
+    public async Task<ActionResult<ApiResponse<StudentDto>>> GetMine(CancellationToken ct)
+    {
+        var r = await sender.Send(new GetMyStudentProfileQuery(), ct);
+        return r.Success
+            ? Ok(ApiResponse<StudentDto>.Ok(r.Data, r.Message))
+            : NotFound(ApiResponse<StudentDto>.Fail(r.Message ?? "Not found"));
     }
 
     [HttpGet("{id:guid}")]

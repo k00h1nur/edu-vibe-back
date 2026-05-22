@@ -18,6 +18,38 @@ public sealed class UsersController(ISender sender) : ControllerBase
         return Ok(ApiResponse<IReadOnlyCollection<UserDto>>.Ok(r.Data, r.Message));
     }
 
+    /// <summary>Returns the currently authenticated user.</summary>
+    [HttpGet("me")]
+    public async Task<ActionResult<ApiResponse<UserDto>>> GetMine(CancellationToken ct)
+    {
+        var r = await sender.Send(new GetMyUserQuery(), ct);
+        return r.Success
+            ? Ok(ApiResponse<UserDto>.Ok(r.Data, r.Message))
+            : Unauthorized(ApiResponse<UserDto>.Fail(r.Message ?? "Unauthorized"));
+    }
+
+    /// <summary>Updates the currently authenticated user's profile.</summary>
+    [HttpPut("me")]
+    public async Task<ActionResult<ApiResponse<UserDto>>> UpdateMine(
+        [FromBody] UpdateMyUserCommand cmd, CancellationToken ct)
+    {
+        var r = await sender.Send(cmd, ct);
+        return r.Success
+            ? Ok(ApiResponse<UserDto>.Ok(r.Data, r.Message))
+            : BadRequest(ApiResponse<UserDto>.Fail(r.Message ?? "Failed"));
+    }
+
+    /// <summary>Lets the authenticated user change their own password.</summary>
+    [HttpPost("me/password")]
+    public async Task<ActionResult<ApiResponse<object>>> ChangeMyPassword(
+        [FromBody] ChangeMyPasswordCommand cmd, CancellationToken ct)
+    {
+        var r = await sender.Send(cmd, ct);
+        return r.Success
+            ? Ok(ApiResponse<object>.Ok(new { }, r.Message))
+            : BadRequest(ApiResponse<object>.Fail(r.Message ?? "Failed"));
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ApiResponse<UserDto>>> GetById(Guid id, CancellationToken ct)
     {

@@ -18,6 +18,16 @@ public sealed class StaffController(ISender sender) : ControllerBase
         return Ok(ApiResponse<IReadOnlyCollection<StaffDto>>.Ok(r.Data, r.Message));
     }
 
+    /// <summary>Returns the staff profile linked to the authenticated user.</summary>
+    [HttpGet("me")]
+    public async Task<ActionResult<ApiResponse<StaffDto>>> GetMine(CancellationToken ct)
+    {
+        var r = await sender.Send(new GetMyStaffProfileQuery(), ct);
+        return r.Success
+            ? Ok(ApiResponse<StaffDto>.Ok(r.Data, r.Message))
+            : NotFound(ApiResponse<StaffDto>.Fail(r.Message ?? "Not found"));
+    }
+
     [HttpPost]
     public async Task<ActionResult<ApiResponse<StaffDto>>> Create([FromBody] CreateStaffCommand cmd,
         CancellationToken ct)

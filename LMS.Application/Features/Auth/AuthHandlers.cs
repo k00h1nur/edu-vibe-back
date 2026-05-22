@@ -33,16 +33,28 @@ public sealed class RegisterUserCommandHandler(
 
         await dbContext.UserRoles.AddAsync(new UserRole(user.Id, role.Id), cancellationToken);
 
+        StudentProfile? studentProfile = null;
+        StaffProfile? staffProfile = null;
+
         if (string.Equals(role.Code, RoleCodes.Student, StringComparison.OrdinalIgnoreCase))
         {
-            if (!await dbContext.StudentProfiles.AnyAsync(x => x.UserId == user.Id, cancellationToken))
-                await dbContext.StudentProfiles.AddAsync(new StudentProfile(user.Id, user), cancellationToken);
+            studentProfile = await dbContext.StudentProfiles
+                .FirstOrDefaultAsync(x => x.UserId == user.Id, cancellationToken);
+            if (studentProfile is null)
+            {
+                studentProfile = new StudentProfile(user.Id, user);
+                await dbContext.StudentProfiles.AddAsync(studentProfile, cancellationToken);
+            }
         }
         else
         {
-            if (!await dbContext.StaffProfiles.AnyAsync(x => x.UserId == user.Id, cancellationToken))
-                await dbContext.StaffProfiles.AddAsync(new StaffProfile(user.Id, EmploymentType.FullTime),
-                    cancellationToken);
+            staffProfile = await dbContext.StaffProfiles
+                .FirstOrDefaultAsync(x => x.UserId == user.Id, cancellationToken);
+            if (staffProfile is null)
+            {
+                staffProfile = new StaffProfile(user.Id, EmploymentType.FullTime);
+                await dbContext.StaffProfiles.AddAsync(staffProfile, cancellationToken);
+            }
         }
 
         var roles = new[] { role.Code };
@@ -50,7 +62,10 @@ public sealed class RegisterUserCommandHandler(
             .Where(rp => rp.RoleId == role.Id)
             .Join(dbContext.Permissions, rp => rp.PermissionId, p => p.Id, (rp, p) => p.Code)
             .ToArrayAsync(cancellationToken);
-        var accessToken = jwtTokenGenerator.Generate(user.Id, user.Email, roles, permissions);
+        var accessToken = jwtTokenGenerator.Generate(
+            user.Id, user.Email, roles, permissions,
+            studentProfileId: studentProfile?.Id,
+            staffProfileId: staffProfile?.Id);
         var refreshToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
         var refreshHash = passwordHasher.Hash(refreshToken);
 
@@ -87,7 +102,19 @@ public sealed class LoginCommandHandler(
             .Distinct()
             .ToArrayAsync(cancellationToken);
 
-        var accessToken = jwtTokenGenerator.Generate(user.Id, user.Email, roles, permissions);
+        var studentProfileId = await dbContext.StudentProfiles
+            .Where(x => x.UserId == user.Id)
+            .Select(x => (Guid?)x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        var staffProfileId = await dbContext.StaffProfiles
+            .Where(x => x.UserId == user.Id)
+            .Select(x => (Guid?)x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var accessToken = jwtTokenGenerator.Generate(
+            user.Id, user.Email, roles, permissions,
+            studentProfileId: studentProfileId,
+            staffProfileId: staffProfileId);
         var refreshToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
         var refreshHash = passwordHasher.Hash(refreshToken);
         user.SetRefreshToken(refreshHash, dateTimeProvider.UtcNow.AddDays(30));
@@ -124,7 +151,20 @@ public sealed class RefreshTokenCommandHandler(
             .Join(dbContext.Permissions, pid => pid, p => p.Id, (pid, p) => p.Code)
             .Distinct()
             .ToArrayAsync(cancellationToken);
-        var accessToken = jwtTokenGenerator.Generate(user.Id, user.Email, roles, permissions);
+
+        var studentProfileId = await dbContext.StudentProfiles
+            .Where(x => x.UserId == user.Id)
+            .Select(x => (Guid?)x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        var staffProfileId = await dbContext.StaffProfiles
+            .Where(x => x.UserId == user.Id)
+            .Select(x => (Guid?)x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var accessToken = jwtTokenGenerator.Generate(
+            user.Id, user.Email, roles, permissions,
+            studentProfileId: studentProfileId,
+            staffProfileId: staffProfileId);
 
         var newRefreshToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
         user.SetRefreshToken(passwordHasher.Hash(newRefreshToken), dateTimeProvider.UtcNow.AddDays(30));

@@ -95,3 +95,72 @@ public sealed class DeactivateUserCommandHandler(IApplicationDbContext db)
         return Result.Ok("User deactivated.");
     }
 }
+
+public sealed class GetMyUserQueryHandler(IApplicationDbContext db, ICurrentUserService currentUser)
+    : IRequestHandler<GetMyUserQuery, Result<UserDto>>
+{
+    public async Task<Result<UserDto>> Handle(GetMyUserQuery request, CancellationToken cancellationToken)
+    {
+        if (currentUser.UserId is null)
+            return Result<UserDto>.Fail("UNAUTHENTICATED", "No authenticated user.");
+
+        var user = await db.Users.FirstOrDefaultAsync(x => x.Id == currentUser.UserId, cancellationToken);
+        if (user is null) return Result<UserDto>.Fail("NOT_FOUND", "User not found.");
+
+        var roles = await db.UserRoles.Where(ur => ur.UserId == user.Id)
+            .Join(db.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => r.Code)
+            .ToListAsync(cancellationToken);
+        return Result<UserDto>.Ok(new UserDto(user.Id, user.Email, user.Status, roles));
+    }
+}
+
+public sealed class UpdateMyUserCommandHandler(IApplicationDbContext db, ICurrentUserService currentUser)
+    : IRequestHandler<UpdateMyUserCommand, Result<UserDto>>
+{
+    public async Task<Result<UserDto>> Handle(UpdateMyUserCommand request, CancellationToken cancellationToken)
+    {
+        if (currentUser.UserId is null)
+            return Result<UserDto>.Fail("UNAUTHENTICATED", "No authenticated user.");
+
+        var user = await db.Users.FirstOrDefaultAsync(x => x.Id == currentUser.UserId, cancellationToken);
+        if (user is null) return Result<UserDto>.Fail("NOT_FOUND", "User not found.");
+
+        var newEmail = request.Email.Trim().ToLowerInvariant();
+        if (newEmail != user.Email &&
+            await db.Users.AnyAsync(x => x.Email == newEmail && x.Id != user.Id, cancellationToken))
+            return Result<UserDto>.Fail("EMAIL_EXISTS", "Email already in use.");
+
+        typeof(User).GetProperty(nameof(User.Email))!.SetValue(user, newEmail);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var roles = await db.UserRoles.Where(ur => ur.UserId == user.Id)
+            .Join(db.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => r.Code)
+            .ToListAsync(cancellationToken);
+        return Result<UserDto>.Ok(new UserDto(user.Id, user.Email, user.Status, roles));
+    }
+}
+
+public sealed class ChangeMyPasswordCommandHandler(
+    IApplicationDbContext db,
+    ICurrentUserService currentUser,
+    IPasswordHasher hasher)
+    : IRequestHandler<ChangeMyPasswordCommand, Result>
+{
+    public async Task<Result> Handle(ChangeMyPasswordCommand request, CancellationToken cancellationToken)
+    {
+        if (currentUser.UserId is null)
+            return Result.Fail("UNAUTHENTICATED", "No authenticated user.");
+
+        var user = await db.Users.FirstOrDefaultAsync(x => x.Id == currentUser.UserId, cancellationToken);
+        if (user is null) return Result.Fail("NOT_FOUND", "User not found.");
+
+        if (!hasher.Verify(request.CurrentPassword, user.PasswordHash))
+            return Result.Fail("INVALID_CREDENTIALS", "Current password is incorrect.");
+
+        user.SetPasswordHash(hasher.Hash(request.NewPassword));
+        // Invalidate refresh tokens after a password change.
+        user.ClearRefreshToken();
+        await db.SaveChangesAsync(cancellationToken);
+        return Result.Ok("Password updated.");
+    }
+}

@@ -1,4 +1,5 @@
 using LMS.Application.Features.Assignments;
+using LMS.Domain.Enums;
 using LMS.WebApi.Common;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -11,6 +12,18 @@ namespace LMS.WebApi.Controllers;
 [Authorize]
 public sealed class AssignmentsController(ISender sender) : ControllerBase
 {
+    /// <summary>Lists assignments, optionally filtered by teacher, class, or status.</summary>
+    [HttpGet]
+    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<AssignmentDto>>>> GetAll(
+        [FromQuery] Guid? teacherUserId,
+        [FromQuery] Guid? classId,
+        [FromQuery] AssignmentStatus? status,
+        CancellationToken ct)
+    {
+        var r = await sender.Send(new GetAssignmentsQuery(teacherUserId, classId, status), ct);
+        return Ok(ApiResponse<IReadOnlyCollection<AssignmentDto>>.Ok(r.Data, r.Message));
+    }
+
     [HttpGet("class/{classId:guid}")]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<AssignmentDto>>>> Class(Guid classId,
         CancellationToken ct)

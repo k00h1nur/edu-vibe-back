@@ -22,3 +22,8 @@ public sealed record GetConversationMessagesQuery(Guid ConversationId)
     : IRequest<Result<IReadOnlyCollection<MessageDto>>>;
 
 public sealed record MarkMessageAsReadCommand(Guid MessageId) : IRequest<Result<MessageDto>>;
+
+/// <summary>
+/// Count of unread messages addressed to the given user across all conversations they participate in.
+/// </summary>
+public sealed record GetUnreadMessageCountQuery(Guid UserId) : IRequest<Result<int>>;

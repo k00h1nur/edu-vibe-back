@@ -26,6 +26,15 @@ public sealed class ClassSessionsController(ISender sender) : ControllerBase
         return Ok(ApiResponse<IReadOnlyCollection<SessionDto>>.Ok(r.Data, r.Message));
     }
 
+    /// <summary>Upcoming sessions (today onwards) for a user, capped by <paramref name="take"/>.</summary>
+    [HttpGet("upcoming/{userId:guid}")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<SessionDto>>>> Upcoming(
+        Guid userId, [FromQuery] int take = 20, CancellationToken ct = default)
+    {
+        var r = await sender.Send(new GetUpcomingSessionsQuery(userId, take), ct);
+        return Ok(ApiResponse<IReadOnlyCollection<SessionDto>>.Ok(r.Data, r.Message));
+    }
+
     [HttpPost]
     public async Task<ActionResult<ApiResponse<SessionDto>>> Create([FromBody] CreateClassSessionCommand cmd,
         CancellationToken ct)
