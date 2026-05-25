@@ -175,11 +175,32 @@ public sealed class RefreshTokenCommandHandler(
     }
 }
 
-public sealed class AssignRoleCommandHandler(IApplicationDbContext dbContext)
+public sealed class AssignRoleCommandHandler(IApplicationDbContext dbContext, ICurrentUserService currentUser)
     : IRequestHandler<AssignRoleCommand, Result>
 {
     public async Task<Result> Handle(AssignRoleCommand request, CancellationToken cancellationToken)
     {
+        // Anti-privilege-escalation guards. The controller already gates on
+        // Auth.AssignRole permission; these are defence-in-depth.
+        if (currentUser.UserId is null)
+            return Result.Fail("UNAUTHENTICATED", "Caller must be authenticated.");
+
+        if (request.UserId == currentUser.UserId.Value)
+            return Result.Fail("SELF_ROLE_CHANGE_FORBIDDEN", "You cannot modify your own roles.");
+
+        // Only a SuperAdmin can promote another user to SuperAdmin.
+        if (string.Equals(request.RoleCode, RoleCodes.SuperAdmin, StringComparison.OrdinalIgnoreCase)
+            && !currentUser.IsInRole(RoleCodes.SuperAdmin))
+            return Result.Fail("INSUFFICIENT_PRIVILEGES",
+                "Only a SuperAdmin may grant the SuperAdmin role.");
+
+        // Only Admin/SuperAdmin can grant Admin.
+        if (string.Equals(request.RoleCode, RoleCodes.Admin, StringComparison.OrdinalIgnoreCase)
+            && !currentUser.IsInRole(RoleCodes.SuperAdmin)
+            && !currentUser.IsInRole(RoleCodes.Admin))
+            return Result.Fail("INSUFFICIENT_PRIVILEGES",
+                "Only an Admin or SuperAdmin may grant the Admin role.");
+
         var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == request.UserId, cancellationToken);
         if (user is null) return Result.Fail("USER_NOT_FOUND", "User not found.");
 

@@ -1,6 +1,8 @@
+using LMS.Application.Common.Security;
 using LMS.Application.Features.Attendance;
 using LMS.Domain.Enums;
 using LMS.WebApi.Common;
+using LMS.WebApi.Security;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,6 +16,7 @@ public sealed class AttendanceController(ISender sender) : ControllerBase
 {
     /// <summary>Lists attendance records, optionally filtered. Powers the admin attendance view.</summary>
     [HttpGet]
+    [PermissionAuthorize(Permissions.Attendance.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<AttendanceDto>>>> GetAll(
         [FromQuery] Guid? classId,
         [FromQuery] Guid? sessionId,
@@ -26,6 +29,7 @@ public sealed class AttendanceController(ISender sender) : ControllerBase
     }
 
     [HttpGet("session/{sessionId:guid}")]
+    [PermissionAuthorize(Permissions.Attendance.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<AttendanceDto>>>> Session(Guid sessionId,
         CancellationToken ct)
     {
@@ -34,6 +38,7 @@ public sealed class AttendanceController(ISender sender) : ControllerBase
     }
 
     [HttpGet("student/{studentProfileId:guid}")]
+    [PermissionAuthorize(Permissions.Attendance.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<AttendanceDto>>>> Student(Guid studentProfileId,
         CancellationToken ct)
     {
@@ -42,6 +47,7 @@ public sealed class AttendanceController(ISender sender) : ControllerBase
     }
 
     [HttpPost]
+    [PermissionAuthorize(Permissions.Attendance.Mark)]
     public async Task<ActionResult<ApiResponse<AttendanceDto>>> Mark([FromBody] MarkAttendanceCommand cmd,
         CancellationToken ct)
     {
@@ -52,6 +58,7 @@ public sealed class AttendanceController(ISender sender) : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [PermissionAuthorize(Permissions.Attendance.Update)]
     public async Task<ActionResult<ApiResponse<AttendanceDto>>> Update(Guid id, [FromBody] UpdateAttendanceCommand cmd,
         CancellationToken ct)
     {

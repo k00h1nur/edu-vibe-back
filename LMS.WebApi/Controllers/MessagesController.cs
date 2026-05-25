@@ -1,5 +1,7 @@
+using LMS.Application.Common.Security;
 using LMS.Application.Features.Messages;
 using LMS.WebApi.Common;
+using LMS.WebApi.Security;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,6 +14,7 @@ namespace LMS.WebApi.Controllers;
 public sealed class MessagesController(ISender sender) : ControllerBase
 {
     [HttpGet("conversation/{conversationId:guid}")]
+    [PermissionAuthorize(Permissions.Messages.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<MessageDto>>>> Conversation(Guid conversationId,
         CancellationToken ct)
     {
@@ -20,6 +23,7 @@ public sealed class MessagesController(ISender sender) : ControllerBase
     }
 
     [HttpPost]
+    [PermissionAuthorize(Permissions.Messages.Send)]
     public async Task<ActionResult<ApiResponse<MessageDto>>> Send([FromBody] SendMessageCommand cmd,
         CancellationToken ct)
     {
@@ -30,6 +34,7 @@ public sealed class MessagesController(ISender sender) : ControllerBase
     }
 
     [HttpPost("{id:guid}/read")]
+    [PermissionAuthorize(Permissions.Messages.Read)]
     public async Task<ActionResult<ApiResponse<MessageDto>>> Read(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new MarkMessageAsReadCommand(id), ct);

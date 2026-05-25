@@ -1,5 +1,7 @@
+using LMS.Application.Common.Security;
 using LMS.Application.Features.Xp;
 using LMS.WebApi.Common;
+using LMS.WebApi.Security;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,6 +14,7 @@ namespace LMS.WebApi.Controllers;
 public sealed class XpController(ISender sender) : ControllerBase
 {
     [HttpGet("student/{studentProfileId:guid}/ledger")]
+    [PermissionAuthorize(Permissions.Xp.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<XpLedgerDto>>>> Ledger(Guid studentProfileId,
         CancellationToken ct)
     {
@@ -20,6 +23,7 @@ public sealed class XpController(ISender sender) : ControllerBase
     }
 
     [HttpGet("leaderboard")]
+    [PermissionAuthorize(Permissions.Xp.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<LeaderboardDto>>>> Leaderboard(
         [FromQuery] int top = 10, CancellationToken ct = default)
     {
@@ -28,6 +32,7 @@ public sealed class XpController(ISender sender) : ControllerBase
     }
 
     [HttpPost("manual")]
+    [PermissionAuthorize(Permissions.Xp.Grant)]
     public async Task<ActionResult<ApiResponse<object>>> Manual([FromBody] AddManualXpCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);

@@ -1,5 +1,7 @@
+using LMS.Application.Common.Security;
 using LMS.Application.Features.Auth;
 using LMS.WebApi.Common;
+using LMS.WebApi.Security;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -52,8 +54,12 @@ public sealed class AuthController(ISender sender) : ControllerBase
         return Ok(ApiResponse<AuthTokensResponse>.Ok(result.Data, "Token refreshed"));
     }
 
+    /// <summary>
+    /// Grants a role to a user. The handler enforces additional rules: only a
+    /// SuperAdmin may grant SuperAdmin, and you can't change your own roles.
+    /// </summary>
     [HttpPost("assign-role")]
-    [Authorize(Policy = "RequireAcademyDirector")]
+    [PermissionAuthorize(Permissions.Auth.AssignRole)]
     public async Task<ActionResult<ApiResponse<object>>> AssignRole([FromBody] AssignRoleCommand command,
         CancellationToken cancellationToken)
     {

@@ -1,5 +1,7 @@
+using LMS.Application.Common.Security;
 using LMS.Application.Features.Staff;
 using LMS.WebApi.Common;
+using LMS.WebApi.Security;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,13 +14,14 @@ namespace LMS.WebApi.Controllers;
 public sealed class StaffController(ISender sender) : ControllerBase
 {
     [HttpGet]
+    [PermissionAuthorize(Permissions.Staff.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<StaffDto>>>> GetAll(CancellationToken ct)
     {
         var r = await sender.Send(new GetStaffQuery(), ct);
         return Ok(ApiResponse<IReadOnlyCollection<StaffDto>>.Ok(r.Data, r.Message));
     }
 
-    /// <summary>Returns the staff profile linked to the authenticated user.</summary>
+    /// <summary>Returns the staff profile linked to the authenticated user. No extra permission required.</summary>
     [HttpGet("me")]
     public async Task<ActionResult<ApiResponse<StaffDto>>> GetMine(CancellationToken ct)
     {
@@ -29,6 +32,7 @@ public sealed class StaffController(ISender sender) : ControllerBase
     }
 
     [HttpPost]
+    [PermissionAuthorize(Permissions.Staff.Create)]
     public async Task<ActionResult<ApiResponse<StaffDto>>> Create([FromBody] CreateStaffCommand cmd,
         CancellationToken ct)
     {
@@ -39,6 +43,7 @@ public sealed class StaffController(ISender sender) : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [PermissionAuthorize(Permissions.Staff.Update)]
     public async Task<ActionResult<ApiResponse<StaffDto>>> Update(Guid id, [FromBody] UpdateStaffProfileCommand cmd,
         CancellationToken ct)
     {

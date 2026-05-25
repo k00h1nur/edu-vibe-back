@@ -1,5 +1,7 @@
+using LMS.Application.Common.Security;
 using LMS.Application.Features.Courses;
 using LMS.WebApi.Common;
+using LMS.WebApi.Security;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,6 +14,7 @@ namespace LMS.WebApi.Controllers;
 public sealed class CoursesController(ISender sender) : ControllerBase
 {
     [HttpGet]
+    [PermissionAuthorize(Permissions.Courses.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<CourseDto>>>> GetAll(CancellationToken ct)
     {
         var r = await sender.Send(new GetCoursesQuery(), ct);
@@ -19,6 +22,7 @@ public sealed class CoursesController(ISender sender) : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [PermissionAuthorize(Permissions.Courses.Read)]
     public async Task<ActionResult<ApiResponse<CourseDto>>> Get(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new GetCourseByIdQuery(id), ct);
@@ -28,6 +32,7 @@ public sealed class CoursesController(ISender sender) : ControllerBase
     }
 
     [HttpPost]
+    [PermissionAuthorize(Permissions.Courses.Manage)]
     public async Task<ActionResult<ApiResponse<CourseDto>>> Create([FromBody] CreateCourseCommand cmd,
         CancellationToken ct)
     {
@@ -38,6 +43,7 @@ public sealed class CoursesController(ISender sender) : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [PermissionAuthorize(Permissions.Courses.Manage)]
     public async Task<ActionResult<ApiResponse<CourseDto>>> Update(Guid id, [FromBody] UpdateCourseCommand cmd,
         CancellationToken ct)
     {
@@ -48,6 +54,7 @@ public sealed class CoursesController(ISender sender) : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [PermissionAuthorize(Permissions.Courses.Manage)]
     public async Task<ActionResult<ApiResponse<object>>> Delete(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new DeleteCourseCommand(id), ct);

@@ -1,5 +1,7 @@
+using LMS.Application.Common.Security;
 using LMS.Application.Features.Classes;
 using LMS.WebApi.Common;
+using LMS.WebApi.Security;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,6 +14,7 @@ namespace LMS.WebApi.Controllers;
 public sealed class ClassesController(ISender sender) : ControllerBase
 {
     [HttpGet]
+    [PermissionAuthorize(Permissions.Classes.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<ClassDto>>>> GetAll(CancellationToken ct)
     {
         var r = await sender.Send(new GetClassesQuery(), ct);
@@ -19,6 +22,7 @@ public sealed class ClassesController(ISender sender) : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [PermissionAuthorize(Permissions.Classes.Read)]
     public async Task<ActionResult<ApiResponse<ClassDto>>> Get(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new GetClassByIdQuery(id), ct);
@@ -28,6 +32,7 @@ public sealed class ClassesController(ISender sender) : ControllerBase
     }
 
     [HttpGet("assigned/{teacherUserId:guid}")]
+    [PermissionAuthorize(Permissions.Classes.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<ClassDto>>>> Assigned(Guid teacherUserId,
         CancellationToken ct)
     {
@@ -36,6 +41,7 @@ public sealed class ClassesController(ISender sender) : ControllerBase
     }
 
     [HttpGet("{id:guid}/students")]
+    [PermissionAuthorize(Permissions.Classes.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<Guid>>>> Students(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new GetClassStudentsQuery(id), ct);
@@ -43,6 +49,7 @@ public sealed class ClassesController(ISender sender) : ControllerBase
     }
 
     [HttpPost]
+    [PermissionAuthorize(Permissions.Classes.Create)]
     public async Task<ActionResult<ApiResponse<ClassDto>>> Create([FromBody] CreateClassCommand cmd,
         CancellationToken ct)
     {
@@ -53,6 +60,7 @@ public sealed class ClassesController(ISender sender) : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
     public async Task<ActionResult<ApiResponse<ClassDto>>> Update(Guid id, [FromBody] UpdateClassCommand cmd,
         CancellationToken ct)
     {
@@ -63,6 +71,7 @@ public sealed class ClassesController(ISender sender) : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [PermissionAuthorize(Permissions.Classes.Delete)]
     public async Task<ActionResult<ApiResponse<object>>> Cancel(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new CancelClassCommand(id), ct);
@@ -72,6 +81,7 @@ public sealed class ClassesController(ISender sender) : ControllerBase
     }
 
     [HttpPost("{id:guid}/enroll/{studentProfileId:guid}")]
+    [PermissionAuthorize(Permissions.Classes.Enroll)]
     public async Task<ActionResult<ApiResponse<object>>> Enroll(Guid id, Guid studentProfileId, CancellationToken ct)
     {
         var r = await sender.Send(new EnrollStudentCommand(id, studentProfileId), ct);
@@ -81,6 +91,7 @@ public sealed class ClassesController(ISender sender) : ControllerBase
     }
 
     [HttpDelete("{id:guid}/enroll/{studentProfileId:guid}")]
+    [PermissionAuthorize(Permissions.Classes.Enroll)]
     public async Task<ActionResult<ApiResponse<object>>> Drop(Guid id, Guid studentProfileId, CancellationToken ct)
     {
         var r = await sender.Send(new RemoveStudentFromClassCommand(id, studentProfileId), ct);

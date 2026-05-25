@@ -1,5 +1,7 @@
+using LMS.Application.Common.Security;
 using LMS.Application.Features.Students;
 using LMS.WebApi.Common;
+using LMS.WebApi.Security;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,15 +13,16 @@ namespace LMS.WebApi.Controllers;
 [Authorize]
 public sealed class StudentsController(ISender sender) : ControllerBase
 {
-    /// <summary>Lists every student profile.</summary>
+    /// <summary>Lists every student profile. Admin/teacher only.</summary>
     [HttpGet]
+    [PermissionAuthorize(Permissions.Students.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<StudentDto>>>> GetAll(CancellationToken ct)
     {
         var r = await sender.Send(new GetStudentsQuery(), ct);
         return Ok(ApiResponse<IReadOnlyCollection<StudentDto>>.Ok(r.Data, r.Message));
     }
 
-    /// <summary>Returns the student profile linked to the authenticated user.</summary>
+    /// <summary>Returns the student profile linked to the authenticated user. No extra permission required.</summary>
     [HttpGet("me")]
     public async Task<ActionResult<ApiResponse<StudentDto>>> GetMine(CancellationToken ct)
     {
@@ -30,6 +33,7 @@ public sealed class StudentsController(ISender sender) : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [PermissionAuthorize(Permissions.Students.Read)]
     public async Task<ActionResult<ApiResponse<StudentDto>>> Get(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new GetStudentDetailQuery(id), ct);
@@ -39,6 +43,7 @@ public sealed class StudentsController(ISender sender) : ControllerBase
     }
 
     [HttpPost]
+    [PermissionAuthorize(Permissions.Students.Create)]
     public async Task<ActionResult<ApiResponse<StudentDto>>> Register([FromBody] RegisterStudentCommand cmd,
         CancellationToken ct)
     {
@@ -49,6 +54,7 @@ public sealed class StudentsController(ISender sender) : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [PermissionAuthorize(Permissions.Students.Update)]
     public async Task<ActionResult<ApiResponse<StudentDto>>> Update(Guid id, [FromBody] UpdateStudentProfileCommand cmd,
         CancellationToken ct)
     {

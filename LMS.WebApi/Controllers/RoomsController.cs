@@ -1,5 +1,7 @@
+using LMS.Application.Common.Security;
 using LMS.Application.Features.Rooms;
 using LMS.WebApi.Common;
+using LMS.WebApi.Security;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,6 +14,7 @@ namespace LMS.WebApi.Controllers;
 public sealed class RoomsController(ISender sender) : ControllerBase
 {
     [HttpGet]
+    [PermissionAuthorize(Permissions.Rooms.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<RoomDto>>>> GetAll(CancellationToken ct)
     {
         var r = await sender.Send(new GetRoomsQuery(), ct);
@@ -19,6 +22,7 @@ public sealed class RoomsController(ISender sender) : ControllerBase
     }
 
     [HttpPost]
+    [PermissionAuthorize(Permissions.Rooms.Manage)]
     public async Task<ActionResult<ApiResponse<RoomDto>>> Create([FromBody] CreateRoomCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
@@ -28,6 +32,7 @@ public sealed class RoomsController(ISender sender) : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [PermissionAuthorize(Permissions.Rooms.Manage)]
     public async Task<ActionResult<ApiResponse<RoomDto>>> Update(Guid id, [FromBody] UpdateRoomCommand cmd,
         CancellationToken ct)
     {
@@ -38,6 +43,7 @@ public sealed class RoomsController(ISender sender) : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [PermissionAuthorize(Permissions.Rooms.Manage)]
     public async Task<ActionResult<ApiResponse<object>>> Delete(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new DeleteRoomCommand(id), ct);

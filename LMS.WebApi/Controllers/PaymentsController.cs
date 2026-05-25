@@ -1,5 +1,7 @@
+using LMS.Application.Common.Security;
 using LMS.Application.Features.Payments;
 using LMS.WebApi.Common;
+using LMS.WebApi.Security;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,6 +14,7 @@ namespace LMS.WebApi.Controllers;
 public sealed class PaymentsController(ISender sender) : ControllerBase
 {
     [HttpGet]
+    [PermissionAuthorize(Permissions.Payments.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<PaymentDto>>>> All(CancellationToken ct)
     {
         var r = await sender.Send(new GetPaymentsQuery(), ct);
@@ -19,6 +22,7 @@ public sealed class PaymentsController(ISender sender) : ControllerBase
     }
 
     [HttpGet("student/{studentProfileId:guid}")]
+    [PermissionAuthorize(Permissions.Payments.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<PaymentDto>>>> Student(Guid studentProfileId,
         CancellationToken ct)
     {
@@ -27,6 +31,7 @@ public sealed class PaymentsController(ISender sender) : ControllerBase
     }
 
     [HttpGet("revenue")]
+    [PermissionAuthorize(Permissions.Payments.Read)]
     public async Task<ActionResult<ApiResponse<decimal>>> Revenue(CancellationToken ct)
     {
         var r = await sender.Send(new GetRevenueSummaryQuery(), ct);
@@ -34,6 +39,7 @@ public sealed class PaymentsController(ISender sender) : ControllerBase
     }
 
     [HttpPost]
+    [PermissionAuthorize(Permissions.Payments.Create)]
     public async Task<ActionResult<ApiResponse<PaymentDto>>> Create([FromBody] CreatePaymentCommand cmd,
         CancellationToken ct)
     {
@@ -44,6 +50,7 @@ public sealed class PaymentsController(ISender sender) : ControllerBase
     }
 
     [HttpPost("{id:guid}/paid")]
+    [PermissionAuthorize(Permissions.Payments.Update)]
     public async Task<ActionResult<ApiResponse<PaymentDto>>> Paid(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new MarkPaymentPaidCommand(id), ct);
@@ -53,6 +60,7 @@ public sealed class PaymentsController(ISender sender) : ControllerBase
     }
 
     [HttpPost("{id:guid}/failed")]
+    [PermissionAuthorize(Permissions.Payments.Update)]
     public async Task<ActionResult<ApiResponse<PaymentDto>>> Failed(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new MarkPaymentFailedCommand(id), ct);

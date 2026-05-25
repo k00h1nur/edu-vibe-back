@@ -1,5 +1,7 @@
+using LMS.Application.Common.Security;
 using LMS.Application.Features.Sessions;
 using LMS.WebApi.Common;
+using LMS.WebApi.Security;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,6 +14,7 @@ namespace LMS.WebApi.Controllers;
 public sealed class ClassSessionsController(ISender sender) : ControllerBase
 {
     [HttpGet("class/{classId:guid}")]
+    [PermissionAuthorize(Permissions.Sessions.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<SessionDto>>>> ByClass(Guid classId,
         CancellationToken ct)
     {
@@ -19,6 +22,7 @@ public sealed class ClassSessionsController(ISender sender) : ControllerBase
         return Ok(ApiResponse<IReadOnlyCollection<SessionDto>>.Ok(r.Data, r.Message));
     }
 
+    /// <summary>The caller's own schedule. No extra permission — implicitly scoped to the route's userId.</summary>
     [HttpGet("my/{userId:guid}")]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<SessionDto>>>> My(Guid userId, CancellationToken ct)
     {
@@ -36,6 +40,7 @@ public sealed class ClassSessionsController(ISender sender) : ControllerBase
     }
 
     [HttpPost]
+    [PermissionAuthorize(Permissions.Sessions.Create)]
     public async Task<ActionResult<ApiResponse<SessionDto>>> Create([FromBody] CreateClassSessionCommand cmd,
         CancellationToken ct)
     {
@@ -46,6 +51,7 @@ public sealed class ClassSessionsController(ISender sender) : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [PermissionAuthorize(Permissions.Sessions.Update)]
     public async Task<ActionResult<ApiResponse<SessionDto>>> Update(Guid id, [FromBody] UpdateClassSessionCommand cmd,
         CancellationToken ct)
     {
@@ -56,6 +62,7 @@ public sealed class ClassSessionsController(ISender sender) : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [PermissionAuthorize(Permissions.Sessions.Delete)]
     public async Task<ActionResult<ApiResponse<object>>> Delete(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new CancelClassSessionCommand(id), ct);

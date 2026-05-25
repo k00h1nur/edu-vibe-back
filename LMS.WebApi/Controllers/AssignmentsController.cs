@@ -1,6 +1,8 @@
+using LMS.Application.Common.Security;
 using LMS.Application.Features.Assignments;
 using LMS.Domain.Enums;
 using LMS.WebApi.Common;
+using LMS.WebApi.Security;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,6 +16,7 @@ public sealed class AssignmentsController(ISender sender) : ControllerBase
 {
     /// <summary>Lists assignments, optionally filtered by teacher, class, or status.</summary>
     [HttpGet]
+    [PermissionAuthorize(Permissions.Assignments.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<AssignmentDto>>>> GetAll(
         [FromQuery] Guid? teacherUserId,
         [FromQuery] Guid? classId,
@@ -25,6 +28,7 @@ public sealed class AssignmentsController(ISender sender) : ControllerBase
     }
 
     [HttpGet("class/{classId:guid}")]
+    [PermissionAuthorize(Permissions.Assignments.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<AssignmentDto>>>> Class(Guid classId,
         CancellationToken ct)
     {
@@ -33,6 +37,7 @@ public sealed class AssignmentsController(ISender sender) : ControllerBase
     }
 
     [HttpGet("student/{studentProfileId:guid}")]
+    [PermissionAuthorize(Permissions.Assignments.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<AssignmentDto>>>> Student(Guid studentProfileId,
         CancellationToken ct)
     {
@@ -41,6 +46,7 @@ public sealed class AssignmentsController(ISender sender) : ControllerBase
     }
 
     [HttpPost]
+    [PermissionAuthorize(Permissions.Assignments.Create)]
     public async Task<ActionResult<ApiResponse<AssignmentDto>>> Create([FromBody] CreateAssignmentCommand cmd,
         CancellationToken ct)
     {
@@ -51,6 +57,7 @@ public sealed class AssignmentsController(ISender sender) : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [PermissionAuthorize(Permissions.Assignments.Update)]
     public async Task<ActionResult<ApiResponse<AssignmentDto>>> Update(Guid id, [FromBody] UpdateAssignmentCommand cmd,
         CancellationToken ct)
     {
@@ -61,6 +68,7 @@ public sealed class AssignmentsController(ISender sender) : ControllerBase
     }
 
     [HttpPost("{id:guid}/publish")]
+    [PermissionAuthorize(Permissions.Assignments.Publish)]
     public async Task<ActionResult<ApiResponse<AssignmentDto>>> Publish(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new PublishAssignmentCommand(id), ct);
@@ -70,6 +78,7 @@ public sealed class AssignmentsController(ISender sender) : ControllerBase
     }
 
     [HttpPost("{id:guid}/close")]
+    [PermissionAuthorize(Permissions.Assignments.Close)]
     public async Task<ActionResult<ApiResponse<AssignmentDto>>> Close(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new CloseAssignmentCommand(id), ct);
