@@ -32,4 +32,11 @@ public sealed class Payment : BaseEntity
         Status = PaymentStatus.Paid;
         Touch();
     }
+
+    public void MarkFailed()
+    {
+        if (Status == PaymentStatus.Failed) return;
+        Status = PaymentStatus.Failed;
+        Touch();
+    }
 }

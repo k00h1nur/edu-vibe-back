@@ -34,6 +34,13 @@ public sealed class Assignment : BaseEntity
 
     public ICollection<Submission> Submissions { get; } = new List<Submission>();
 
+    public void UpdateTitle(string title)
+    {
+        if (string.IsNullOrWhiteSpace(title)) throw new DomainException("Assignment title is required.");
+        Title = title.Trim();
+        Touch();
+    }
+
     public void Publish()
     {
         if (Status != AssignmentStatus.Draft) throw new DomainException("Only draft assignment can be published.");

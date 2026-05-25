@@ -20,4 +20,14 @@ public sealed class Permission : BaseEntity
     public bool IsSystem { get; private set; } = true;
 
     public ICollection<RolePermission> RolePermissions { get; } = new List<RolePermission>();
+
+    public void Update(string code, string module, string? description)
+    {
+        if (string.IsNullOrWhiteSpace(code)) throw new DomainException("Permission code is required.");
+        if (string.IsNullOrWhiteSpace(module)) throw new DomainException("Permission module is required.");
+        Code = code.Trim();
+        Module = module.Trim();
+        Description = description?.Trim();
+        Touch();
+    }
 }

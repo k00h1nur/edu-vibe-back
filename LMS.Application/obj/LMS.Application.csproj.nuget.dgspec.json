@@ -52,14 +52,6 @@
               "target": "Package",
               "version": "[11.9.0, )"
             },
-            "Mapster": {
-              "target": "Package",
-              "version": "[7.4.0, )"
-            },
-            "Mapster.DependencyInjection": {
-              "target": "Package",
-              "version": "[1.0.1, )"
-            },
             "MediatR": {
               "target": "Package",
               "version": "[12.2.0, )"

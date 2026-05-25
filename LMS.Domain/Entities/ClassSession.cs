@@ -23,4 +23,14 @@ public sealed class ClassSession : BaseEntity
     public TimeOnly EndsAt { get; private set; }
     public Guid? RoomId { get; private set; }
     public Room? Room { get; private set; }
+
+    public void Reschedule(DateOnly sessionDate, TimeOnly startsAt, TimeOnly endsAt, Guid? roomId)
+    {
+        if (startsAt >= endsAt) throw new DomainException("StartsAt must be before EndsAt.");
+        SessionDate = sessionDate;
+        StartsAt = startsAt;
+        EndsAt = endsAt;
+        RoomId = roomId;
+        Touch();
+    }
 }

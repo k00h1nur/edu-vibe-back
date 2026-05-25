@@ -69,7 +69,7 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db) :
     {
         var a = await db.Assignments.FirstOrDefaultAsync(x => x.Id == request.AssignmentId, cancellationToken);
         if (a is null) return Result<AssignmentDto>.Fail("NOT_FOUND", "Assignment not found.");
-        typeof(Assignment).GetProperty(nameof(Assignment.Title))!.SetValue(a, request.Title.Trim());
+        a.UpdateTitle(request.Title);
         await db.SaveChangesAsync(cancellationToken);
         return Result<AssignmentDto>.Ok(Map(a));
     }

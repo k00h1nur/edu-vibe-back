@@ -16,4 +16,10 @@ public sealed class StaffProfile : BaseEntity
     public Guid UserId { get; private set; }
     public User? User { get; private set; }
     public EmploymentType EmploymentType { get; private set; }
+
+    public void SetEmploymentType(EmploymentType employmentType)
+    {
+        EmploymentType = employmentType;
+        Touch();
+    }
 }

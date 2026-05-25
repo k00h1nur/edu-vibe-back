@@ -42,9 +42,7 @@ public sealed class RoomsHandlers(IApplicationDbContext db) :
     {
         var r = await db.Rooms.FirstOrDefaultAsync(x => x.Id == request.RoomId, cancellationToken);
         if (r is null) return Result<RoomDto>.Fail("NOT_FOUND", "Room not found.");
-        typeof(Room).GetProperty(nameof(Room.Name))!.SetValue(r, request.Name.Trim());
-        typeof(Room).GetProperty(nameof(Room.Capacity))!.SetValue(r, request.Capacity);
-        typeof(Room).GetProperty(nameof(Room.MeetingLink))!.SetValue(r, request.MeetingLink);
+        r.Update(request.Name, request.Capacity, request.MeetingLink);
         await db.SaveChangesAsync(cancellationToken);
         return Result<RoomDto>.Ok(new RoomDto(r.Id, r.Name, r.Capacity, r.MeetingLink));
     }

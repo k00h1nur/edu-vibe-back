@@ -51,8 +51,7 @@ public sealed class CoursesHandlers(IApplicationDbContext db) :
     {
         var c = await db.Courses.FirstOrDefaultAsync(x => x.Id == request.CourseId, cancellationToken);
         if (c is null) return Result<CourseDto>.Fail("NOT_FOUND", "Course not found.");
-        typeof(Course).GetProperty(nameof(Course.Code))!.SetValue(c, request.Code.Trim().ToUpperInvariant());
-        typeof(Course).GetProperty(nameof(Course.Name))!.SetValue(c, request.Name.Trim());
+        c.Update(request.Code, request.Name);
         await db.SaveChangesAsync(cancellationToken);
         return Result<CourseDto>.Ok(new CourseDto(c.Id, c.Code, c.Name));
     }

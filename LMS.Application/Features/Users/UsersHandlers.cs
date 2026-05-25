@@ -13,15 +13,24 @@ public sealed class GetUsersQueryHandler(IApplicationDbContext db)
     public async Task<Result<IReadOnlyCollection<UserDto>>> Handle(GetUsersQuery request,
         CancellationToken cancellationToken)
     {
+        // Two queries with an in-memory join instead of a correlated subquery
+        // per user (the previous shape produced N+1 SQL roundtrips).
         var users = await db.Users
-            .Select(u => new UserDto(
-                u.Id,
-                u.Email,
-                u.Status,
-                db.UserRoles.Where(ur => ur.UserId == u.Id)
-                    .Join(db.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => r.Code).ToList()))
+            .Select(u => new { u.Id, u.Email, u.Status })
             .ToListAsync(cancellationToken);
-        return Result<IReadOnlyCollection<UserDto>>.Ok(users);
+
+        var roleCodesByUser = await db.UserRoles
+            .Join(db.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => new { ur.UserId, r.Code })
+            .GroupBy(x => x.UserId)
+            .Select(g => new { UserId = g.Key, Codes = g.Select(x => x.Code).ToList() })
+            .ToDictionaryAsync(x => x.UserId, x => x.Codes, cancellationToken);
+
+        var result = users
+            .Select(u => new UserDto(
+                u.Id, u.Email, u.Status,
+                roleCodesByUser.TryGetValue(u.Id, out var codes) ? codes : new List<string>()))
+            .ToList();
+        return Result<IReadOnlyCollection<UserDto>>.Ok(result);
     }
 }
 
@@ -72,7 +81,7 @@ public sealed class UpdateUserCommandHandler(IApplicationDbContext db)
         if (await db.Users.AnyAsync(x => x.Email == email && x.Id != request.UserId, cancellationToken))
             return Result<UserDto>.Fail("EMAIL_EXISTS", "Email already exists.");
 
-        typeof(User).GetProperty(nameof(User.Email))!.SetValue(user, email);
+        user.SetEmail(email);
         if (request.Status == UserStatus.Active) user.Activate();
         else user.Deactivate();
 
@@ -130,7 +139,7 @@ public sealed class UpdateMyUserCommandHandler(IApplicationDbContext db, ICurren
             await db.Users.AnyAsync(x => x.Email == newEmail && x.Id != user.Id, cancellationToken))
             return Result<UserDto>.Fail("EMAIL_EXISTS", "Email already in use.");
 
-        typeof(User).GetProperty(nameof(User.Email))!.SetValue(user, newEmail);
+        user.SetEmail(newEmail);
         await db.SaveChangesAsync(cancellationToken);
 
         var roles = await db.UserRoles.Where(ur => ur.UserId == user.Id)

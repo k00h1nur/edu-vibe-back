@@ -62,8 +62,7 @@ public sealed class BadgesHandlers(IApplicationDbContext db) :
     {
         var b = await db.Badges.FirstOrDefaultAsync(x => x.Id == request.BadgeId, cancellationToken);
         if (b is null) return Result<BadgeDto>.Fail("NOT_FOUND", "Badge not found.");
-        typeof(Badge).GetProperty(nameof(Badge.Name))!.SetValue(b, request.Name.Trim());
-        typeof(Badge).GetProperty(nameof(Badge.XpReward))!.SetValue(b, request.XpReward);
+        b.Update(request.Name, request.XpReward);
         await db.SaveChangesAsync(cancellationToken);
         return Result<BadgeDto>.Ok(new BadgeDto(b.Id, b.Name, b.XpReward));
     }
