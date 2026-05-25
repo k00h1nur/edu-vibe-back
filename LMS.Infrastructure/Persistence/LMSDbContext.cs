@@ -36,6 +36,7 @@ public sealed class LMSDbContext : DbContext, IApplicationDbContext
     public DbSet<ResultScoreBreakdown> ResultScoreBreakdowns => Set<ResultScoreBreakdown>();
     public DbSet<ResultImage> ResultImages => Set<ResultImage>();
     public DbSet<ResultView> ResultViews => Set<ResultView>();
+    public DbSet<VisitorMessage> VisitorMessages => Set<VisitorMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

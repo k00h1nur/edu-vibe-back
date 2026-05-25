@@ -26,6 +26,8 @@ public static class DependencyInjection
         services.AddScoped<IResultImageService, ResultImageService>();
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
         services.AddHttpContextAccessor();
+        services.AddHttpClient("Telegram", c => c.Timeout = TimeSpan.FromSeconds(10));
+        services.AddScoped<ITelegramNotifier, TelegramNotifier>();
         return services;
     }
 
