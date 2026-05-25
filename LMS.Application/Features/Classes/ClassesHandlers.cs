@@ -22,7 +22,7 @@ public sealed class ClassesHandlers(IApplicationDbContext db) :
     {
         var c = await db.Classes.FirstOrDefaultAsync(x => x.Id == request.ClassId, cancellationToken);
         if (c is null) return Result.Fail("NOT_FOUND", "Class not found.");
-        typeof(Class).GetProperty(nameof(Class.Status))!.SetValue(c, ClassStatus.Cancelled);
+        c.Cancel();
         await db.SaveChangesAsync(cancellationToken);
         return Result.Ok("Cancelled");
     }
@@ -97,9 +97,7 @@ public sealed class ClassesHandlers(IApplicationDbContext db) :
     {
         var c = await db.Classes.FirstOrDefaultAsync(x => x.Id == request.ClassId, cancellationToken);
         if (c is null) return Result<ClassDto>.Fail("NOT_FOUND", "Class not found.");
-        typeof(Class).GetProperty(nameof(Class.Title))!.SetValue(c, request.Title.Trim());
-        typeof(Class).GetProperty(nameof(Class.MaxStudents))!.SetValue(c, request.MaxStudents);
-        typeof(Class).GetProperty(nameof(Class.Modality))!.SetValue(c, request.Modality);
+        c.UpdateDetails(request.Title, request.MaxStudents, request.Modality);
         if (request.TeacherUserId.HasValue)
         {
             var t = await db.Users.FirstOrDefaultAsync(x => x.Id == request.TeacherUserId.Value, cancellationToken);

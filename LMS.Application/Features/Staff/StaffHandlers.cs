@@ -43,7 +43,7 @@ public sealed class UpdateStaffProfileCommandHandler(IApplicationDbContext db)
     {
         var sp = await db.StaffProfiles.FirstOrDefaultAsync(x => x.Id == request.StaffProfileId, cancellationToken);
         if (sp is null) return Result<StaffDto>.Fail("NOT_FOUND", "Staff profile not found.");
-        typeof(StaffProfile).GetProperty(nameof(StaffProfile.EmploymentType))!.SetValue(sp, request.EmploymentType);
+        sp.SetEmploymentType(request.EmploymentType);
         await db.SaveChangesAsync(cancellationToken);
         var user = await db.Users.FirstAsync(x => x.Id == sp.UserId, cancellationToken);
         return Result<StaffDto>.Ok(new StaffDto(sp.Id, sp.UserId, user.Email, sp.EmploymentType));

@@ -43,15 +43,14 @@ public sealed class MessagesHandlers(IApplicationDbContext db) :
 
     public async Task<Result<int>> Handle(GetUnreadMessageCountQuery request, CancellationToken cancellationToken)
     {
-        var convIds = await db.ConversationParticipants
-            .Where(p => p.UserId == request.UserId)
-            .Select(p => p.ConversationId)
-            .ToListAsync(cancellationToken);
-
+        // Single query: subquery via Any() instead of materializing every
+        // conversation id first. With ix_conversation_participants_user_id +
+        // ix_messages_conversation_read_at this is two index seeks total.
         var count = await db.Messages
-            .Where(m => convIds.Contains(m.ConversationId)
-                        && m.SenderUserId != request.UserId
-                        && m.ReadAt == null)
+            .Where(m => m.SenderUserId != request.UserId
+                        && m.ReadAt == null
+                        && db.ConversationParticipants.Any(
+                            p => p.ConversationId == m.ConversationId && p.UserId == request.UserId))
             .CountAsync(cancellationToken);
         return Result<int>.Ok(count);
     }

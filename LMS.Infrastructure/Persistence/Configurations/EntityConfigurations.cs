@@ -14,6 +14,12 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         b.Property(x => x.PasswordHash).IsRequired().HasMaxLength(512);
         b.Property(x => x.RefreshTokenHash).HasMaxLength(512);
         b.HasIndex(x => x.Email).IsUnique();
+
+        // RefreshTokenCommandHandler does a hash equality lookup as the first
+        // filter. Indexing the hash + expiry lets PostgreSQL skip every user
+        // whose token is null or expired without a table scan.
+        b.HasIndex(x => new { x.RefreshTokenHash, x.RefreshTokenExpiresAt })
+            .HasDatabaseName("ix_users_refresh_token_lookup");
     }
 }
 
@@ -62,7 +68,10 @@ public sealed class UserRoleConfiguration : IEntityTypeConfiguration<UserRole>
     {
         b.ToTable("user_roles");
         b.HasKey(x => x.Id);
+        // Unique pair (UserId, RoleId) is already covered. The PermissionAuthorizationHandler
+        // and LoginCommandHandler filter on UserId alone — needs its own index.
         b.HasIndex(x => new { x.UserId, x.RoleId }).IsUnique();
+        b.HasIndex(x => x.UserId).HasDatabaseName("ix_user_roles_user_id");
         b.HasOne(x => x.User).WithMany(x => x.UserRoles).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Role).WithMany(x => x.UserRoles).HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Restrict);
     }
@@ -123,6 +132,9 @@ public sealed class ClassConfiguration : IEntityTypeConfiguration<Class>
         b.ToTable("classes");
         b.HasKey(x => x.Id);
         b.Property(x => x.Title).IsRequired().HasMaxLength(256);
+        // Used by Classes/assigned/{teacherUserId} + ResolveUserClassIds in the
+        // session handlers. EF doesn't auto-index FKs on optional one-to-many.
+        b.HasIndex(x => x.TeacherUserId).HasDatabaseName("ix_classes_teacher_user_id");
         b.HasOne(x => x.Teacher).WithMany(x => x.TeachingClasses).HasForeignKey(x => x.TeacherUserId)
             .OnDelete(DeleteBehavior.Restrict);
     }
@@ -135,6 +147,9 @@ public sealed class EnrollmentConfiguration : IEntityTypeConfiguration<Enrollmen
         b.ToTable("enrollments");
         b.HasKey(x => x.Id);
         b.HasIndex(x => new { x.ClassId, x.StudentProfileId }).IsUnique();
+        // The composite covers WHERE ClassId = X via left-prefix. Filtering by
+        // StudentProfileId alone (assignments lookups, dashboards) needs its own index.
+        b.HasIndex(x => x.StudentProfileId).HasDatabaseName("ix_enrollments_student_profile_id");
     }
 }
 
@@ -155,6 +170,10 @@ public sealed class AttendanceConfiguration : IEntityTypeConfiguration<Attendanc
         b.ToTable("attendance");
         b.HasKey(x => x.Id);
         b.HasIndex(x => new { x.SessionId, x.StudentProfileId }).IsUnique();
+        // GET /api/Attendance and the student-history query filter by single columns.
+        b.HasIndex(x => x.SessionId).HasDatabaseName("ix_attendance_session_id");
+        b.HasIndex(x => x.StudentProfileId).HasDatabaseName("ix_attendance_student_profile_id");
+        b.HasIndex(x => x.ClassId).HasDatabaseName("ix_attendance_class_id");
     }
 }
 
@@ -205,6 +224,8 @@ public sealed class ConversationParticipantConfiguration : IEntityTypeConfigurat
         b.ToTable("conversation_participants");
         b.HasKey(x => x.Id);
         b.HasIndex(x => new { x.ConversationId, x.UserId }).IsUnique();
+        // Conversations/my/{userId} and unread-count both filter by UserId only.
+        b.HasIndex(x => x.UserId).HasDatabaseName("ix_conversation_participants_user_id");
     }
 }
 
@@ -215,6 +236,9 @@ public sealed class MessageConfiguration : IEntityTypeConfiguration<Message>
         b.ToTable("messages");
         b.HasKey(x => x.Id);
         b.Property(x => x.Text).IsRequired().HasMaxLength(4000);
+        // Hot paths: list messages by conversation, count unread per user.
+        b.HasIndex(x => new { x.ConversationId, x.ReadAt })
+            .HasDatabaseName("ix_messages_conversation_read_at");
     }
 }
 

@@ -24,7 +24,7 @@ public sealed class Class : BaseEntity
     }
 
     public string Title { get; private set; }
-    public int MaxStudents { get; }
+    public int MaxStudents { get; private set; }
     public Modality Modality { get; private set; }
     public ClassStatus Status { get; private set; }
 
@@ -54,6 +54,26 @@ public sealed class Class : BaseEntity
 
         TeacherUserId = teacher.Id;
         Teacher = teacher;
+        Touch();
+    }
+
+    public void UpdateDetails(string title, int maxStudents, Modality modality)
+    {
+        if (string.IsNullOrWhiteSpace(title)) throw new DomainException("Class title is required.");
+        if (maxStudents <= 0) throw new DomainException("Max students must be greater than zero.");
+        if (Status == ClassStatus.Cancelled)
+            throw new DomainException("Cannot modify a cancelled class.");
+
+        Title = title.Trim();
+        MaxStudents = maxStudents;
+        Modality = modality;
+        Touch();
+    }
+
+    public void Cancel()
+    {
+        if (Status == ClassStatus.Cancelled) return;
+        Status = ClassStatus.Cancelled;
         Touch();
     }
 }

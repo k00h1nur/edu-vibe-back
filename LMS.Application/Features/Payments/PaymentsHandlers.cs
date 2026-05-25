@@ -50,7 +50,7 @@ public sealed class PaymentsHandlers(IApplicationDbContext db) :
     {
         var p = await db.Payments.FirstOrDefaultAsync(x => x.Id == request.PaymentId, cancellationToken);
         if (p is null) return Result<PaymentDto>.Fail("NOT_FOUND", "Payment not found.");
-        typeof(Payment).GetProperty(nameof(Payment.Status))!.SetValue(p, PaymentStatus.Failed);
+        p.MarkFailed();
         await db.SaveChangesAsync(cancellationToken);
         return Result<PaymentDto>.Ok(Map(p));
     }

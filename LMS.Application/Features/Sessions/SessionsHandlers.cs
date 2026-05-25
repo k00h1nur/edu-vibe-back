@@ -70,27 +70,29 @@ public sealed class SessionsHandlers(IApplicationDbContext db) :
 
     /// <summary>
     /// Returns the class ids the user touches — both as a student (via enrollment)
-    /// and as a teacher (via Class.TeacherUserId).
+    /// and as a teacher (via Class.TeacherUserId). One round-trip via UNION; the
+    /// student/teacher branches join against StudentProfiles and Classes in SQL.
     /// </summary>
     private async Task<List<Guid>> ResolveUserClassIds(Guid userId, CancellationToken cancellationToken)
     {
-        var studentIds = await db.StudentProfiles.Where(x => x.UserId == userId).Select(x => x.Id)
+        var enrolledClassIds = db.Enrollments
+            .Where(e => db.StudentProfiles.Any(sp => sp.UserId == userId && sp.Id == e.StudentProfileId))
+            .Select(e => e.ClassId);
+
+        var teachingClassIds = db.Classes
+            .Where(c => c.TeacherUserId == userId)
+            .Select(c => c.Id);
+
+        return await enrolledClassIds
+            .Union(teachingClassIds)
             .ToListAsync(cancellationToken);
-        var enrolledClassIds = await db.Enrollments.Where(x => studentIds.Contains(x.StudentProfileId))
-            .Select(x => x.ClassId).ToListAsync(cancellationToken);
-        var teachingClassIds = await db.Classes.Where(x => x.TeacherUserId == userId).Select(x => x.Id)
-            .ToListAsync(cancellationToken);
-        return enrolledClassIds.Concat(teachingClassIds).Distinct().ToList();
     }
 
     public async Task<Result<SessionDto>> Handle(UpdateClassSessionCommand request, CancellationToken cancellationToken)
     {
         var s = await db.ClassSessions.FirstOrDefaultAsync(x => x.Id == request.SessionId, cancellationToken);
         if (s is null) return Result<SessionDto>.Fail("NOT_FOUND", "Session not found.");
-        typeof(ClassSession).GetProperty(nameof(ClassSession.SessionDate))!.SetValue(s, request.SessionDate);
-        typeof(ClassSession).GetProperty(nameof(ClassSession.StartsAt))!.SetValue(s, request.StartsAt);
-        typeof(ClassSession).GetProperty(nameof(ClassSession.EndsAt))!.SetValue(s, request.EndsAt);
-        typeof(ClassSession).GetProperty(nameof(ClassSession.RoomId))!.SetValue(s, request.RoomId);
+        s.Reschedule(request.SessionDate, request.StartsAt, request.EndsAt, request.RoomId);
         await db.SaveChangesAsync(cancellationToken);
         return Result<SessionDto>.Ok(Map(s));
     }

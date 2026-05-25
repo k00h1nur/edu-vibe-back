@@ -45,8 +45,7 @@ public sealed class RolesHandlers(IApplicationDbContext db) :
     {
         var r = await db.Roles.FirstOrDefaultAsync(x => x.Id == request.RoleId, cancellationToken);
         if (r is null) return Result<RoleDto>.Fail("NOT_FOUND", "Role not found.");
-        typeof(Role).GetProperty(nameof(Role.Code))!.SetValue(r, request.Code.Trim());
-        typeof(Role).GetProperty(nameof(Role.Name))!.SetValue(r, request.Name.Trim());
+        r.Update(request.Code, request.Name);
         await db.SaveChangesAsync(cancellationToken);
         var pids = await db.RolePermissions.Where(x => x.RoleId == r.Id).Select(x => x.PermissionId).ToListAsync(cancellationToken);
         return Result<RoleDto>.Ok(new RoleDto(r.Id, r.Code, r.Name, pids));
@@ -75,9 +74,7 @@ public sealed class RolesHandlers(IApplicationDbContext db) :
     {
         var p = await db.Permissions.FirstOrDefaultAsync(x => x.Id == request.PermissionId, cancellationToken);
         if (p is null) return Result<PermissionDto>.Fail("NOT_FOUND", "Permission not found.");
-        typeof(Permission).GetProperty(nameof(Permission.Code))!.SetValue(p, request.Code.Trim());
-        typeof(Permission).GetProperty(nameof(Permission.Module))!.SetValue(p, request.Module.Trim());
-        typeof(Permission).GetProperty(nameof(Permission.Description))!.SetValue(p, request.Description?.Trim());
+        p.Update(request.Code, request.Module, request.Description);
         await db.SaveChangesAsync(cancellationToken);
         return Result<PermissionDto>.Ok(new PermissionDto(p.Id, p.Code, p.Module, p.Description));
     }

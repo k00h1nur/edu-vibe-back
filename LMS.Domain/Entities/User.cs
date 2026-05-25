@@ -40,6 +40,13 @@ public sealed class User : BaseEntity
         Touch();
     }
 
+    public void SetEmail(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email)) throw new DomainException("Email is required.");
+        Email = email.Trim().ToLowerInvariant();
+        Touch();
+    }
+
     public void SetRefreshToken(string refreshTokenHash, DateTime expiresAt)
     {
         if (string.IsNullOrWhiteSpace(refreshTokenHash)) throw new DomainException("Refresh token hash is required.");

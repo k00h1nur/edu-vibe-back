@@ -135,14 +135,24 @@ public sealed class RefreshTokenCommandHandler(
     public async Task<Result<AuthTokensResponse>> Handle(RefreshTokenCommand request,
         CancellationToken cancellationToken)
     {
-        var users = await dbContext.Users.Where(x => x.RefreshTokenHash != null && x.RefreshTokenExpiresAt != null)
+        // The refresh token hash is salted (PBKDF2-style), so SQL equality
+        // can't pre-filter to a single row. But we CAN narrow the candidate
+        // set to active users with a non-expired token via the
+        // (RefreshTokenHash, RefreshTokenExpiresAt) composite index. The
+        // in-memory hash verify then runs over a tiny set instead of every
+        // user with any refresh token ever issued.
+        var now = dateTimeProvider.UtcNow;
+        var candidates = await dbContext.Users
+            .Where(x => x.RefreshTokenHash != null
+                        && x.RefreshTokenExpiresAt != null
+                        && x.RefreshTokenExpiresAt >= now
+                        && x.Status == UserStatus.Active)
             .ToListAsync(cancellationToken);
-        var user = users.FirstOrDefault(x =>
-            x.RefreshTokenExpiresAt >= dateTimeProvider.UtcNow && x.RefreshTokenHash != null &&
-            passwordHasher.Verify(request.RefreshToken, x.RefreshTokenHash));
+
+        var user = candidates.FirstOrDefault(x =>
+            x.RefreshTokenHash is not null
+            && passwordHasher.Verify(request.RefreshToken, x.RefreshTokenHash));
         if (user is null) return Result<AuthTokensResponse>.Fail("INVALID_REFRESH_TOKEN", "Invalid refresh token.");
-        if (user.Status != UserStatus.Active)
-            return Result<AuthTokensResponse>.Fail("USER_INACTIVE", "User is not active.");
 
         var roles = await dbContext.UserRoles.Where(x => x.UserId == user.Id)
             .Join(dbContext.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => r.Code).ToArrayAsync(cancellationToken);
