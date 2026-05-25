@@ -70,4 +70,6 @@ public enum VisitorMessageSource
 {
     Contact = 1,
     DemoLesson = 2,
+    MockTest = 3,
+    LevelCheck = 4,
 }

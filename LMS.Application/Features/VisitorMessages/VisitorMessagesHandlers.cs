@@ -45,6 +45,8 @@ public sealed class CreateVisitorMessageCommandHandler(
         var sourceLabel = m.Source switch
         {
             VisitorMessageSource.DemoLesson => "🎓 Demo Lesson Request",
+            VisitorMessageSource.MockTest   => "📝 Mock Test Registration",
+            VisitorMessageSource.LevelCheck => "🎯 Level Check Request",
             VisitorMessageSource.Contact    => "✉️ Contact Form",
             _                               => "Visitor Message",
         };
