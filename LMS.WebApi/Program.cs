@@ -16,6 +16,8 @@ builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddAuthorizationPolicies();
 builder.Services.AddSwagger();
 builder.Services.AddHostedService<PermissionDiscoveryHostedService>();
+// Must run AFTER PermissionDiscoveryHostedService — hosted services start in registration order.
+builder.Services.AddHostedService<RolePermissionSeederHostedService>();
 var redisConn = builder.Configuration["Redis:ConnectionString"];
 if (!string.IsNullOrWhiteSpace(redisConn))
 {
