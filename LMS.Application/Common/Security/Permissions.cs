@@ -135,6 +135,12 @@ public static class Permissions
         public const string Student = "Dashboard.Student";
     }
 
+    public static class VisitorMessages
+    {
+        public const string Read = "VisitorMessages.Read";
+        public const string Update = "VisitorMessages.Update";
+    }
+
     // Results / Roles / Permissions already existed in controllers — kept stable here.
     public static class Results
     {
@@ -181,6 +187,7 @@ public static class Permissions
         Courses.Read, Courses.Manage,
         Rooms.Read, Rooms.Manage,
         Dashboard.Director, Dashboard.Office, Dashboard.Teacher, Dashboard.Student,
+        VisitorMessages.Read, VisitorMessages.Update,
         Results.Read, Results.Create, Results.Update, Results.Delete,
         Roles.Read, Roles.Create, Roles.Update, Roles.Delete, Roles.AssignPermissions,
         PermissionsCatalog.Read, PermissionsCatalog.Create, PermissionsCatalog.Update, PermissionsCatalog.Delete,
@@ -217,6 +224,7 @@ public static class RolePermissionMatrix
         Permissions.Courses.Read, Permissions.Courses.Manage,
         Permissions.Rooms.Read, Permissions.Rooms.Manage,
         Permissions.Results.Read, Permissions.Results.Create, Permissions.Results.Update,
+        Permissions.VisitorMessages.Read, Permissions.VisitorMessages.Update,
         Permissions.Roles.Read,
     };
 
@@ -242,6 +250,7 @@ public static class RolePermissionMatrix
         Permissions.Messages.Read, Permissions.Messages.Send,
         Permissions.Courses.Read, Permissions.Courses.Manage,
         Permissions.Rooms.Read, Permissions.Rooms.Manage,
+        Permissions.VisitorMessages.Read, Permissions.VisitorMessages.Update,
         Permissions.Roles.Read,
     };
 

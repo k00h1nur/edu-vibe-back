@@ -329,3 +329,21 @@ public sealed class ResultViewConfiguration : IEntityTypeConfiguration<ResultVie
         b.HasIndex(x => x.ResultId);
     }
 }
+
+public sealed class VisitorMessageConfiguration : IEntityTypeConfiguration<VisitorMessage>
+{
+    public void Configure(EntityTypeBuilder<VisitorMessage> b)
+    {
+        b.ToTable("visitor_messages");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Name).IsRequired().HasMaxLength(128);
+        b.Property(x => x.Phone).IsRequired().HasMaxLength(64);
+        b.Property(x => x.Email).HasMaxLength(320);
+        b.Property(x => x.Message).IsRequired().HasMaxLength(4000);
+        b.Property(x => x.Course).HasMaxLength(128);
+        b.Property(x => x.PreferredTime).HasMaxLength(128);
+        b.Property(x => x.Language).HasMaxLength(8);
+        // Admin inbox sorts by CreatedAt desc and filters by IsRead.
+        b.HasIndex(x => new { x.IsRead, x.CreatedAt }).HasDatabaseName("ix_visitor_messages_inbox");
+    }
+}

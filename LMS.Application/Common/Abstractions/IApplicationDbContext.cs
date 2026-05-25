@@ -31,5 +31,6 @@ public interface IApplicationDbContext
     DbSet<ResultScoreBreakdown> ResultScoreBreakdowns { get; }
     DbSet<ResultImage> ResultImages { get; }
     DbSet<ResultView> ResultViews { get; }
+    DbSet<VisitorMessage> VisitorMessages { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }
