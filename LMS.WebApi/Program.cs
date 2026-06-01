@@ -46,6 +46,20 @@ builder.Services.AddRateLimiter(options =>
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
             }));
+
+    // Per-IP throttle on anonymous auth endpoints (login/register/refresh) to
+    // make credential stuffing and refresh-token brute force expensive.
+    // 20 requests / minute is generous for a real user (typo retries, a
+    // forgotten-password loop) but kills any automated attack.
+    options.AddPolicy("auth-anon", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+            }));
 });
 
 var redisConn = builder.Configuration["Redis:ConnectionString"];

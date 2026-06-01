@@ -5,6 +5,7 @@ using LMS.WebApi.Security;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace LMS.WebApi.Controllers;
 
@@ -22,6 +23,7 @@ public sealed class AuthController(ISender sender) : ControllerBase
 
     [HttpPost("register")]
     [AllowAnonymous]
+    [EnableRateLimiting("auth-anon")]
     public async Task<ActionResult<ApiResponse<AuthTokensResponse>>> Register([FromBody] RegisterUserCommand command,
         CancellationToken cancellationToken)
     {
@@ -34,6 +36,7 @@ public sealed class AuthController(ISender sender) : ControllerBase
 
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting("auth-anon")]
     public async Task<ActionResult<ApiResponse<AuthTokensResponse>>> Login([FromBody] LoginCommand command,
         CancellationToken cancellationToken)
     {
@@ -45,6 +48,7 @@ public sealed class AuthController(ISender sender) : ControllerBase
 
     [HttpPost("refresh")]
     [AllowAnonymous]
+    [EnableRateLimiting("auth-anon")]
     public async Task<ActionResult<ApiResponse<AuthTokensResponse>>> Refresh([FromBody] RefreshTokenCommand command,
         CancellationToken cancellationToken)
     {

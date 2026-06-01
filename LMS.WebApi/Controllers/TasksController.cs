@@ -16,22 +16,14 @@ public sealed class TasksController(ISender sender, ICurrentUserService currentU
 {
     /// <summary>
     /// Lists tasks under an assignment. Solutions are stripped from the
-    /// response for student callers — only Tasks.Manage holders see them.
+    /// response for non-staff callers — only the allowlist roles see them.
     /// </summary>
     [HttpGet("assignment/{assignmentId:guid}")]
     [PermissionAuthorize(Permissions.Tasks.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<LearningTaskDto>>>> GetByAssignment(
         Guid assignmentId, CancellationToken ct)
     {
-        var canSeeSolutions = currentUser.Roles.Any(r =>
-            string.Equals(r, RoleCodes.SuperAdmin, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(r, RoleCodes.Admin, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(r, RoleCodes.AcademyDirector, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(r, RoleCodes.OfficeAdmin, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(r, RoleCodes.Teacher, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(r, RoleCodes.SupportTeacher, StringComparison.OrdinalIgnoreCase));
-
-        var r = await sender.Send(new GetAssignmentTasksQuery(assignmentId, canSeeSolutions), ct);
+        var r = await sender.Send(new GetAssignmentTasksQuery(assignmentId, CallerCanSeeSolutions()), ct);
         return Ok(ApiResponse<IReadOnlyCollection<LearningTaskDto>>.Ok(r.Data, r.Message));
     }
 
@@ -39,13 +31,24 @@ public sealed class TasksController(ISender sender, ICurrentUserService currentU
     [PermissionAuthorize(Permissions.Tasks.Read)]
     public async Task<ActionResult<ApiResponse<LearningTaskDto>>> Get(Guid id, CancellationToken ct)
     {
-        var canSeeSolutions = currentUser.Roles.Any(r =>
-            !string.Equals(r, RoleCodes.Student, StringComparison.OrdinalIgnoreCase));
-        var r = await sender.Send(new GetTaskByIdQuery(id, canSeeSolutions), ct);
+        var r = await sender.Send(new GetTaskByIdQuery(id, CallerCanSeeSolutions()), ct);
         return r.Success
             ? Ok(ApiResponse<LearningTaskDto>.Ok(r.Data, r.Message))
             : NotFound(ApiResponse<LearningTaskDto>.Fail(r.Message ?? "Not found"));
     }
+
+    /// <summary>
+    /// True only when the caller is in one of the explicit staff roles allowed
+    /// to view answer keys. Allowlist (not denylist) so a newly-introduced role
+    /// (Parent, Observer, etc.) cannot accidentally leak solutions to students.
+    /// </summary>
+    private bool CallerCanSeeSolutions() => currentUser.Roles.Any(r =>
+        string.Equals(r, RoleCodes.SuperAdmin, StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(r, RoleCodes.Admin, StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(r, RoleCodes.AcademyDirector, StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(r, RoleCodes.OfficeAdmin, StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(r, RoleCodes.Teacher, StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(r, RoleCodes.SupportTeacher, StringComparison.OrdinalIgnoreCase));
 
     [HttpPost]
     [PermissionAuthorize(Permissions.Tasks.Manage)]

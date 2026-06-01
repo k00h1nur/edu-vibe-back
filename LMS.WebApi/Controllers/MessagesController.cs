@@ -1,3 +1,4 @@
+using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Security;
 using LMS.Application.Features.Messages;
 using LMS.WebApi.Common;
@@ -11,7 +12,7 @@ namespace LMS.WebApi.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
-public sealed class MessagesController(ISender sender) : ControllerBase
+public sealed class MessagesController(ISender sender, ICurrentUserService currentUser) : ControllerBase
 {
     [HttpGet("conversation/{conversationId:guid}")]
     [PermissionAuthorize(Permissions.Messages.Read)]
@@ -43,10 +44,20 @@ public sealed class MessagesController(ISender sender) : ControllerBase
             : BadRequest(ApiResponse<MessageDto>.Fail(r.Message ?? "Failed"));
     }
 
-    /// <summary>Number of unread messages addressed to the user across all their conversations.</summary>
+    /// <summary>
+    /// Number of unread messages addressed to the caller across all their conversations.
+    /// Self-only — the route id must match the authenticated user, otherwise 403.
+    /// (Kept as a route parameter for backwards-compat with existing clients;
+    /// new clients should ignore the value and rely on the auth context.)
+    /// </summary>
     [HttpGet("unread-count/{userId:guid}")]
+    [PermissionAuthorize(Permissions.Messages.Read)]
     public async Task<ActionResult<ApiResponse<int>>> UnreadCount(Guid userId, CancellationToken ct)
     {
+        if (currentUser.UserId is null || currentUser.UserId != userId)
+            return StatusCode(StatusCodes.Status403Forbidden,
+                ApiResponse<int>.Fail("Unread count is self-only."));
+
         var r = await sender.Send(new GetUnreadMessageCountQuery(userId), ct);
         return Ok(ApiResponse<int>.Ok(r.Data, r.Message));
     }

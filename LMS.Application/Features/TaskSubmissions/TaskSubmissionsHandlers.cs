@@ -18,6 +18,15 @@ public sealed class TaskSubmissionsHandlers(
     public async Task<Result<TaskSubmissionDto>> Handle(
         SubmitTaskResponseCommand request, CancellationToken cancellationToken)
     {
+        // SECURITY: ignore the StudentProfileId on the wire — always force the
+        // submission onto the caller's own student profile. Without this, a
+        // student could pass any other student's id in the body and submit
+        // work as them. The Submit permission is only granted to the Student
+        // role, so anyone reaching this handler must have a student profile.
+        var callerStudentProfileId = currentUser.StudentProfileId;
+        if (callerStudentProfileId is null)
+            return Result<TaskSubmissionDto>.Fail("FORBIDDEN", "Only students may submit responses.");
+
         var task = await db.LearningTasks
             .FirstOrDefaultAsync(t => t.Id == request.TaskId, cancellationToken);
         if (task is null) return Result<TaskSubmissionDto>.Fail("NOT_FOUND", "Task not found.");
@@ -25,12 +34,12 @@ public sealed class TaskSubmissionsHandlers(
         // Allow re-submission by updating the existing row (one submission per
         // (task, student)).
         var submission = await db.TaskSubmissions.FirstOrDefaultAsync(
-            s => s.TaskId == request.TaskId && s.StudentProfileId == request.StudentProfileId,
+            s => s.TaskId == request.TaskId && s.StudentProfileId == callerStudentProfileId,
             cancellationToken);
 
         if (submission is null)
         {
-            submission = new TaskSubmission(request.TaskId, request.StudentProfileId, request.ResponseJson);
+            submission = new TaskSubmission(request.TaskId, callerStudentProfileId.Value, request.ResponseJson);
             await db.TaskSubmissions.AddAsync(submission, cancellationToken);
         }
         else
@@ -78,8 +87,22 @@ public sealed class TaskSubmissionsHandlers(
     public async Task<Result<IReadOnlyCollection<TaskSubmissionDto>>> Handle(
         GetMyTaskSubmissionsByAssignmentQuery request, CancellationToken cancellationToken)
     {
+        // SECURITY: students see their own submissions only. Staff (anyone with
+        // a StaffProfileId in the JWT — teachers, support teachers, admins,
+        // office) can read any student's submissions for grading workflows.
+        var targetStudentProfileId = request.StudentProfileId;
+        if (currentUser.StaffProfileId is null)
+        {
+            if (currentUser.StudentProfileId is null)
+                return Result<IReadOnlyCollection<TaskSubmissionDto>>.Fail(
+                    "FORBIDDEN", "Caller is neither a student nor staff.");
+            if (currentUser.StudentProfileId != targetStudentProfileId)
+                return Result<IReadOnlyCollection<TaskSubmissionDto>>.Fail(
+                    "FORBIDDEN", "Students may only read their own submissions.");
+        }
+
         var items = await db.TaskSubmissions
-            .Where(s => s.StudentProfileId == request.StudentProfileId
+            .Where(s => s.StudentProfileId == targetStudentProfileId
                         && s.Task != null && s.Task.AssignmentId == request.AssignmentId)
             .OrderBy(s => s.Task!.Order)
             .Select(s => new TaskSubmissionDto(
