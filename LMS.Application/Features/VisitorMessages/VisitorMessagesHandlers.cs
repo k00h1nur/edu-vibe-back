@@ -36,20 +36,9 @@ public sealed class CreateVisitorMessageCommandHandler(
         await db.VisitorMessages.AddAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
 
-        // Fire-and-forget Telegram ping. We DON'T await it — if Telegram is
-        // down the visitor still gets a happy path. The notifier itself
-        // swallows errors and logs them.
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await telegram.SendAsync(BuildTelegramMessage(entity), CancellationToken.None);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Telegram notification failed for visitor message {Id}", entity.Id);
-            }
-        }, CancellationToken.None);
+        // Hand off to the Telegram queue — non-blocking, never throws. The
+        // background sender handles retries, backoff and Telegram 429 throttling.
+        await telegram.SendAsync(BuildTelegramMessage(entity), CancellationToken.None);
 
         return Result<VisitorMessageDto>.Ok(Map(entity), "Message received.");
     }

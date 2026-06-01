@@ -1,64 +1,64 @@
-using System.Net.Http.Json;
+using System.Threading.Channels;
 using LMS.Application.Common.Abstractions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace LMS.Infrastructure.Services;
 
 /// <summary>
-/// Sends MarkdownV2 messages to a Telegram chat via the Bot API.
+/// Producer side of the Telegram pipeline. <see cref="SendAsync"/> writes the
+/// markdown payload to an in-process bounded channel and returns immediately —
+/// the HTTP call to api.telegram.org happens on a single background worker
+/// (<see cref="TelegramSenderHostedService"/>) with retry + backoff.
 ///
-/// Config keys (appsettings.json or env):
-///   Telegram:BotToken — bot token from @BotFather. Required.
-///   Telegram:ChatId   — target chat id (negative for groups/channels). Required.
-///
-/// If either is missing the notifier is a no-op and logs once on first call.
-/// Never throws — callers can treat <see cref="SendAsync"/> as best-effort.
+/// Why a channel:
+///   • Caller (web request) is never blocked on the network.
+///   • One bounded queue ⇒ predictable memory under bursts and outages.
+///   • Single reader ⇒ no Telegram rate-limit pile-on from concurrent sends.
+///   • Graceful drain on shutdown via BackgroundService.StopAsync.
 /// </summary>
-public sealed class TelegramNotifier(
-    IHttpClientFactory httpFactory,
-    IConfiguration configuration,
-    ILogger<TelegramNotifier> logger)
-    : ITelegramNotifier
+public sealed class TelegramNotifier : ITelegramNotifier
 {
-    private const string HttpClientName = "Telegram";
+    private readonly Channel<string> _channel;
+    private readonly TelegramOptions _options;
+    private readonly ILogger<TelegramNotifier> _logger;
 
-    public async Task<bool> SendAsync(string markdownText, CancellationToken cancellationToken = default)
+    public TelegramNotifier(IOptions<TelegramOptions> options, ILogger<TelegramNotifier> logger)
     {
-        var botToken = configuration["Telegram:BotToken"];
-        var chatId = configuration["Telegram:ChatId"];
+        _options = options.Value;
+        _logger = logger;
 
-        if (string.IsNullOrWhiteSpace(botToken) || string.IsNullOrWhiteSpace(chatId))
+        var capacity = _options.QueueCapacity > 0 ? _options.QueueCapacity : 256;
+        _channel = Channel.CreateBounded<string>(new BoundedChannelOptions(capacity)
         {
-            logger.LogWarning(
-                "Telegram notifier is disabled — set Telegram:BotToken and Telegram:ChatId in configuration.");
-            return false;
-        }
+            // Drop the oldest queued payload when full — staleness beats memory pressure
+            // for non-critical chat notifications.
+            FullMode = BoundedChannelFullMode.DropOldest,
+            SingleReader = true,
+            SingleWriter = false,
+        });
 
-        try
+        if (!_options.IsEnabled)
         {
-            var http = httpFactory.CreateClient(HttpClientName);
-            var url = $"https://api.telegram.org/bot{botToken}/sendMessage";
-            var payload = new
-            {
-                chat_id = chatId,
-                text = markdownText,
-                parse_mode = "MarkdownV2",
-                disable_web_page_preview = true,
-            };
-
-            using var response = await http.PostAsJsonAsync(url, payload, cancellationToken);
-            if (response.IsSuccessStatusCode) return true;
-
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
-            logger.LogWarning(
-                "Telegram sendMessage returned {Status}: {Body}", (int)response.StatusCode, body);
-            return false;
+            _logger.LogInformation(
+                "Telegram notifier disabled — set Telegram:BotToken and Telegram:ChatId to enable.");
         }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Telegram sendMessage threw");
-            return false;
-        }
+    }
+
+    /// <summary>Consumed by <see cref="TelegramSenderHostedService"/>; not part of the public API.</summary>
+    internal ChannelReader<string> Reader => _channel.Reader;
+
+    public Task<bool> SendAsync(string markdownText, CancellationToken cancellationToken = default)
+    {
+        if (!_options.IsEnabled) return Task.FromResult(false);
+        if (string.IsNullOrWhiteSpace(markdownText)) return Task.FromResult(false);
+
+        if (_channel.Writer.TryWrite(markdownText)) return Task.FromResult(true);
+
+        // BoundedChannelFullMode.DropOldest guarantees TryWrite always succeeds while
+        // the channel is open, so reaching here means the channel was completed
+        // (i.e. the host is shutting down). Log quietly and drop.
+        _logger.LogWarning("Telegram queue closed — message dropped.");
+        return Task.FromResult(false);
     }
 }

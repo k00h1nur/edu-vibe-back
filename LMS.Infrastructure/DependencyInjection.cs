@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace LMS.Infrastructure;
@@ -26,8 +28,24 @@ public static class DependencyInjection
         services.AddScoped<IResultImageService, ResultImageService>();
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
         services.AddHttpContextAccessor();
-        services.AddHttpClient("Telegram", c => c.Timeout = TimeSpan.FromSeconds(10));
-        services.AddScoped<ITelegramNotifier, TelegramNotifier>();
+
+        // Telegram pipeline: producer/consumer split.
+        //   • TelegramNotifier (singleton) enqueues into a bounded Channel — non-blocking.
+        //   • TelegramSenderHostedService drains the channel on one worker with retry +
+        //     backoff and honors Telegram's 429 retry_after.
+        //   • Notifier is registered both as the interface (for callers) and the
+        //     concrete type (so the hosted service can reach the channel reader
+        //     without duplicating the singleton).
+        services.Configure<TelegramOptions>(configuration.GetSection(TelegramOptions.SectionName));
+        services.AddHttpClient("Telegram", (sp, c) =>
+        {
+            var opts = sp.GetRequiredService<IOptions<TelegramOptions>>().Value;
+            c.Timeout = TimeSpan.FromSeconds(Math.Max(1, opts.RequestTimeoutSeconds));
+        });
+        services.AddSingleton<TelegramNotifier>();
+        services.AddSingleton<ITelegramNotifier>(sp => sp.GetRequiredService<TelegramNotifier>());
+        services.AddHostedService<TelegramSenderHostedService>();
+
         services.AddSingleton<ITaskGrader, TaskGrader>();
         return services;
     }
