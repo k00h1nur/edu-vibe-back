@@ -32,5 +32,10 @@ public interface IApplicationDbContext
     DbSet<ResultImage> ResultImages { get; }
     DbSet<ResultView> ResultViews { get; }
     DbSet<VisitorMessage> VisitorMessages { get; }
+    DbSet<Book> Books { get; }
+    DbSet<AssignmentBook> AssignmentBooks { get; }
+    DbSet<AssignmentAssignee> AssignmentAssignees { get; }
+    DbSet<LearningTask> LearningTasks { get; }
+    DbSet<TaskSubmission> TaskSubmissions { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }

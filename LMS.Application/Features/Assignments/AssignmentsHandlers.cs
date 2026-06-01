@@ -13,7 +13,12 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db) :
     IRequestHandler<CloseAssignmentCommand, Result<AssignmentDto>>,
     IRequestHandler<GetClassAssignmentsQuery, Result<IReadOnlyCollection<AssignmentDto>>>,
     IRequestHandler<GetStudentAssignmentsQuery, Result<IReadOnlyCollection<AssignmentDto>>>,
-    IRequestHandler<GetAssignmentsQuery, Result<IReadOnlyCollection<AssignmentDto>>>
+    IRequestHandler<GetAssignmentsQuery, Result<IReadOnlyCollection<AssignmentDto>>>,
+    IRequestHandler<AttachBookToAssignmentCommand, Result<AssignmentBookDto>>,
+    IRequestHandler<DetachBookFromAssignmentCommand, Result>,
+    IRequestHandler<GetAssignmentBooksQuery, Result<IReadOnlyCollection<AssignmentBookDto>>>,
+    IRequestHandler<SetAssignmentAssigneesCommand, Result<IReadOnlyCollection<AssignmentAssigneeDto>>>,
+    IRequestHandler<GetAssignmentAssigneesQuery, Result<IReadOnlyCollection<AssignmentAssigneeDto>>>
 {
     public async Task<Result<AssignmentDto>> Handle(CloseAssignmentCommand request, CancellationToken cancellationToken)
     {
@@ -47,11 +52,26 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db) :
     public async Task<Result<IReadOnlyCollection<AssignmentDto>>> Handle(GetStudentAssignmentsQuery request,
         CancellationToken cancellationToken)
     {
-        var cls = await db.Enrollments.Where(x => x.StudentProfileId == request.StudentProfileId).Select(x => x.ClassId)
+        var enrolledClassIds = await db.Enrollments
+            .Where(x => x.StudentProfileId == request.StudentProfileId)
+            .Select(x => x.ClassId)
             .ToListAsync(cancellationToken);
-        return Result<IReadOnlyCollection<AssignmentDto>>.Ok(await db.Assignments.Where(x => cls.Contains(x.ClassId))
+
+        // An assignment is visible to this student if:
+        //  • The student is enrolled in the assignment's class AND
+        //    (the assignment has NO assignee restriction
+        //     OR the student is in the assignee set)
+        // No assignee rows = whole class. Some rows = targeted subset.
+        var data = await db.Assignments
+            .Where(a => enrolledClassIds.Contains(a.ClassId))
+            .Where(a =>
+                !db.AssignmentAssignees.Any(aa => aa.AssignmentId == a.Id) ||
+                db.AssignmentAssignees.Any(aa =>
+                    aa.AssignmentId == a.Id && aa.StudentProfileId == request.StudentProfileId))
             .Select(a => new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId))
-            .ToListAsync(cancellationToken));
+            .ToListAsync(cancellationToken);
+
+        return Result<IReadOnlyCollection<AssignmentDto>>.Ok(data);
     }
 
     public async Task<Result<AssignmentDto>> Handle(PublishAssignmentCommand request,
@@ -90,6 +110,103 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db) :
             .Select(a => new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId))
             .ToListAsync(cancellationToken);
         return Result<IReadOnlyCollection<AssignmentDto>>.Ok(data);
+    }
+
+    // ----- Book attachments ------------------------------------------------
+
+    public async Task<Result<AssignmentBookDto>> Handle(AttachBookToAssignmentCommand request,
+        CancellationToken cancellationToken)
+    {
+        var assignmentExists = await db.Assignments.AnyAsync(a => a.Id == request.AssignmentId, cancellationToken);
+        if (!assignmentExists) return Result<AssignmentBookDto>.Fail("NOT_FOUND", "Assignment not found.");
+        var bookExists = await db.Books.AnyAsync(b => b.Id == request.BookId, cancellationToken);
+        if (!bookExists) return Result<AssignmentBookDto>.Fail("NOT_FOUND", "Book not found.");
+
+        var existing = await db.AssignmentBooks.FirstOrDefaultAsync(
+            x => x.AssignmentId == request.AssignmentId && x.BookId == request.BookId,
+            cancellationToken);
+        if (existing is not null)
+        {
+            existing.SetNote(request.Note);
+            await db.SaveChangesAsync(cancellationToken);
+            return Result<AssignmentBookDto>.Ok(
+                new AssignmentBookDto(existing.Id, existing.BookId, existing.Note),
+                "Note updated.");
+        }
+
+        var link = new AssignmentBook(request.AssignmentId, request.BookId, request.Note);
+        await db.AssignmentBooks.AddAsync(link, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return Result<AssignmentBookDto>.Ok(new AssignmentBookDto(link.Id, link.BookId, link.Note));
+    }
+
+    public async Task<Result> Handle(DetachBookFromAssignmentCommand request, CancellationToken cancellationToken)
+    {
+        var link = await db.AssignmentBooks.FirstOrDefaultAsync(
+            x => x.AssignmentId == request.AssignmentId && x.BookId == request.BookId,
+            cancellationToken);
+        if (link is null) return Result.Fail("NOT_FOUND", "Book is not attached to this assignment.");
+        db.AssignmentBooks.Remove(link);
+        await db.SaveChangesAsync(cancellationToken);
+        return Result.Ok("Book detached.");
+    }
+
+    public async Task<Result<IReadOnlyCollection<AssignmentBookDto>>> Handle(
+        GetAssignmentBooksQuery request, CancellationToken cancellationToken)
+    {
+        var items = await db.AssignmentBooks
+            .Where(x => x.AssignmentId == request.AssignmentId)
+            .Select(x => new AssignmentBookDto(x.Id, x.BookId, x.Note))
+            .ToListAsync(cancellationToken);
+        return Result<IReadOnlyCollection<AssignmentBookDto>>.Ok(items);
+    }
+
+    // ----- Per-student targeting ------------------------------------------
+
+    public async Task<Result<IReadOnlyCollection<AssignmentAssigneeDto>>> Handle(
+        SetAssignmentAssigneesCommand request, CancellationToken cancellationToken)
+    {
+        var assignment = await db.Assignments.FirstOrDefaultAsync(a => a.Id == request.AssignmentId, cancellationToken);
+        if (assignment is null)
+            return Result<IReadOnlyCollection<AssignmentAssigneeDto>>.Fail("NOT_FOUND", "Assignment not found.");
+
+        // Only allow assignees who are actually enrolled in the assignment's class.
+        var enrolled = await db.Enrollments
+            .Where(e => e.ClassId == assignment.ClassId)
+            .Select(e => e.StudentProfileId)
+            .ToListAsync(cancellationToken);
+        var enrolledSet = enrolled.ToHashSet();
+
+        var requested = request.StudentProfileIds.Where(id => enrolledSet.Contains(id)).Distinct().ToList();
+
+        var existing = await db.AssignmentAssignees
+            .Where(a => a.AssignmentId == request.AssignmentId)
+            .ToListAsync(cancellationToken);
+        var existingSet = existing.Select(e => e.StudentProfileId).ToHashSet();
+
+        var toRemove = existing.Where(e => !requested.Contains(e.StudentProfileId)).ToList();
+        var toAdd = requested.Where(id => !existingSet.Contains(id))
+            .Select(id => new AssignmentAssignee(request.AssignmentId, id))
+            .ToList();
+
+        if (toRemove.Count > 0) db.AssignmentAssignees.RemoveRange(toRemove);
+        if (toAdd.Count > 0) await db.AssignmentAssignees.AddRangeAsync(toAdd, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var final = requested
+            .Select(id => new AssignmentAssigneeDto(request.AssignmentId, id))
+            .ToList();
+        return Result<IReadOnlyCollection<AssignmentAssigneeDto>>.Ok(final);
+    }
+
+    public async Task<Result<IReadOnlyCollection<AssignmentAssigneeDto>>> Handle(
+        GetAssignmentAssigneesQuery request, CancellationToken cancellationToken)
+    {
+        var items = await db.AssignmentAssignees
+            .Where(a => a.AssignmentId == request.AssignmentId)
+            .Select(a => new AssignmentAssigneeDto(a.AssignmentId, a.StudentProfileId))
+            .ToListAsync(cancellationToken);
+        return Result<IReadOnlyCollection<AssignmentAssigneeDto>>.Ok(items);
     }
 
     private static AssignmentDto Map(Assignment a)

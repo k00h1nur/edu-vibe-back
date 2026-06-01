@@ -141,6 +141,25 @@ public static class Permissions
         public const string Update = "VisitorMessages.Update";
     }
 
+    public static class Books
+    {
+        public const string Read = "Books.Read";
+        public const string Manage = "Books.Manage";
+    }
+
+    public static class Tasks
+    {
+        public const string Read = "Tasks.Read";
+        public const string Manage = "Tasks.Manage";
+    }
+
+    public static class TaskSubmissions
+    {
+        public const string Read = "TaskSubmissions.Read";
+        public const string Submit = "TaskSubmissions.Submit";
+        public const string Grade = "TaskSubmissions.Grade";
+    }
+
     // Results / Roles / Permissions already existed in controllers — kept stable here.
     public static class Results
     {
@@ -188,6 +207,9 @@ public static class Permissions
         Rooms.Read, Rooms.Manage,
         Dashboard.Director, Dashboard.Office, Dashboard.Teacher, Dashboard.Student,
         VisitorMessages.Read, VisitorMessages.Update,
+        Books.Read, Books.Manage,
+        Tasks.Read, Tasks.Manage,
+        TaskSubmissions.Read, TaskSubmissions.Submit, TaskSubmissions.Grade,
         Results.Read, Results.Create, Results.Update, Results.Delete,
         Roles.Read, Roles.Create, Roles.Update, Roles.Delete, Roles.AssignPermissions,
         PermissionsCatalog.Read, PermissionsCatalog.Create, PermissionsCatalog.Update, PermissionsCatalog.Delete,
@@ -225,6 +247,9 @@ public static class RolePermissionMatrix
         Permissions.Rooms.Read, Permissions.Rooms.Manage,
         Permissions.Results.Read, Permissions.Results.Create, Permissions.Results.Update,
         Permissions.VisitorMessages.Read, Permissions.VisitorMessages.Update,
+        Permissions.Books.Read,
+        Permissions.Tasks.Read,
+        Permissions.TaskSubmissions.Read,
         Permissions.Roles.Read,
     };
 
@@ -251,6 +276,9 @@ public static class RolePermissionMatrix
         Permissions.Courses.Read, Permissions.Courses.Manage,
         Permissions.Rooms.Read, Permissions.Rooms.Manage,
         Permissions.VisitorMessages.Read, Permissions.VisitorMessages.Update,
+        Permissions.Books.Read, Permissions.Books.Manage,
+        Permissions.Tasks.Read,
+        Permissions.TaskSubmissions.Read,
         Permissions.Roles.Read,
     };
 
@@ -271,6 +299,9 @@ public static class RolePermissionMatrix
         Permissions.Results.Read,
         Permissions.Courses.Read,
         Permissions.Rooms.Read,
+        Permissions.Books.Read,
+        Permissions.Tasks.Read, Permissions.Tasks.Manage,
+        Permissions.TaskSubmissions.Read, Permissions.TaskSubmissions.Grade,
     };
 
     public static IReadOnlyCollection<string> ForSupportTeacher { get; } = new[]
@@ -285,6 +316,9 @@ public static class RolePermissionMatrix
         Permissions.Conversations.Read,
         Permissions.Messages.Read, Permissions.Messages.Send,
         Permissions.Courses.Read,
+        Permissions.Books.Read,
+        Permissions.Tasks.Read, Permissions.Tasks.Manage,
+        Permissions.TaskSubmissions.Read, Permissions.TaskSubmissions.Grade,
     };
 
     public static IReadOnlyCollection<string> ForStudent { get; } = new[]
@@ -298,5 +332,8 @@ public static class RolePermissionMatrix
         Permissions.Conversations.Read,
         Permissions.Messages.Read, Permissions.Messages.Send,
         Permissions.Results.Read,
+        Permissions.Books.Read,
+        Permissions.Tasks.Read,
+        Permissions.TaskSubmissions.Submit, Permissions.TaskSubmissions.Read,
     };
 }

@@ -86,4 +86,63 @@ public sealed class AssignmentsController(ISender sender) : ControllerBase
             ? Ok(ApiResponse<AssignmentDto>.Ok(r.Data, r.Message))
             : BadRequest(ApiResponse<AssignmentDto>.Fail(r.Message ?? "Failed"));
     }
+
+    // ----- Book attachments ------------------------------------------------
+
+    /// <summary>Books attached to this assignment (reference material).</summary>
+    [HttpGet("{id:guid}/books")]
+    [PermissionAuthorize(Permissions.Assignments.Read)]
+    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<AssignmentBookDto>>>> GetBooks(Guid id,
+        CancellationToken ct)
+    {
+        var r = await sender.Send(new GetAssignmentBooksQuery(id), ct);
+        return Ok(ApiResponse<IReadOnlyCollection<AssignmentBookDto>>.Ok(r.Data, r.Message));
+    }
+
+    /// <summary>Attach a book to this assignment. If already attached, updates the note.</summary>
+    [HttpPost("{id:guid}/books")]
+    [PermissionAuthorize(Permissions.Assignments.Update)]
+    public async Task<ActionResult<ApiResponse<AssignmentBookDto>>> AttachBook(Guid id,
+        [FromBody] AttachBookToAssignmentCommand cmd, CancellationToken ct)
+    {
+        var r = await sender.Send(cmd with { AssignmentId = id }, ct);
+        return r.Success
+            ? Ok(ApiResponse<AssignmentBookDto>.Ok(r.Data, r.Message))
+            : BadRequest(ApiResponse<AssignmentBookDto>.Fail(r.Message ?? "Failed"));
+    }
+
+    /// <summary>Detach a book from this assignment.</summary>
+    [HttpDelete("{id:guid}/books/{bookId:guid}")]
+    [PermissionAuthorize(Permissions.Assignments.Update)]
+    public async Task<ActionResult<ApiResponse<object>>> DetachBook(Guid id, Guid bookId, CancellationToken ct)
+    {
+        var r = await sender.Send(new DetachBookFromAssignmentCommand(id, bookId), ct);
+        return r.Success
+            ? Ok(ApiResponse<object>.Ok(null, r.Message))
+            : BadRequest(ApiResponse<object>.Fail(r.Message ?? "Failed"));
+    }
+
+    // ----- Per-student targeting ------------------------------------------
+
+    /// <summary>Targeted assignees. Empty list = assignment is visible to the whole class.</summary>
+    [HttpGet("{id:guid}/assignees")]
+    [PermissionAuthorize(Permissions.Assignments.Read)]
+    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<AssignmentAssigneeDto>>>> GetAssignees(Guid id,
+        CancellationToken ct)
+    {
+        var r = await sender.Send(new GetAssignmentAssigneesQuery(id), ct);
+        return Ok(ApiResponse<IReadOnlyCollection<AssignmentAssigneeDto>>.Ok(r.Data, r.Message));
+    }
+
+    /// <summary>Replace the assignee set. Empty body = whole class (default). Body = subset of students.</summary>
+    [HttpPut("{id:guid}/assignees")]
+    [PermissionAuthorize(Permissions.Assignments.Update)]
+    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<AssignmentAssigneeDto>>>> SetAssignees(Guid id,
+        [FromBody] IReadOnlyCollection<Guid> studentProfileIds, CancellationToken ct)
+    {
+        var r = await sender.Send(new SetAssignmentAssigneesCommand(id, studentProfileIds ?? Array.Empty<Guid>()), ct);
+        return r.Success
+            ? Ok(ApiResponse<IReadOnlyCollection<AssignmentAssigneeDto>>.Ok(r.Data, r.Message))
+            : BadRequest(ApiResponse<IReadOnlyCollection<AssignmentAssigneeDto>>.Fail(r.Message ?? "Failed"));
+    }
 }

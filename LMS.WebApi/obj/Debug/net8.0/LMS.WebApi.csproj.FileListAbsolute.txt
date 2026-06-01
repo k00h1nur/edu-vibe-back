@@ -289,3 +289,8 @@ C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\obj\Debug\net8.0\refint\
 C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\obj\Debug\net8.0\LMS.WebApi.pdb
 C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\obj\Debug\net8.0\LMS.WebApi.genruntimeconfig.cache
 C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\obj\Debug\net8.0\ref\LMS.WebApi.dll
+C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microsoft.Extensions.Diagnostics.Abstractions.dll
+C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microsoft.Extensions.Diagnostics.HealthChecks.dll
+C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions.dll
+C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore.dll
+C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microsoft.Extensions.Hosting.Abstractions.dll

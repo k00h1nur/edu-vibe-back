@@ -43,3 +43,32 @@ public sealed record GetAssignmentsQuery(
     Guid? ClassId = null,
     AssignmentStatus? Status = null)
     : IRequest<Result<IReadOnlyCollection<AssignmentDto>>>;
+
+// ----- Book attachments ---------------------------------------------------
+
+public sealed record AssignmentBookDto(Guid Id, Guid BookId, string? Note);
+
+public sealed record AttachBookToAssignmentCommand(Guid AssignmentId, Guid BookId, string? Note)
+    : IRequest<Result<AssignmentBookDto>>;
+
+public sealed record DetachBookFromAssignmentCommand(Guid AssignmentId, Guid BookId)
+    : IRequest<Result>;
+
+public sealed record GetAssignmentBooksQuery(Guid AssignmentId)
+    : IRequest<Result<IReadOnlyCollection<AssignmentBookDto>>>;
+
+// ----- Per-student targeting ---------------------------------------------
+
+public sealed record AssignmentAssigneeDto(Guid AssignmentId, Guid StudentProfileId);
+
+/// <summary>
+/// Replace the assignee set on an assignment. Empty list = whole class
+/// (the implicit default). Use for "assign to selected students" workflows.
+/// </summary>
+public sealed record SetAssignmentAssigneesCommand(
+    Guid AssignmentId,
+    IReadOnlyCollection<Guid> StudentProfileIds)
+    : IRequest<Result<IReadOnlyCollection<AssignmentAssigneeDto>>>;
+
+public sealed record GetAssignmentAssigneesQuery(Guid AssignmentId)
+    : IRequest<Result<IReadOnlyCollection<AssignmentAssigneeDto>>>;

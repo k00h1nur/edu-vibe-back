@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace LMS.Application.Features.Classes;
 
 public sealed class ClassesHandlers(IApplicationDbContext db) :
-    IRequestHandler<GetClassesQuery, Result<IReadOnlyCollection<ClassDto>>>,
+    IRequestHandler<GetClassesQuery, Result<PagedResult<ClassDto>>>,
     IRequestHandler<GetClassByIdQuery, Result<ClassDto>>,
     IRequestHandler<GetAssignedClassesQuery, Result<IReadOnlyCollection<ClassDto>>>,
     IRequestHandler<CreateClassCommand, Result<ClassDto>>,

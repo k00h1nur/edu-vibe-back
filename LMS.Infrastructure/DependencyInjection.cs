@@ -28,6 +28,7 @@ public static class DependencyInjection
         services.AddHttpContextAccessor();
         services.AddHttpClient("Telegram", c => c.Timeout = TimeSpan.FromSeconds(10));
         services.AddScoped<ITelegramNotifier, TelegramNotifier>();
+        services.AddSingleton<ITaskGrader, TaskGrader>();
         return services;
     }
 

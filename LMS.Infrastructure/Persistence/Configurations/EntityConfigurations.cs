@@ -330,6 +330,89 @@ public sealed class ResultViewConfiguration : IEntityTypeConfiguration<ResultVie
     }
 }
 
+public sealed class BookConfiguration : IEntityTypeConfiguration<Book>
+{
+    public void Configure(EntityTypeBuilder<Book> b)
+    {
+        b.ToTable("books");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Title).IsRequired().HasMaxLength(256);
+        b.Property(x => x.Author).HasMaxLength(256);
+        b.Property(x => x.Subject).HasMaxLength(64);
+        b.Property(x => x.Level).HasMaxLength(32);
+        b.Property(x => x.Description).HasMaxLength(2000);
+        b.Property(x => x.CoverImageUrl).HasMaxLength(1024);
+        b.Property(x => x.FileUrl).HasMaxLength(1024);
+        b.HasIndex(x => x.Title);
+        b.HasIndex(x => x.Subject);
+    }
+}
+
+public sealed class AssignmentBookConfiguration : IEntityTypeConfiguration<AssignmentBook>
+{
+    public void Configure(EntityTypeBuilder<AssignmentBook> b)
+    {
+        b.ToTable("assignment_books");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Note).HasMaxLength(512);
+        b.HasIndex(x => new { x.AssignmentId, x.BookId }).IsUnique();
+        b.HasOne(x => x.Assignment).WithMany().HasForeignKey(x => x.AssignmentId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.HasOne(x => x.Book).WithMany(x => x.AssignmentLinks).HasForeignKey(x => x.BookId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public sealed class AssignmentAssigneeConfiguration : IEntityTypeConfiguration<AssignmentAssignee>
+{
+    public void Configure(EntityTypeBuilder<AssignmentAssignee> b)
+    {
+        b.ToTable("assignment_assignees");
+        b.HasKey(x => x.Id);
+        b.HasIndex(x => new { x.AssignmentId, x.StudentProfileId }).IsUnique();
+        b.HasIndex(x => x.StudentProfileId).HasDatabaseName("ix_assignment_assignees_student_id");
+        b.HasOne(x => x.Assignment).WithMany().HasForeignKey(x => x.AssignmentId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.HasOne(x => x.StudentProfile).WithMany().HasForeignKey(x => x.StudentProfileId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public sealed class LearningTaskConfiguration : IEntityTypeConfiguration<LearningTask>
+{
+    public void Configure(EntityTypeBuilder<LearningTask> b)
+    {
+        b.ToTable("learning_tasks");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Title).IsRequired().HasMaxLength(256);
+        // jsonb on PostgreSQL — efficient nested-path queries + smaller storage.
+        b.Property(x => x.ContentJson).IsRequired().HasColumnType("jsonb");
+        b.Property(x => x.SolutionJson).HasColumnType("jsonb");
+        b.HasIndex(x => new { x.AssignmentId, x.Order })
+            .HasDatabaseName("ix_learning_tasks_assignment_order");
+        b.HasOne(x => x.Assignment).WithMany().HasForeignKey(x => x.AssignmentId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public sealed class TaskSubmissionConfiguration : IEntityTypeConfiguration<TaskSubmission>
+{
+    public void Configure(EntityTypeBuilder<TaskSubmission> b)
+    {
+        b.ToTable("task_submissions");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.ResponseJson).IsRequired().HasColumnType("jsonb");
+        b.Property(x => x.Score).HasPrecision(5, 4);
+        b.Property(x => x.TeacherFeedback).HasMaxLength(2000);
+        b.HasIndex(x => new { x.TaskId, x.StudentProfileId }).IsUnique();
+        b.HasIndex(x => x.StudentProfileId).HasDatabaseName("ix_task_submissions_student_id");
+        b.HasOne(x => x.Task).WithMany(x => x.Submissions).HasForeignKey(x => x.TaskId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.HasOne(x => x.StudentProfile).WithMany().HasForeignKey(x => x.StudentProfileId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 public sealed class VisitorMessageConfiguration : IEntityTypeConfiguration<VisitorMessage>
 {
     public void Configure(EntityTypeBuilder<VisitorMessage> b)
