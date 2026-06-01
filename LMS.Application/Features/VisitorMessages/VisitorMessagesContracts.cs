@@ -20,7 +20,14 @@ public sealed record VisitorMessageDto(
 
 /// <summary>
 /// Inbound message from a visitor. Anonymous endpoint — used by the marketing
-/// site's contact form and demo-lesson form.
+/// site's contact form, demo-lesson form, mock-test registration, and
+/// level-check request.
+///
+/// <c>HoneypotField</c> is a server-side anti-spam check. The marketing site
+/// renders a hidden input that real users never see; bots fill it. If it has
+/// any value, the handler silently returns success without persisting
+/// anything — bots think they got through but no record is created and no
+/// Telegram ping fires.
 /// </summary>
 public sealed record CreateVisitorMessageCommand(
     string Name,
@@ -30,7 +37,8 @@ public sealed record CreateVisitorMessageCommand(
     VisitorMessageSource Source,
     string? Course = null,
     string? PreferredTime = null,
-    string? Language = null) : IRequest<Result<VisitorMessageDto>>;
+    string? Language = null,
+    string? HoneypotField = null) : IRequest<Result<VisitorMessageDto>>;
 
 /// <summary>Admin inbox query — paginated, filterable by read state.</summary>
 public sealed record GetVisitorMessagesQuery(

@@ -1,5 +1,7 @@
+using LMS.Application.Common.Models;
 using LMS.Application.Common.Security;
 using LMS.Application.Features.Payments;
+using LMS.Domain.Enums;
 using LMS.WebApi.Common;
 using LMS.WebApi.Security;
 using MediatR;
@@ -15,10 +17,14 @@ public sealed class PaymentsController(ISender sender) : ControllerBase
 {
     [HttpGet]
     [PermissionAuthorize(Permissions.Payments.Read)]
-    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<PaymentDto>>>> All(CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<PagedResult<PaymentDto>>>> All(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
+        [FromQuery] PaymentStatus? status = null,
+        CancellationToken ct = default)
     {
-        var r = await sender.Send(new GetPaymentsQuery(), ct);
-        return Ok(ApiResponse<IReadOnlyCollection<PaymentDto>>.Ok(r.Data, r.Message));
+        var r = await sender.Send(new GetPaymentsQuery(page, pageSize, status), ct);
+        return Ok(ApiResponse<PagedResult<PaymentDto>>.Ok(r.Data, r.Message));
     }
 
     [HttpGet("student/{studentProfileId:guid}")]

@@ -30,6 +30,9 @@ public sealed record MarkPaymentFailedCommand(Guid PaymentId) : IRequest<Result<
 
 public sealed record GetStudentPaymentsQuery(Guid StudentProfileId) : IRequest<Result<IReadOnlyCollection<PaymentDto>>>;
 
-public sealed record GetPaymentsQuery : IRequest<Result<IReadOnlyCollection<PaymentDto>>>;
+public sealed record GetPaymentsQuery(
+    int Page = 1,
+    int PageSize = 25,
+    PaymentStatus? Status = null) : IRequest<Result<PagedResult<PaymentDto>>>;
 
 public sealed record GetRevenueSummaryQuery : IRequest<Result<decimal>>;

@@ -6,6 +6,7 @@ using LMS.WebApi.Security;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace LMS.WebApi.Controllers;
 
@@ -18,9 +19,13 @@ namespace LMS.WebApi.Controllers;
 [Route("api/[controller]")]
 public sealed class VisitorMessagesController(ISender sender) : ControllerBase
 {
-    /// <summary>Submit a message as an unauthenticated visitor. Triggers a Telegram ping.</summary>
+    /// <summary>
+    /// Submit a message as an unauthenticated visitor. Rate limited to
+    /// 10 requests / minute per remote IP. Triggers a Telegram ping.
+    /// </summary>
     [HttpPost]
     [AllowAnonymous]
+    [EnableRateLimiting("visitor-submit")]
     public async Task<ActionResult<ApiResponse<VisitorMessageDto>>> Submit(
         [FromBody] CreateVisitorMessageCommand command, CancellationToken ct)
     {

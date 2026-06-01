@@ -16,6 +16,20 @@ public sealed class CreateVisitorMessageCommandHandler(
     public async Task<Result<VisitorMessageDto>> Handle(
         CreateVisitorMessageCommand request, CancellationToken cancellationToken)
     {
+        // Honeypot: if the bot filled the hidden field, pretend success without
+        // persisting. Same response shape so the bot gets no signal.
+        if (!string.IsNullOrWhiteSpace(request.HoneypotField))
+        {
+            logger.LogInformation(
+                "Honeypot triggered — dropping visitor message from source {Source}.", request.Source);
+            return Result<VisitorMessageDto>.Ok(
+                new VisitorMessageDto(
+                    Guid.Empty, request.Name, request.Phone, request.Email, request.Message,
+                    request.Source, request.Course, request.PreferredTime, request.Language,
+                    false, null, DateTime.UtcNow),
+                "Message received.");
+        }
+
         var entity = new VisitorMessage(
             request.Name, request.Phone, request.Email, request.Message,
             request.Source, request.Course, request.PreferredTime, request.Language);

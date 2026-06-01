@@ -1,3 +1,4 @@
+using LMS.Application.Common.Models;
 using LMS.Application.Common.Security;
 using LMS.Application.Features.Staff;
 using LMS.WebApi.Common;
@@ -15,10 +16,14 @@ public sealed class StaffController(ISender sender) : ControllerBase
 {
     [HttpGet]
     [PermissionAuthorize(Permissions.Staff.Read)]
-    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<StaffDto>>>> GetAll(CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<PagedResult<StaffDto>>>> GetAll(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
+        [FromQuery] string? search = null,
+        CancellationToken ct = default)
     {
-        var r = await sender.Send(new GetStaffQuery(), ct);
-        return Ok(ApiResponse<IReadOnlyCollection<StaffDto>>.Ok(r.Data, r.Message));
+        var r = await sender.Send(new GetStaffQuery(page, pageSize, search), ct);
+        return Ok(ApiResponse<PagedResult<StaffDto>>.Ok(r.Data, r.Message));
     }
 
     /// <summary>Returns the staff profile linked to the authenticated user. No extra permission required.</summary>

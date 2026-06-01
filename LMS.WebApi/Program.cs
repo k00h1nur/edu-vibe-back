@@ -1,10 +1,17 @@
+using System.Threading.RateLimiting;
 using LMS.Application;
+using LMS.Application.Common.Abstractions;
 using LMS.Infrastructure;
 using LMS.WebApi.Extensions;
 using LMS.WebApi.Middleware;
 using LMS.WebApi.Security;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Serilog;
 using Microsoft.Extensions.FileProviders;
+using LMS.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +25,29 @@ builder.Services.AddSwagger();
 builder.Services.AddHostedService<PermissionDiscoveryHostedService>();
 // Must run AFTER PermissionDiscoveryHostedService — hosted services start in registration order.
 builder.Services.AddHostedService<RolePermissionSeederHostedService>();
+
+// Health checks — wires up /health (liveness, always OK if process is up) and
+// /health/ready (readiness, also pings the DB so load balancers can wait for warm starts).
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<LMSDbContext>("postgres", failureStatus: HealthStatus.Unhealthy);
+
+// Rate limiting — applied selectively via [EnableRateLimiting] on hot anonymous
+// endpoints (currently just POST /api/VisitorMessages). 10 requests / minute per
+// remote IP, queue depth 0 — over-limit returns 429 immediately.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("visitor-submit", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+            }));
+});
+
 var redisConn = builder.Configuration["Redis:ConnectionString"];
 if (!string.IsNullOrWhiteSpace(redisConn))
 {
@@ -51,8 +81,18 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Liveness — always 200 if the process is up. Used by k8s livenessProbe / docker HEALTHCHECK.
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    Predicate = _ => false,
+});
+// Readiness — 200 only when the DB and any other deps are reachable. Used by load
+// balancers + k8s readinessProbe to know when to send traffic.
+app.MapHealthChecks("/health/ready");
+
 app.MapControllers();
 app.Run();
- 

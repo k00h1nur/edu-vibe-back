@@ -67,12 +67,25 @@ public sealed class ClassesHandlers(IApplicationDbContext db) :
         return c is null ? Result<ClassDto>.Fail("NOT_FOUND", "Class not found.") : Result<ClassDto>.Ok(Map(c));
     }
 
-    public async Task<Result<IReadOnlyCollection<ClassDto>>> Handle(GetClassesQuery request,
+    public async Task<Result<PagedResult<ClassDto>>> Handle(GetClassesQuery request,
         CancellationToken cancellationToken)
     {
-        return Result<IReadOnlyCollection<ClassDto>>.Ok(await db.Classes
-            .Select(c => new ClassDto(c.Id, c.Title, c.MaxStudents, c.Modality, c.Status, c.TeacherUserId))
-            .ToListAsync(cancellationToken));
+        var page = new PageRequest(request.Page, request.PageSize, request.Search);
+
+        var query = db.Classes
+            .Select(c => new ClassDto(c.Id, c.Title, c.MaxStudents, c.Modality, c.Status, c.TeacherUserId));
+
+        if (page.NormalizedSearch is { } search)
+            query = query.Where(c => c.Title.ToLower().Contains(search));
+
+        var total = await query.CountAsync(cancellationToken);
+        var items = await query
+            .OrderBy(c => c.Title)
+            .Skip(page.Skip)
+            .Take(page.NormalizedPageSize)
+            .ToListAsync(cancellationToken);
+
+        return Result<PagedResult<ClassDto>>.Ok(PagedResult<ClassDto>.From(items, total, page));
     }
 
     public async Task<Result<IReadOnlyCollection<Guid>>> Handle(GetClassStudentsQuery request,

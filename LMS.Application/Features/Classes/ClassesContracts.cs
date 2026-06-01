@@ -34,7 +34,8 @@ public sealed record UpdateClassCommand(
 
 public sealed record CancelClassCommand(Guid ClassId) : IRequest<Result>;
 
-public sealed record GetClassesQuery : IRequest<Result<IReadOnlyCollection<ClassDto>>>;
+public sealed record GetClassesQuery(int Page = 1, int PageSize = 25, string? Search = null)
+    : IRequest<Result<PagedResult<ClassDto>>>;
 
 public sealed record GetClassByIdQuery(Guid ClassId) : IRequest<Result<ClassDto>>;
 

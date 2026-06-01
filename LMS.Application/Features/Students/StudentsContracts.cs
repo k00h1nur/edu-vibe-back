@@ -20,7 +20,8 @@ public sealed record RegisterStudentCommand(Guid UserId) : IRequest<Result<Stude
 public sealed record UpdateStudentProfileCommand(Guid StudentProfileId, int Xp, int Streak)
     : IRequest<Result<StudentDto>>;
 
-public sealed record GetStudentsQuery : IRequest<Result<IReadOnlyCollection<StudentDto>>>;
+public sealed record GetStudentsQuery(int Page = 1, int PageSize = 25, string? Search = null)
+    : IRequest<Result<PagedResult<StudentDto>>>;
 
 public sealed record GetStudentDetailQuery(Guid StudentProfileId) : IRequest<Result<StudentDto>>;
 

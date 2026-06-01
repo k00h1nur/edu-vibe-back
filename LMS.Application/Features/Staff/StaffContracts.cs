@@ -21,7 +21,8 @@ public sealed record CreateStaffCommand(Guid UserId, EmploymentType EmploymentTy
 public sealed record UpdateStaffProfileCommand(Guid StaffProfileId, EmploymentType EmploymentType)
     : IRequest<Result<StaffDto>>;
 
-public sealed record GetStaffQuery : IRequest<Result<IReadOnlyCollection<StaffDto>>>;
+public sealed record GetStaffQuery(int Page = 1, int PageSize = 25, string? Search = null)
+    : IRequest<Result<PagedResult<StaffDto>>>;
 
 /// <summary>Returns the staff profile linked to the currently authenticated user.</summary>
 public sealed record GetMyStaffProfileQuery : IRequest<Result<StaffDto>>;

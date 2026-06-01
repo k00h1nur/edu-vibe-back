@@ -1,3 +1,4 @@
+using LMS.Application.Common.Models;
 using LMS.Application.Common.Security;
 using LMS.Application.Features.Students;
 using LMS.WebApi.Common;
@@ -13,13 +14,17 @@ namespace LMS.WebApi.Controllers;
 [Authorize]
 public sealed class StudentsController(ISender sender) : ControllerBase
 {
-    /// <summary>Lists every student profile. Admin/teacher only.</summary>
+    /// <summary>Lists student profiles, paginated. Admin/teacher only.</summary>
     [HttpGet]
     [PermissionAuthorize(Permissions.Students.Read)]
-    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<StudentDto>>>> GetAll(CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<PagedResult<StudentDto>>>> GetAll(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
+        [FromQuery] string? search = null,
+        CancellationToken ct = default)
     {
-        var r = await sender.Send(new GetStudentsQuery(), ct);
-        return Ok(ApiResponse<IReadOnlyCollection<StudentDto>>.Ok(r.Data, r.Message));
+        var r = await sender.Send(new GetStudentsQuery(page, pageSize, search), ct);
+        return Ok(ApiResponse<PagedResult<StudentDto>>.Ok(r.Data, r.Message));
     }
 
     /// <summary>Returns the student profile linked to the authenticated user. No extra permission required.</summary>

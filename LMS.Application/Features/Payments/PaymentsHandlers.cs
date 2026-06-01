@@ -12,7 +12,7 @@ public sealed class PaymentsHandlers(IApplicationDbContext db) :
     IRequestHandler<MarkPaymentPaidCommand, Result<PaymentDto>>,
     IRequestHandler<MarkPaymentFailedCommand, Result<PaymentDto>>,
     IRequestHandler<GetStudentPaymentsQuery, Result<IReadOnlyCollection<PaymentDto>>>,
-    IRequestHandler<GetPaymentsQuery, Result<IReadOnlyCollection<PaymentDto>>>,
+    IRequestHandler<GetPaymentsQuery, Result<PagedResult<PaymentDto>>>,
     IRequestHandler<GetRevenueSummaryQuery, Result<decimal>>
 {
     public async Task<Result<PaymentDto>> Handle(CreatePaymentCommand request, CancellationToken cancellationToken)
@@ -23,12 +23,23 @@ public sealed class PaymentsHandlers(IApplicationDbContext db) :
         return Result<PaymentDto>.Ok(Map(p));
     }
 
-    public async Task<Result<IReadOnlyCollection<PaymentDto>>> Handle(GetPaymentsQuery request,
+    public async Task<Result<PagedResult<PaymentDto>>> Handle(GetPaymentsQuery request,
         CancellationToken cancellationToken)
     {
-        return Result<IReadOnlyCollection<PaymentDto>>.Ok(await db.Payments
+        var page = new PageRequest(request.Page, request.PageSize);
+
+        var query = db.Payments.AsQueryable();
+        if (request.Status is { } status) query = query.Where(p => p.Status == status);
+
+        var total = await query.CountAsync(cancellationToken);
+        var items = await query
+            .OrderByDescending(p => p.CreatedAt)
+            .Skip(page.Skip)
+            .Take(page.NormalizedPageSize)
             .Select(p => new PaymentDto(p.Id, p.StudentProfileId, p.Amount, p.Method, p.Status))
-            .ToListAsync(cancellationToken));
+            .ToListAsync(cancellationToken);
+
+        return Result<PagedResult<PaymentDto>>.Ok(PagedResult<PaymentDto>.From(items, total, page));
     }
 
     public async Task<Result<decimal>> Handle(GetRevenueSummaryQuery request, CancellationToken cancellationToken)

@@ -7,15 +7,30 @@ using Microsoft.EntityFrameworkCore;
 namespace LMS.Application.Features.Students;
 
 public sealed class GetStudentsQueryHandler(IApplicationDbContext db)
-    : IRequestHandler<GetStudentsQuery, Result<IReadOnlyCollection<StudentDto>>>
+    : IRequestHandler<GetStudentsQuery, Result<PagedResult<StudentDto>>>
 {
-    public async Task<Result<IReadOnlyCollection<StudentDto>>> Handle(GetStudentsQuery request,
+    public async Task<Result<PagedResult<StudentDto>>> Handle(GetStudentsQuery request,
         CancellationToken cancellationToken)
     {
-        var data = await db.StudentProfiles
-            .Join(db.Users, s => s.UserId, u => u.Id, (s, u) => new StudentDto(s.Id, s.UserId, u.Email, s.XP, s.Streak))
+        var page = new PageRequest(request.Page, request.PageSize, request.Search);
+
+        var query = db.StudentProfiles
+            .Join(db.Users, s => s.UserId, u => u.Id,
+                (s, u) => new StudentDto(s.Id, s.UserId, u.Email, s.XP, s.Streak));
+
+        if (page.NormalizedSearch is { } search)
+        {
+            query = query.Where(d => d.Email.ToLower().Contains(search));
+        }
+
+        var total = await query.CountAsync(cancellationToken);
+        var items = await query
+            .OrderBy(d => d.Email)
+            .Skip(page.Skip)
+            .Take(page.NormalizedPageSize)
             .ToListAsync(cancellationToken);
-        return Result<IReadOnlyCollection<StudentDto>>.Ok(data);
+
+        return Result<PagedResult<StudentDto>>.Ok(PagedResult<StudentDto>.From(items, total, page));
     }
 }
 

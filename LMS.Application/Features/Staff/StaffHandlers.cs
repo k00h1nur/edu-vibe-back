@@ -7,15 +7,28 @@ using Microsoft.EntityFrameworkCore;
 namespace LMS.Application.Features.Staff;
 
 public sealed class GetStaffQueryHandler(IApplicationDbContext db)
-    : IRequestHandler<GetStaffQuery, Result<IReadOnlyCollection<StaffDto>>>
+    : IRequestHandler<GetStaffQuery, Result<PagedResult<StaffDto>>>
 {
-    public async Task<Result<IReadOnlyCollection<StaffDto>>> Handle(GetStaffQuery request,
+    public async Task<Result<PagedResult<StaffDto>>> Handle(GetStaffQuery request,
         CancellationToken cancellationToken)
     {
-        var data = await db.StaffProfiles
-            .Join(db.Users, s => s.UserId, u => u.Id, (s, u) => new StaffDto(s.Id, s.UserId, u.Email, s.EmploymentType))
+        var page = new PageRequest(request.Page, request.PageSize, request.Search);
+
+        var query = db.StaffProfiles
+            .Join(db.Users, s => s.UserId, u => u.Id,
+                (s, u) => new StaffDto(s.Id, s.UserId, u.Email, s.EmploymentType));
+
+        if (page.NormalizedSearch is { } search)
+            query = query.Where(d => d.Email.ToLower().Contains(search));
+
+        var total = await query.CountAsync(cancellationToken);
+        var items = await query
+            .OrderBy(d => d.Email)
+            .Skip(page.Skip)
+            .Take(page.NormalizedPageSize)
             .ToListAsync(cancellationToken);
-        return Result<IReadOnlyCollection<StaffDto>>.Ok(data);
+
+        return Result<PagedResult<StaffDto>>.Ok(PagedResult<StaffDto>.From(items, total, page));
     }
 }
 

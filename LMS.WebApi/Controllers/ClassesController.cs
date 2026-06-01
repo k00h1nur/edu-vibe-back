@@ -1,3 +1,4 @@
+using LMS.Application.Common.Models;
 using LMS.Application.Common.Security;
 using LMS.Application.Features.Classes;
 using LMS.WebApi.Common;
@@ -15,10 +16,14 @@ public sealed class ClassesController(ISender sender) : ControllerBase
 {
     [HttpGet]
     [PermissionAuthorize(Permissions.Classes.Read)]
-    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<ClassDto>>>> GetAll(CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<PagedResult<ClassDto>>>> GetAll(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
+        [FromQuery] string? search = null,
+        CancellationToken ct = default)
     {
-        var r = await sender.Send(new GetClassesQuery(), ct);
-        return Ok(ApiResponse<IReadOnlyCollection<ClassDto>>.Ok(r.Data, r.Message));
+        var r = await sender.Send(new GetClassesQuery(page, pageSize, search), ct);
+        return Ok(ApiResponse<PagedResult<ClassDto>>.Ok(r.Data, r.Message));
     }
 
     [HttpGet("{id:guid}")]
