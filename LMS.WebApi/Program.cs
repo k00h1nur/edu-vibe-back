@@ -26,6 +26,30 @@ builder.Services.AddHostedService<PermissionDiscoveryHostedService>();
 // Must run AFTER PermissionDiscoveryHostedService — hosted services start in registration order.
 builder.Services.AddHostedService<RolePermissionSeederHostedService>();
 
+// CORS — browser clients (marketing site at :5173, LMS admin at :3000) need
+// the API origin to whitelist them. Origins are config-driven via
+// "Cors:AllowedOrigins"; a sensible localhost default kicks in if the array
+// is empty so a fresh checkout works without extra setup. AllowCredentials is
+// on so the Next.js admin can send its httpOnly cookie on /me etc.
+var corsOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>();
+if (corsOrigins is null || corsOrigins.Length == 0)
+{
+    corsOrigins = new[]
+    {
+        "http://localhost:5173", // Vite (marketing)
+        "http://localhost:5174", // Vite fallback port
+        "http://localhost:3000", // Next.js (LMS admin)
+        "http://localhost:3001",
+    };
+}
+builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
+    .WithOrigins(corsOrigins)
+    .AllowAnyHeader()
+    .AllowAnyMethod()
+    .AllowCredentials()));
+
 // Health checks — wires up /health (liveness, always OK if process is up) and
 // /health/ready (readiness, also pings the DB so load balancers can wait for warm starts).
 builder.Services.AddHealthChecks()
@@ -94,6 +118,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+// CORS must come BEFORE auth and rate limiter so preflight OPTIONS requests
+// short-circuit cleanly without being rate-limited or rejected as unauthorized.
+app.UseCors();
 
 app.UseRateLimiter();
 app.UseAuthentication();
