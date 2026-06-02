@@ -186,6 +186,37 @@ public static class Permissions
         public const string Delete = "Permissions.Delete";
     }
 
+    // ─── Capability gates surfaced as sidebar items ──────────────────────────
+    // These don't (yet) map to dedicated controllers, but every sidebar / route
+    // gate references them so a role without the grant doesn't get an unwired
+    // landing page. Granting these via the matrix below is how each role is
+    // differentiated in the UI.
+
+    /// <summary>Course materials library — readable / managed reference content.</summary>
+    public static class Materials
+    {
+        public const string Read = "Materials.Read";
+        public const string Manage = "Materials.Manage";
+    }
+
+    /// <summary>Analytics surfaces: progress, performance, class-level rollups.</summary>
+    public static class Analytics
+    {
+        public const string Read = "Analytics.Read";
+    }
+
+    /// <summary>Operational reports (payments, attendance, enrolment).</summary>
+    public static class Reports
+    {
+        public const string Read = "Reports.Read";
+    }
+
+    /// <summary>Self-directed practice / drills (student-facing).</summary>
+    public static class Practice
+    {
+        public const string Read = "Practice.Read";
+    }
+
     /// <summary>Flat list of every permission code — used by seed data and tests.</summary>
     public static IReadOnlyCollection<string> All { get; } = new[]
     {
@@ -213,6 +244,10 @@ public static class Permissions
         Results.Read, Results.Create, Results.Update, Results.Delete,
         Roles.Read, Roles.Create, Roles.Update, Roles.Delete, Roles.AssignPermissions,
         PermissionsCatalog.Read, PermissionsCatalog.Create, PermissionsCatalog.Update, PermissionsCatalog.Delete,
+        Materials.Read, Materials.Manage,
+        Analytics.Read,
+        Reports.Read,
+        Practice.Read,
     };
 }
 
@@ -251,6 +286,10 @@ public static class RolePermissionMatrix
         Permissions.Tasks.Read,
         Permissions.TaskSubmissions.Read,
         Permissions.Roles.Read,
+        // UI capability gates — Director sees the analytics-heavy view + reports.
+        Permissions.Materials.Read,
+        Permissions.Analytics.Read,
+        Permissions.Reports.Read,
     };
 
     public static IReadOnlyCollection<string> ForOfficeAdmin { get; } = new[]
@@ -280,6 +319,9 @@ public static class RolePermissionMatrix
         Permissions.Tasks.Read,
         Permissions.TaskSubmissions.Read,
         Permissions.Roles.Read,
+        // UI capability gates — Office sees materials + ops reports, no analytics drill-down.
+        Permissions.Materials.Read, Permissions.Materials.Manage,
+        Permissions.Reports.Read,
     };
 
     public static IReadOnlyCollection<string> ForTeacher { get; } = new[]
@@ -302,6 +344,9 @@ public static class RolePermissionMatrix
         Permissions.Books.Read,
         Permissions.Tasks.Read, Permissions.Tasks.Manage,
         Permissions.TaskSubmissions.Read, Permissions.TaskSubmissions.Grade,
+        // UI capability gates — Teacher curates materials + sees class-level analytics.
+        Permissions.Materials.Read, Permissions.Materials.Manage,
+        Permissions.Analytics.Read,
     };
 
     public static IReadOnlyCollection<string> ForSupportTeacher { get; } = new[]
@@ -319,6 +364,8 @@ public static class RolePermissionMatrix
         Permissions.Books.Read,
         Permissions.Tasks.Read, Permissions.Tasks.Manage,
         Permissions.TaskSubmissions.Read, Permissions.TaskSubmissions.Grade,
+        // UI capability gates — Support gets read-only materials, no analytics surface.
+        Permissions.Materials.Read,
     };
 
     public static IReadOnlyCollection<string> ForStudent { get; } = new[]
@@ -335,5 +382,8 @@ public static class RolePermissionMatrix
         Permissions.Books.Read,
         Permissions.Tasks.Read,
         Permissions.TaskSubmissions.Submit, Permissions.TaskSubmissions.Read,
+        // UI capability gates — Student gets self-directed practice + reference materials.
+        Permissions.Materials.Read,
+        Permissions.Practice.Read,
     };
 }

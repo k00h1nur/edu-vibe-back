@@ -72,8 +72,11 @@ public sealed class ClassesHandlers(IApplicationDbContext db) :
     {
         var page = new PageRequest(request.Page, request.PageSize, request.Search);
 
-        var query = db.Classes
-            .Select(c => new ClassDto(c.Id, c.Title, c.MaxStudents, c.Modality, c.Status, c.TeacherUserId));
+        // Keep the queryable on the entity, filter and order on entity columns,
+        // and project to the DTO LAST. Projecting to `new ClassDto(...)` up
+        // front and then OrderBy(d => d.Title) is the EF-untranslatable
+        // anti-pattern that also broke Staff and Students earlier this session.
+        var query = db.Classes.AsNoTracking();
 
         if (page.NormalizedSearch is { } search)
             query = query.Where(c => c.Title.ToLower().Contains(search));
@@ -83,6 +86,7 @@ public sealed class ClassesHandlers(IApplicationDbContext db) :
             .OrderBy(c => c.Title)
             .Skip(page.Skip)
             .Take(page.NormalizedPageSize)
+            .Select(c => new ClassDto(c.Id, c.Title, c.MaxStudents, c.Modality, c.Status, c.TeacherUserId))
             .ToListAsync(cancellationToken);
 
         return Result<PagedResult<ClassDto>>.Ok(PagedResult<ClassDto>.From(items, total, page));

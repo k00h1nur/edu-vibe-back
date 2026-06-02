@@ -6,17 +6,20 @@ using Microsoft.EntityFrameworkCore;
 namespace LMS.WebApi.Security;
 
 /// <summary>
-/// Applies <see cref="RolePermissionMatrix"/> defaults the first time a role
-/// has no grants at all. Once a role has any rows in <c>role_permissions</c>
-/// — whether seeded here previously or created via the admin API — this
-/// service leaves it alone forever.
+/// Applies <see cref="RolePermissionMatrix"/> defaults to roles. Two modes:
 ///
-/// Why bootstrap-once instead of "INSERT any missing":
-///   • If an admin revokes a default grant via the API, a strictly-additive
-///     seeder would silently re-add it on the next boot, undoing the change.
-///   • Per-role granularity is the right level: a brand-new role (added via
-///     the admin UI later) starts empty and would get NO defaults, but new
-///     roles aren't covered by the matrix anyway — they're admin-curated.
+/// <para><b>Bootstrap-once (default).</b> The first time a role has zero rows
+/// in <c>role_permissions</c> the matrix defaults land. Once it has any grants
+/// — whether seeded here previously or created via the admin API — this service
+/// leaves it alone forever. This protects an admin's deliberate removals from
+/// being silently undone on the next boot.</para>
+///
+/// <para><b>Top-up mode (opt-in via config).</b> Set
+/// <c>RolePermissions:TopUpDefaults=true</c> in configuration to additionally
+/// grant any matrix permission a role is missing — useful when the matrix grew
+/// new entries (e.g. new modules) and existing roles need to catch up. This
+/// mode WILL re-add anything an admin removed, so flip it on once, restart,
+/// then flip it back off.</para>
 ///
 /// Runs immediately after <see cref="PermissionDiscoveryHostedService"/> in
 /// <c>Program.cs</c>'s registration order, so the <c>permissions</c> table
@@ -24,6 +27,7 @@ namespace LMS.WebApi.Security;
 /// </summary>
 public sealed class RolePermissionSeederHostedService(
     IServiceProvider serviceProvider,
+    IConfiguration configuration,
     ILogger<RolePermissionSeederHostedService> logger)
     : IHostedService
 {
@@ -48,16 +52,18 @@ public sealed class RolePermissionSeederHostedService(
             .ToDictionaryAsync(r => r.Code, r => r.Id,
                 StringComparer.OrdinalIgnoreCase, cancellationToken);
 
-        // Roles that already have ANY grants are considered "initialized" and
-        // off-limits — admin customizations (additions or removals) are
-        // preserved as-is.
-        var initializedRoleIds = await db.RolePermissions
-            .Select(rp => rp.RoleId)
-            .Distinct()
+        // Existing (role, permission) pairs — used by both bootstrap and top-up
+        // modes to know what's already there.
+        var existingPairs = await db.RolePermissions
+            .Select(rp => new { rp.RoleId, rp.PermissionId })
             .ToListAsync(cancellationToken);
-        var initialized = initializedRoleIds.ToHashSet();
+        var existing = new HashSet<(Guid RoleId, Guid PermissionId)>(
+            existingPairs.Select(p => (p.RoleId, p.PermissionId)));
+        var initialized = existing.Select(p => p.RoleId).ToHashSet();
 
-        // (RoleCode → permission codes to grant on first bootstrap).
+        var topUp = configuration.GetValue("RolePermissions:TopUpDefaults", false);
+
+        // (RoleCode → matrix defaults).
         var defaults = new (string RoleCode, IEnumerable<string> Codes)[]
         {
             (RoleCodes.SuperAdmin,      Permissions.All),
@@ -70,6 +76,7 @@ public sealed class RolePermissionSeederHostedService(
         };
 
         var bootstrappedRoles = 0;
+        var toppedUpRoles = 0;
         var insertedRows = 0;
 
         foreach (var (roleCode, codes) in defaults)
@@ -80,7 +87,8 @@ public sealed class RolePermissionSeederHostedService(
                 continue;
             }
 
-            if (initialized.Contains(roleId))
+            var isInitialized = initialized.Contains(roleId);
+            if (isInitialized && !topUp)
             {
                 logger.LogDebug(
                     "Role {Role} already has grants — leaving admin configuration untouched.",
@@ -88,6 +96,7 @@ public sealed class RolePermissionSeederHostedService(
                 continue;
             }
 
+            var addedThisRole = 0;
             foreach (var code in codes)
             {
                 if (!permissionIdByCode.TryGetValue(code, out var permissionId))
@@ -98,19 +107,37 @@ public sealed class RolePermissionSeederHostedService(
                     continue;
                 }
 
+                // Top-up mode: skip pairs that already exist; only insert the
+                // missing matrix entries. Bootstrap mode: nothing exists for
+                // this role yet, so the existing-set check is also safe.
+                if (existing.Contains((roleId, permissionId))) continue;
+
                 await db.RolePermissions.AddAsync(new RolePermission(roleId, permissionId),
                     cancellationToken);
+                existing.Add((roleId, permissionId));
+                addedThisRole++;
                 insertedRows++;
             }
-            bootstrappedRoles++;
+
+            if (addedThisRole > 0)
+            {
+                if (isInitialized) toppedUpRoles++;
+                else bootstrappedRoles++;
+            }
         }
 
         if (insertedRows > 0)
         {
             await db.SaveChangesAsync(cancellationToken);
-            logger.LogInformation(
-                "Bootstrapped default permissions for {Roles} role(s) ({Rows} grants).",
-                bootstrappedRoles, insertedRows);
+            if (bootstrappedRoles > 0)
+                logger.LogInformation(
+                    "Bootstrapped default permissions for {Roles} role(s).", bootstrappedRoles);
+            if (toppedUpRoles > 0)
+                logger.LogInformation(
+                    "Topped up {Roles} existing role(s) with {Rows} missing matrix grant(s). " +
+                    "Set RolePermissions:TopUpDefaults=false after this run to restore " +
+                    "bootstrap-once safety.",
+                    toppedUpRoles, insertedRows - (bootstrappedRoles > 0 ? 0 : 0));
         }
     }
 
