@@ -14,20 +14,26 @@ public sealed class GetStudentsQueryHandler(IApplicationDbContext db)
     {
         var page = new PageRequest(request.Page, request.PageSize, request.Search);
 
-        var query = db.StudentProfiles
-            .Join(db.Users, s => s.UserId, u => u.Id,
-                (s, u) => new StudentDto(s.Id, s.UserId, u.Email, s.XP, s.Streak));
+        // Join to an anonymous shape and project to the DTO LAST so EF can
+        // translate the whole query. Previous shape projected `new StudentDto(...)`
+        // before Where/OrderBy, which EF cannot push into SQL — same bug shape
+        // as StaffHandlers; was waiting for the first user to hit the page.
+        var query =
+            from s in db.StudentProfiles.AsNoTracking()
+            join u in db.Users.AsNoTracking() on s.UserId equals u.Id
+            select new { s, u };
 
         if (page.NormalizedSearch is { } search)
         {
-            query = query.Where(d => d.Email.ToLower().Contains(search));
+            query = query.Where(x => x.u.Email.ToLower().Contains(search));
         }
 
         var total = await query.CountAsync(cancellationToken);
         var items = await query
-            .OrderBy(d => d.Email)
+            .OrderBy(x => x.u.Email)
             .Skip(page.Skip)
             .Take(page.NormalizedPageSize)
+            .Select(x => new StudentDto(x.s.Id, x.s.UserId, x.u.Email, x.s.XP, x.s.Streak))
             .ToListAsync(cancellationToken);
 
         return Result<PagedResult<StudentDto>>.Ok(PagedResult<StudentDto>.From(items, total, page));
