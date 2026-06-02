@@ -25,6 +25,9 @@ builder.Services.AddSwagger();
 builder.Services.AddHostedService<PermissionDiscoveryHostedService>();
 // Must run AFTER PermissionDiscoveryHostedService — hosted services start in registration order.
 builder.Services.AddHostedService<RolePermissionSeederHostedService>();
+// Runs last so roles + permissions are guaranteed seeded before we try to
+// attach the demo users to them. Idempotent and config-gated.
+builder.Services.AddHostedService<DemoUsersSeederHostedService>();
 
 // CORS — browser clients (marketing site at :5173, LMS admin at :3000) need
 // the API origin to whitelist them. Origins are config-driven via
