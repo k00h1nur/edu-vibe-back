@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("LMS.WebApi")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ee6e7c9bb49726faee5eccf9bc8fd1612bd77e7d")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0a74e084d0d69a0a38e865b4daadbb9468eff376")]
 [assembly: System.Reflection.AssemblyProductAttribute("LMS.WebApi")]
 [assembly: System.Reflection.AssemblyTitleAttribute("LMS.WebApi")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
