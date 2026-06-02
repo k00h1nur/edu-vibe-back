@@ -1,3 +1,4 @@
+using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Security;
 using LMS.Application.Features.Conversations;
 using LMS.WebApi.Common;
@@ -11,13 +12,23 @@ namespace LMS.WebApi.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
-public sealed class ConversationsController(ISender sender) : ControllerBase
+public sealed class ConversationsController(ISender sender, ICurrentUserService currentUser) : ControllerBase
 {
-    /// <summary>The caller's own conversations — implicitly scoped to the route's userId.</summary>
+    /// <summary>
+    /// The caller's own conversations. Self-only — the route id must match the
+    /// authenticated user, otherwise 403. The userId in the route is kept for
+    /// backwards-compat; new clients should ignore the value and rely on the
+    /// auth context.
+    /// </summary>
     [HttpGet("my/{userId:guid}")]
+    [PermissionAuthorize(Permissions.Conversations.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<ConversationDto>>>> My(Guid userId,
         CancellationToken ct)
     {
+        if (currentUser.UserId is null || currentUser.UserId != userId)
+            return StatusCode(StatusCodes.Status403Forbidden,
+                ApiResponse<IReadOnlyCollection<ConversationDto>>.Fail("Conversation list is self-only."));
+
         var r = await sender.Send(new GetMyConversationsQuery(userId), ct);
         return Ok(ApiResponse<IReadOnlyCollection<ConversationDto>>.Ok(r.Data, r.Message));
     }

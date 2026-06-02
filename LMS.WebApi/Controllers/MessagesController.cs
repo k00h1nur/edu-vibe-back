@@ -14,13 +14,26 @@ namespace LMS.WebApi.Controllers;
 [Authorize]
 public sealed class MessagesController(ISender sender, ICurrentUserService currentUser) : ControllerBase
 {
+    /// <summary>
+    /// Returns a page of messages from a conversation. Default page size is 50;
+    /// pass <paramref name="before"/> = oldest message's CreatedAt to walk back
+    /// through history page-by-page. The caller must be a participant — the
+    /// handler returns 403 otherwise.
+    /// </summary>
     [HttpGet("conversation/{conversationId:guid}")]
     [PermissionAuthorize(Permissions.Messages.Read)]
-    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<MessageDto>>>> Conversation(Guid conversationId,
-        CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<MessageDto>>>> Conversation(
+        Guid conversationId,
+        [FromQuery] DateTime? before,
+        [FromQuery] int limit = 50,
+        CancellationToken ct = default)
     {
-        var r = await sender.Send(new GetConversationMessagesQuery(conversationId), ct);
-        return Ok(ApiResponse<IReadOnlyCollection<MessageDto>>.Ok(r.Data, r.Message));
+        var r = await sender.Send(
+            new GetConversationMessagesQuery(conversationId, before, limit), ct);
+        return r.Success
+            ? Ok(ApiResponse<IReadOnlyCollection<MessageDto>>.Ok(r.Data, r.Message))
+            : StatusCode(StatusCodes.Status403Forbidden,
+                ApiResponse<IReadOnlyCollection<MessageDto>>.Fail(r.Message ?? "Forbidden"));
     }
 
     [HttpPost]
