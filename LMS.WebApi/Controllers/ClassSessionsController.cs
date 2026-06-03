@@ -1,3 +1,4 @@
+using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Security;
 using LMS.Application.Features.Sessions;
 using LMS.WebApi.Common;
@@ -11,7 +12,7 @@ namespace LMS.WebApi.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
-public sealed class ClassSessionsController(ISender sender) : ControllerBase
+public sealed class ClassSessionsController(ISender sender, ICurrentUserService currentUser) : ControllerBase
 {
     [HttpGet("class/{classId:guid}")]
     [PermissionAuthorize(Permissions.Sessions.Read)]
@@ -22,19 +23,36 @@ public sealed class ClassSessionsController(ISender sender) : ControllerBase
         return Ok(ApiResponse<IReadOnlyCollection<SessionDto>>.Ok(r.Data, r.Message));
     }
 
-    /// <summary>The caller's own schedule. No extra permission — implicitly scoped to the route's userId.</summary>
+    /// <summary>
+    /// The caller's own schedule. Self-only — the route id must match the
+    /// authenticated user, otherwise 403. The userId is kept as a route param
+    /// for wire-compat; new clients can ignore the value and rely on the JWT.
+    /// </summary>
     [HttpGet("my/{userId:guid}")]
+    [PermissionAuthorize(Permissions.Sessions.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<SessionDto>>>> My(Guid userId, CancellationToken ct)
     {
+        if (currentUser.UserId is null || currentUser.UserId != userId)
+            return StatusCode(StatusCodes.Status403Forbidden,
+                ApiResponse<IReadOnlyCollection<SessionDto>>.Fail("Schedule is self-only."));
+
         var r = await sender.Send(new GetMyScheduleQuery(userId), ct);
         return Ok(ApiResponse<IReadOnlyCollection<SessionDto>>.Ok(r.Data, r.Message));
     }
 
-    /// <summary>Upcoming sessions (today onwards) for a user, capped by <paramref name="take"/>.</summary>
+    /// <summary>
+    /// Upcoming sessions (today onwards) for the caller, capped by <paramref name="take"/>.
+    /// Self-only — same gate as <see cref="My"/>.
+    /// </summary>
     [HttpGet("upcoming/{userId:guid}")]
+    [PermissionAuthorize(Permissions.Sessions.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<SessionDto>>>> Upcoming(
         Guid userId, [FromQuery] int take = 20, CancellationToken ct = default)
     {
+        if (currentUser.UserId is null || currentUser.UserId != userId)
+            return StatusCode(StatusCodes.Status403Forbidden,
+                ApiResponse<IReadOnlyCollection<SessionDto>>.Fail("Schedule is self-only."));
+
         var r = await sender.Send(new GetUpcomingSessionsQuery(userId, take), ct);
         return Ok(ApiResponse<IReadOnlyCollection<SessionDto>>.Ok(r.Data, r.Message));
     }
