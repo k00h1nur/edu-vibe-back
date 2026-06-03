@@ -16,7 +16,8 @@ public sealed class UsersPingCommandHandler : IRequestHandler<UsersPingCommand, 
     }
 }
 
-public sealed record GetUsersQuery : IRequest<Result<IReadOnlyCollection<UserDto>>>;
+public sealed record GetUsersQuery(int Page = 1, int PageSize = 25, string? Search = null)
+    : IRequest<Result<PagedResult<UserDto>>>;
 
 public sealed record GetUserByIdQuery(Guid UserId) : IRequest<Result<UserDto>>;
 
