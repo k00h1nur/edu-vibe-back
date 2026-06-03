@@ -68,4 +68,20 @@ public sealed class StudentsController(ISender sender) : ControllerBase
             ? Ok(ApiResponse<StudentDto>.Ok(r.Data, r.Message))
             : BadRequest(ApiResponse<StudentDto>.Fail(r.Message ?? "Failed"));
     }
+
+    /// <summary>
+    /// Updates the editable profile fields — first name, last name, phone
+    /// number, description. Separate from <see cref="Update"/> which handles
+    /// XP / streak.
+    /// </summary>
+    [HttpPut("{id:guid}/details")]
+    [PermissionAuthorize(Permissions.Students.Update)]
+    public async Task<ActionResult<ApiResponse<StudentDto>>> UpdateDetails(
+        Guid id, [FromBody] UpdateStudentDetailsCommand cmd, CancellationToken ct)
+    {
+        var r = await sender.Send(cmd with { StudentProfileId = id }, ct);
+        return r.Success
+            ? Ok(ApiResponse<StudentDto>.Ok(r.Data, r.Message))
+            : BadRequest(ApiResponse<StudentDto>.Fail(r.Message ?? "Failed"));
+    }
 }

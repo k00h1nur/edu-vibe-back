@@ -14,10 +14,9 @@ public sealed class GetStudentsQueryHandler(IApplicationDbContext db)
     {
         var page = new PageRequest(request.Page, request.PageSize, request.Search);
 
-        // Join to an anonymous shape and project to the DTO LAST so EF can
-        // translate the whole query. Previous shape projected `new StudentDto(...)`
-        // before Where/OrderBy, which EF cannot push into SQL — same bug shape
-        // as StaffHandlers; was waiting for the first user to hit the page.
+        // Join to an anonymous shape, filter + order on entity columns, project
+        // to the DTO last so EF translates the whole query into one SQL
+        // statement.
         var query =
             from s in db.StudentProfiles.AsNoTracking()
             join u in db.Users.AsNoTracking() on s.UserId equals u.Id
@@ -25,7 +24,15 @@ public sealed class GetStudentsQueryHandler(IApplicationDbContext db)
 
         if (page.NormalizedSearch is { } search)
         {
-            query = query.Where(x => x.u.Email.ToLower().Contains(search));
+            // Match against email AND the new firstName / lastName / phone
+            // fields so the admin can search by any of them. ToLower() keeps
+            // the comparison case-insensitive; nulls fall through (null !=
+            // any contains expression, so they don't match).
+            query = query.Where(x =>
+                x.u.Email.ToLower().Contains(search) ||
+                (x.s.FirstName != null && x.s.FirstName.ToLower().Contains(search)) ||
+                (x.s.LastName != null && x.s.LastName.ToLower().Contains(search)) ||
+                (x.s.PhoneNumber != null && x.s.PhoneNumber.Contains(search)));
         }
 
         var total = await query.CountAsync(cancellationToken);
@@ -33,7 +40,9 @@ public sealed class GetStudentsQueryHandler(IApplicationDbContext db)
             .OrderBy(x => x.u.Email)
             .Skip(page.Skip)
             .Take(page.NormalizedPageSize)
-            .Select(x => new StudentDto(x.s.Id, x.s.UserId, x.u.Email, x.s.XP, x.s.Streak))
+            .Select(x => new StudentDto(
+                x.s.Id, x.s.UserId, x.u.Email, x.s.XP, x.s.Streak,
+                x.s.FirstName, x.s.LastName, x.s.PhoneNumber, x.s.Description))
             .ToListAsync(cancellationToken);
 
         return Result<PagedResult<StudentDto>>.Ok(PagedResult<StudentDto>.From(items, total, page));
@@ -45,10 +54,13 @@ public sealed class GetStudentDetailQueryHandler(IApplicationDbContext db)
 {
     public async Task<Result<StudentDto>> Handle(GetStudentDetailQuery request, CancellationToken cancellationToken)
     {
-        var sp = await db.StudentProfiles.Join(db.Users, s => s.UserId, u => u.Id, (s, u) => new { s, u })
+        var sp = await db.StudentProfiles.AsNoTracking()
+            .Join(db.Users.AsNoTracking(), s => s.UserId, u => u.Id, (s, u) => new { s, u })
             .FirstOrDefaultAsync(x => x.s.Id == request.StudentProfileId, cancellationToken);
         if (sp is null) return Result<StudentDto>.Fail("NOT_FOUND", "Student profile not found.");
-        return Result<StudentDto>.Ok(new StudentDto(sp.s.Id, sp.s.UserId, sp.u.Email, sp.s.XP, sp.s.Streak));
+        return Result<StudentDto>.Ok(new StudentDto(
+            sp.s.Id, sp.s.UserId, sp.u.Email, sp.s.XP, sp.s.Streak,
+            sp.s.FirstName, sp.s.LastName, sp.s.PhoneNumber, sp.s.Description));
     }
 }
 
@@ -62,13 +74,15 @@ public sealed class RegisterStudentCommandHandler(IApplicationDbContext db)
         var existing = await db.StudentProfiles.FirstOrDefaultAsync(x => x.UserId == request.UserId, cancellationToken);
         if (existing is not null)
             return Result<StudentDto>.Ok(
-                new StudentDto(existing.Id, existing.UserId, user.Email, existing.XP, existing.Streak),
+                new StudentDto(existing.Id, existing.UserId, user.Email, existing.XP, existing.Streak,
+                    existing.FirstName, existing.LastName, existing.PhoneNumber, existing.Description),
                 "Already exists.");
 
         var sp = new StudentProfile(user.Id, user);
         await db.StudentProfiles.AddAsync(sp, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
-        return Result<StudentDto>.Ok(new StudentDto(sp.Id, sp.UserId, user.Email, sp.XP, sp.Streak));
+        return Result<StudentDto>.Ok(new StudentDto(sp.Id, sp.UserId, user.Email, sp.XP, sp.Streak,
+            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description));
     }
 }
 
@@ -84,7 +98,24 @@ public sealed class UpdateStudentProfileCommandHandler(IApplicationDbContext db)
         sp.UpdateStreak(request.Streak);
         await db.SaveChangesAsync(cancellationToken);
         var user = await db.Users.FirstAsync(x => x.Id == sp.UserId, cancellationToken);
-        return Result<StudentDto>.Ok(new StudentDto(sp.Id, sp.UserId, user.Email, sp.XP, sp.Streak));
+        return Result<StudentDto>.Ok(new StudentDto(sp.Id, sp.UserId, user.Email, sp.XP, sp.Streak,
+            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description));
+    }
+}
+
+public sealed class UpdateStudentDetailsCommandHandler(IApplicationDbContext db)
+    : IRequestHandler<UpdateStudentDetailsCommand, Result<StudentDto>>
+{
+    public async Task<Result<StudentDto>> Handle(UpdateStudentDetailsCommand request,
+        CancellationToken cancellationToken)
+    {
+        var sp = await db.StudentProfiles.FirstOrDefaultAsync(x => x.Id == request.StudentProfileId, cancellationToken);
+        if (sp is null) return Result<StudentDto>.Fail("NOT_FOUND", "Student profile not found.");
+        sp.UpdateProfile(request.FirstName, request.LastName, request.PhoneNumber, request.Description);
+        await db.SaveChangesAsync(cancellationToken);
+        var user = await db.Users.FirstAsync(x => x.Id == sp.UserId, cancellationToken);
+        return Result<StudentDto>.Ok(new StudentDto(sp.Id, sp.UserId, user.Email, sp.XP, sp.Streak,
+            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description));
     }
 }
 
@@ -107,7 +138,8 @@ public sealed class GetMyStudentProfileQueryHandler(IApplicationDbContext db, IC
         if (match is null)
             return Result<StudentDto>.Fail("NOT_FOUND", "No student profile is linked to this account.");
 
-        return Result<StudentDto>.Ok(
-            new StudentDto(match.s.Id, match.s.UserId, match.u.Email, match.s.XP, match.s.Streak));
+        return Result<StudentDto>.Ok(new StudentDto(
+            match.s.Id, match.s.UserId, match.u.Email, match.s.XP, match.s.Streak,
+            match.s.FirstName, match.s.LastName, match.s.PhoneNumber, match.s.Description));
     }
 }
