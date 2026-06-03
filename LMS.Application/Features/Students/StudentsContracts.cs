@@ -3,7 +3,16 @@ using MediatR;
 
 namespace LMS.Application.Features.Students;
 
-public sealed record StudentDto(Guid StudentProfileId, Guid UserId, string Email, int Xp, int Streak);
+public sealed record StudentDto(
+    Guid StudentProfileId,
+    Guid UserId,
+    string Email,
+    int Xp,
+    int Streak,
+    string? FirstName,
+    string? LastName,
+    string? PhoneNumber,
+    string? Description);
 
 public sealed record StudentsPingCommand : IRequest<Result<string>>;
 
@@ -19,6 +28,17 @@ public sealed record RegisterStudentCommand(Guid UserId) : IRequest<Result<Stude
 
 public sealed record UpdateStudentProfileCommand(Guid StudentProfileId, int Xp, int Streak)
     : IRequest<Result<StudentDto>>;
+
+/// <summary>
+/// Updates the editable profile fields (name, phone, description). XP and
+/// streak are separate via <see cref="UpdateStudentProfileCommand"/>.
+/// </summary>
+public sealed record UpdateStudentDetailsCommand(
+    Guid StudentProfileId,
+    string? FirstName,
+    string? LastName,
+    string? PhoneNumber,
+    string? Description) : IRequest<Result<StudentDto>>;
 
 public sealed record GetStudentsQuery(int Page = 1, int PageSize = 25, string? Search = null)
     : IRequest<Result<PagedResult<StudentDto>>>;

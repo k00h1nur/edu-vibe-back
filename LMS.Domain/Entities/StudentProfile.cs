@@ -7,7 +7,7 @@ public sealed class StudentProfile : BaseEntity
 {
     private StudentProfile()
     {
-        
+
     }
     public StudentProfile(Guid userId, User user)
     {
@@ -24,6 +24,14 @@ public sealed class StudentProfile : BaseEntity
 
     public int XP { get; private set; }
     public int Streak { get; private set; }
+
+    // Profile details surfaced to the admin UI. All optional — existing rows
+    // stay valid after migration because every column is nullable. The admin
+    // search filter (firstName/lastName) reads from these.
+    public string? FirstName { get; private set; }
+    public string? LastName { get; private set; }
+    public string? PhoneNumber { get; private set; }
+    public string? Description { get; private set; }
 
     public ICollection<Enrollment> Enrollments { get; } = new List<Enrollment>();
     public ICollection<Attendance> Attendances { get; } = new List<Attendance>();
@@ -45,5 +53,28 @@ public sealed class StudentProfile : BaseEntity
 
         Streak = newStreak;
         Touch();
+    }
+
+    /// <summary>
+    /// Updates the editable profile fields. Pass null to clear a field, or
+    /// omit it (default null) to leave the existing value untouched is NOT
+    /// supported — callers always pass the full intended state.
+    /// </summary>
+    public void UpdateProfile(string? firstName, string? lastName, string? phoneNumber, string? description)
+    {
+        FirstName = NormalizeOrNull(firstName, maxLength: 128, fieldName: nameof(FirstName));
+        LastName = NormalizeOrNull(lastName, maxLength: 128, fieldName: nameof(LastName));
+        PhoneNumber = NormalizeOrNull(phoneNumber, maxLength: 32, fieldName: nameof(PhoneNumber));
+        Description = NormalizeOrNull(description, maxLength: 2000, fieldName: nameof(Description));
+        Touch();
+    }
+
+    private static string? NormalizeOrNull(string? value, int maxLength, string fieldName)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var trimmed = value.Trim();
+        if (trimmed.Length > maxLength)
+            throw new DomainException($"{fieldName} must be {maxLength} characters or fewer.");
+        return trimmed;
     }
 }
