@@ -21,15 +21,64 @@ public sealed class ResultsHandlers(
       IRequestHandler<DeleteResultImageCommand, Result>,
       IRequestHandler<ResultsAdminStatsQuery, Result<ResultsAdminStatsDto>>
 {
+    /// <summary>
+    /// Single-row mapper. Use only for the byId endpoint where you have exactly
+    /// one ResultEntry — two extra queries is acceptable. For lists use
+    /// <see cref="MapManyAsync"/> which batches the child loads.
+    /// </summary>
     private async Task<ResultDto> Map(ResultEntry r, CancellationToken ct)
     {
-        var b = await db.ResultScoreBreakdowns.Where(x => x.ResultId == r.Id && !x.IsDeleted)
+        var b = await db.ResultScoreBreakdowns.AsNoTracking()
+            .Where(x => x.ResultId == r.Id && !x.IsDeleted)
             .Select(x => new ScoreBreakdownItemDto(x.Key, x.Value)).ToListAsync(ct);
-        var imgs = await db.ResultImages.Where(x => x.ResultId == r.Id && !x.IsDeleted)
+        var imgs = await db.ResultImages.AsNoTracking()
+            .Where(x => x.ResultId == r.Id && !x.IsDeleted)
             .Select(x => new ResultImageDto(x.Id, x.ImageUrl, x.ThumbnailUrl, x.IsMain)).ToListAsync(ct);
         return new ResultDto(r.Id, r.StudentFullName, r.MainImageUrl, r.ExamType, r.OverallScore, r.Description,
             r.ImprovementText, r.DurationText, r.Notes, r.BadgeIcon, r.DisplayOrder, r.IsFeatured, r.IsPublished,
             r.Language, r.CreatedAt, r.ViewsCount, b, imgs);
+    }
+
+    /// <summary>
+    /// Batched mapper. Pulls every breakdown + image for the given results in
+    /// TWO queries total (regardless of list size), groups in memory, then
+    /// assembles the DTOs. Use this on every list / featured / stats path —
+    /// the previous shape fired 2 extra queries per row.
+    /// </summary>
+    private async Task<List<ResultDto>> MapManyAsync(IReadOnlyList<ResultEntry> results, CancellationToken ct)
+    {
+        if (results.Count == 0) return new List<ResultDto>();
+
+        var ids = results.Select(r => r.Id).ToList();
+
+        var breakdownsLookup = await db.ResultScoreBreakdowns.AsNoTracking()
+            .Where(x => ids.Contains(x.ResultId) && !x.IsDeleted)
+            .Select(x => new { x.ResultId, Item = new ScoreBreakdownItemDto(x.Key, x.Value) })
+            .ToListAsync(ct);
+        var breakdowns = breakdownsLookup
+            .GroupBy(x => x.ResultId)
+            .ToDictionary(g => g.Key, g => (IReadOnlyCollection<ScoreBreakdownItemDto>)g.Select(x => x.Item).ToList());
+
+        var imagesLookup = await db.ResultImages.AsNoTracking()
+            .Where(x => ids.Contains(x.ResultId) && !x.IsDeleted)
+            .Select(x => new { x.ResultId, Item = new ResultImageDto(x.Id, x.ImageUrl, x.ThumbnailUrl, x.IsMain) })
+            .ToListAsync(ct);
+        var images = imagesLookup
+            .GroupBy(x => x.ResultId)
+            .ToDictionary(g => g.Key, g => (IReadOnlyCollection<ResultImageDto>)g.Select(x => x.Item).ToList());
+
+        var dtos = new List<ResultDto>(results.Count);
+        var emptyB = (IReadOnlyCollection<ScoreBreakdownItemDto>)Array.Empty<ScoreBreakdownItemDto>();
+        var emptyI = (IReadOnlyCollection<ResultImageDto>)Array.Empty<ResultImageDto>();
+        foreach (var r in results)
+        {
+            dtos.Add(new ResultDto(r.Id, r.StudentFullName, r.MainImageUrl, r.ExamType, r.OverallScore,
+                r.Description, r.ImprovementText, r.DurationText, r.Notes, r.BadgeIcon, r.DisplayOrder,
+                r.IsFeatured, r.IsPublished, r.Language, r.CreatedAt, r.ViewsCount,
+                breakdowns.TryGetValue(r.Id, out var b) ? b : emptyB,
+                images.TryGetValue(r.Id, out var i) ? i : emptyI));
+        }
+        return dtos;
     }
 
     public async Task<Result<IReadOnlyCollection<ResultDto>>> Handle(ResultListQuery q, CancellationToken ct)
@@ -46,10 +95,9 @@ public sealed class ResultsHandlers(
             _ => query.OrderBy(x => x.DisplayOrder).ThenByDescending(x => x.CreatedAt)
         };
 
-        var list = await query.Skip((q.Page - 1) * q.PageSize).Take(q.PageSize).ToListAsync(ct);
-        var result = new List<ResultDto>(list.Count);
-        foreach (var r in list) result.Add(await Map(r, ct));
-        return Result<IReadOnlyCollection<ResultDto>>.Ok(result);
+        var list = await query.AsNoTracking()
+            .Skip((q.Page - 1) * q.PageSize).Take(q.PageSize).ToListAsync(ct);
+        return Result<IReadOnlyCollection<ResultDto>>.Ok(await MapManyAsync(list, ct));
     }
 
     public async Task<Result<ResultDto>> Handle(ResultByIdQuery q, CancellationToken ct)
@@ -69,11 +117,10 @@ public sealed class ResultsHandlers(
 
     public async Task<Result<IReadOnlyCollection<ResultDto>>> Handle(FeaturedResultsQuery q, CancellationToken ct)
     {
-        var list = await db.Results.Where(x => !x.IsDeleted && x.IsPublished && x.IsFeatured)
+        var list = await db.Results.AsNoTracking()
+            .Where(x => !x.IsDeleted && x.IsPublished && x.IsFeatured)
             .OrderBy(x => x.DisplayOrder).ThenByDescending(x => x.CreatedAt).Take(q.Limit).ToListAsync(ct);
-        var result = new List<ResultDto>(list.Count);
-        foreach (var r in list) result.Add(await Map(r, ct));
-        return Result<IReadOnlyCollection<ResultDto>>.Ok(result);
+        return Result<IReadOnlyCollection<ResultDto>>.Ok(await MapManyAsync(list, ct));
     }
 
     public async Task<Result<ResultDto>> Handle(CreateResultCommand c, CancellationToken ct)
@@ -168,9 +215,9 @@ public sealed class ResultsHandlers(
         var featured = await db.Results.CountAsync(x => !x.IsDeleted && x.IsFeatured, ct);
         var mostViewed = await db.Results.Where(x => !x.IsDeleted).OrderByDescending(x => x.ViewsCount)
             .Select(x => (Guid?)x.Id).FirstOrDefaultAsync(ct);
-        var recent = await db.Results.Where(x => !x.IsDeleted).OrderByDescending(x => x.CreatedAt).Take(5).ToListAsync(ct);
-        var recentDtos = new List<ResultDto>();
-        foreach (var r in recent) recentDtos.Add(await Map(r, ct));
+        var recent = await db.Results.AsNoTracking()
+            .Where(x => !x.IsDeleted).OrderByDescending(x => x.CreatedAt).Take(5).ToListAsync(ct);
+        var recentDtos = await MapManyAsync(recent, ct);
 
         return Result<ResultsAdminStatsDto>.Ok(new ResultsAdminStatsDto(total, ielts, sat, featured, mostViewed, recentDtos));
     }

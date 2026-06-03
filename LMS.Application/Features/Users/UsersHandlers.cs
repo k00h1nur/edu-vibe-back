@@ -8,29 +8,44 @@ using Microsoft.EntityFrameworkCore;
 namespace LMS.Application.Features.Users;
 
 public sealed class GetUsersQueryHandler(IApplicationDbContext db)
-    : IRequestHandler<GetUsersQuery, Result<IReadOnlyCollection<UserDto>>>
+    : IRequestHandler<GetUsersQuery, Result<PagedResult<UserDto>>>
 {
-    public async Task<Result<IReadOnlyCollection<UserDto>>> Handle(GetUsersQuery request,
+    public async Task<Result<PagedResult<UserDto>>> Handle(GetUsersQuery request,
         CancellationToken cancellationToken)
     {
-        // Two queries with an in-memory join instead of a correlated subquery
-        // per user (the previous shape produced N+1 SQL roundtrips).
-        var users = await db.Users
+        var page = new PageRequest(request.Page, request.PageSize, request.Search);
+
+        var query = db.Users.AsNoTracking();
+        if (page.NormalizedSearch is { } search)
+            query = query.Where(u => u.Email.ToLower().Contains(search));
+
+        var total = await query.CountAsync(cancellationToken);
+
+        // Paged user rows first; then a single in-memory-joined batch fetches
+        // the role codes for ONLY the visible page (the previous shape pulled
+        // the entire users + user_roles tables every call).
+        var users = await query
+            .OrderBy(u => u.Email)
+            .Skip(page.Skip)
+            .Take(page.NormalizedPageSize)
             .Select(u => new { u.Id, u.Email, u.Status })
             .ToListAsync(cancellationToken);
 
+        var userIds = users.Select(u => u.Id).ToList();
         var roleCodesByUser = await db.UserRoles
+            .AsNoTracking()
+            .Where(ur => userIds.Contains(ur.UserId))
             .Join(db.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => new { ur.UserId, r.Code })
             .GroupBy(x => x.UserId)
             .Select(g => new { UserId = g.Key, Codes = g.Select(x => x.Code).ToList() })
             .ToDictionaryAsync(x => x.UserId, x => x.Codes, cancellationToken);
 
-        var result = users
+        var items = users
             .Select(u => new UserDto(
                 u.Id, u.Email, u.Status,
                 roleCodesByUser.TryGetValue(u.Id, out var codes) ? codes : new List<string>()))
             .ToList();
-        return Result<IReadOnlyCollection<UserDto>>.Ok(result);
+        return Result<PagedResult<UserDto>>.Ok(PagedResult<UserDto>.From(items, total, page));
     }
 }
 

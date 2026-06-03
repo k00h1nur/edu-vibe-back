@@ -1,3 +1,4 @@
+using LMS.Application.Common.Models;
 using LMS.Application.Common.Security;
 using LMS.Application.Features.Users;
 using LMS.WebApi.Common;
@@ -15,10 +16,14 @@ public sealed class UsersController(ISender sender) : ControllerBase
 {
     [HttpGet]
     [PermissionAuthorize(Permissions.Users.Read)]
-    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<UserDto>>>> GetAll(CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<PagedResult<UserDto>>>> GetAll(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
+        [FromQuery] string? search = null,
+        CancellationToken ct = default)
     {
-        var r = await sender.Send(new GetUsersQuery(), ct);
-        return Ok(ApiResponse<IReadOnlyCollection<UserDto>>.Ok(r.Data, r.Message));
+        var r = await sender.Send(new GetUsersQuery(page, pageSize, search), ct);
+        return Ok(ApiResponse<PagedResult<UserDto>>.Ok(r.Data, r.Message));
     }
 
     /// <summary>Returns the currently authenticated user. No extra permission required.</summary>
