@@ -1,4 +1,3 @@
-using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using LMS.Application;
 using LMS.Infrastructure;
@@ -20,15 +19,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog((ctx, cfg) => cfg.ReadFrom.Configuration(ctx.Configuration));
 
 // ---- JSON contract --------------------------------------------------------
-// Enum-as-string makes the wire contract durable: renumbering an enum on the
-// backend won't silently break the frontend. The TS types just become
-// "Draft" | "Published" | "Closed" instead of magic numbers.
-builder.Services
-    .AddControllers()
-    .AddJsonOptions(o =>
-    {
-        o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-    });
+// NOTE: enum-as-string would be a more durable contract (renumbering won't
+// break clients), but the LMS admin frontend types use numeric enum constants
+// today, so flipping this here would be a coordinated breaking change. Track
+// as a future migration.
+builder.Services.AddControllers();
 
 // ---- Layer registration ---------------------------------------------------
 builder.Services.AddApplication();
