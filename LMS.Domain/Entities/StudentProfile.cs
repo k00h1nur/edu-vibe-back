@@ -5,10 +5,13 @@ namespace LMS.Domain.Entities;
 
 public sealed class StudentProfile : BaseEntity
 {
+    // EF materialisation constructor — User is set via the navigation
+    // property when EF loads the entity. Public callers must use the
+    // parameterised ctor below, which enforces all invariants.
     private StudentProfile()
     {
-
     }
+
     public StudentProfile(Guid userId, User user)
     {
         if (userId == Guid.Empty) throw new DomainException("Student user id is required.");
@@ -20,7 +23,10 @@ public sealed class StudentProfile : BaseEntity
     }
 
     public Guid UserId { get; private set; }
-    public User User { get; private set; }
+    // null! signals to the nullable analyser that EF will fill this from the
+    // navigation property — every entity going through the public ctor is
+    // guaranteed to have it set before it's observable.
+    public User User { get; private set; } = null!;
 
     public int XP { get; private set; }
     public int Streak { get; private set; }

@@ -6,11 +6,13 @@ namespace LMS.Domain.Entities;
 
 public sealed class Class : BaseEntity
 {
+    // EF materialisation constructor — fields are populated reflectively by
+    // EF Core when reading from the database. Public callers must use the
+    // parameterised ctor below, which enforces all invariants.
     private Class()
     {
-        
     }
-    
+
     public Class(string title, int maxStudents, Modality modality)
     {
         if (string.IsNullOrWhiteSpace(title)) throw new DomainException("Class title is required.");
@@ -23,7 +25,10 @@ public sealed class Class : BaseEntity
         Status = ClassStatus.Planned;
     }
 
-    public string Title { get; private set; }
+    // null! signals to the nullable analyser that the EF materialisation
+    // path will populate this — the public ctor always sets it before the
+    // entity is observable.
+    public string Title { get; private set; } = null!;
     public int MaxStudents { get; private set; }
     public Modality Modality { get; private set; }
     public ClassStatus Status { get; private set; }
