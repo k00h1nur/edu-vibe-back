@@ -4,6 +4,7 @@ using LMS.Infrastructure.Persistence;
 using LMS.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -14,16 +15,36 @@ namespace LMS.Infrastructure;
 
 public static class DependencyInjection
 {
-    private const string FallbackJwtKey = "EduVibe-Fallback-Secret-Key-At-Least-32-Chars";
-
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddDbContext<LMSDbContext>(opt =>
-            opt.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
+        var connection = configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException(
+                "ConnectionStrings:DefaultConnection is required.");
+
+        // DbContext pooling halves per-request CPU on the change tracker /
+        // model snapshot / query cache. EnableRetryOnFailure absorbs transient
+        // Postgres blips (connection reset, brief network partition) without
+        // bubbling up as 500s.
+        services.AddDbContextPool<LMSDbContext>(opt =>
+        {
+            opt.UseNpgsql(connection, npg =>
+            {
+                npg.EnableRetryOnFailure(
+                    maxRetryCount: 3,
+                    maxRetryDelay: TimeSpan.FromSeconds(2),
+                    errorCodesToAdd: null);
+                npg.MigrationsAssembly(typeof(LMSDbContext).Assembly.FullName);
+            });
+            // Warnings as errors for footguns we never want to silently ship.
+            opt.ConfigureWarnings(w => w.Throw(
+                RelationalEventId.MultipleCollectionIncludeWarning,
+                CoreEventId.RowLimitingOperationWithoutOrderByWarning));
+        });
         services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<LMSDbContext>());
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IPasswordHasher, PasswordHasher>();
-        services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+        // No per-request state — singleton avoids per-request key allocation.
+        services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<IResultImageService, ResultImageService>();
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
@@ -53,13 +74,15 @@ public static class DependencyInjection
     public static IServiceCollection AddJwtAuthentication(this IServiceCollection services,
         IConfiguration configuration)
     {
-        var configuredKey = configuration["Jwt:Key"];
-        var jwtKey = string.IsNullOrWhiteSpace(configuredKey) ? FallbackJwtKey : configuredKey;
+        var jwtKey = configuration["Jwt:Key"]
+            ?? throw new InvalidOperationException(
+                "Jwt:Key is required. Set it via configuration or the Jwt__Key environment variable.");
+
         var keyBytes = Encoding.UTF8.GetBytes(jwtKey);
         if (keyBytes.Length < 32)
         {
             throw new InvalidOperationException(
-                "JWT key must be at least 32 bytes for HS256. Update Jwt:Key in configuration.");
+                "Jwt:Key must be at least 32 bytes for HS256.");
         }
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -73,7 +96,9 @@ public static class DependencyInjection
                     ValidateIssuerSigningKey = true,
                     ValidIssuer = configuration["Jwt:Issuer"],
                     ValidAudience = configuration["Jwt:Audience"],
-                    IssuerSigningKey = new SymmetricSecurityKey(keyBytes)
+                    IssuerSigningKey = new SymmetricSecurityKey(keyBytes),
+                    // Defaults to 5 min — too generous for short-lived tokens.
+                    ClockSkew = TimeSpan.FromSeconds(30),
                 };
             });
         return services;
