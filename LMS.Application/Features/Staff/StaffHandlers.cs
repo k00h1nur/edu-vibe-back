@@ -24,14 +24,25 @@ public sealed class GetStaffQueryHandler(IApplicationDbContext db)
             select new { s, u };
 
         if (page.NormalizedSearch is { } search)
-            query = query.Where(x => x.u.Email.ToLower().Contains(search));
+        {
+            // Match against email AND the new firstName / lastName / phone
+            // fields so the office admin can search by any of them. Matches
+            // the StudentProfile shape so the two list pages behave identically.
+            query = query.Where(x =>
+                x.u.Email.ToLower().Contains(search) ||
+                (x.s.FirstName != null && x.s.FirstName.ToLower().Contains(search)) ||
+                (x.s.LastName != null && x.s.LastName.ToLower().Contains(search)) ||
+                (x.s.PhoneNumber != null && x.s.PhoneNumber.Contains(search)));
+        }
 
         var total = await query.CountAsync(cancellationToken);
         var items = await query
             .OrderBy(x => x.u.Email)
             .Skip(page.Skip)
             .Take(page.NormalizedPageSize)
-            .Select(x => new StaffDto(x.s.Id, x.s.UserId, x.u.Email, x.s.EmploymentType))
+            .Select(x => new StaffDto(
+                x.s.Id, x.s.UserId, x.u.Email, x.s.EmploymentType,
+                x.s.FirstName, x.s.LastName, x.s.PhoneNumber, x.s.Description))
             .ToListAsync(cancellationToken);
 
         return Result<PagedResult<StaffDto>>.Ok(PagedResult<StaffDto>.From(items, total, page));
@@ -51,7 +62,8 @@ public sealed class CreateStaffCommandHandler(IApplicationDbContext db)
         var sp = new StaffProfile(request.UserId, request.EmploymentType);
         await db.StaffProfiles.AddAsync(sp, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
-        return Result<StaffDto>.Ok(new StaffDto(sp.Id, sp.UserId, user.Email, sp.EmploymentType));
+        return Result<StaffDto>.Ok(new StaffDto(sp.Id, sp.UserId, user.Email, sp.EmploymentType,
+            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description));
     }
 }
 
@@ -65,7 +77,24 @@ public sealed class UpdateStaffProfileCommandHandler(IApplicationDbContext db)
         sp.SetEmploymentType(request.EmploymentType);
         await db.SaveChangesAsync(cancellationToken);
         var user = await db.Users.FirstAsync(x => x.Id == sp.UserId, cancellationToken);
-        return Result<StaffDto>.Ok(new StaffDto(sp.Id, sp.UserId, user.Email, sp.EmploymentType));
+        return Result<StaffDto>.Ok(new StaffDto(sp.Id, sp.UserId, user.Email, sp.EmploymentType,
+            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description));
+    }
+}
+
+public sealed class UpdateStaffDetailsCommandHandler(IApplicationDbContext db)
+    : IRequestHandler<UpdateStaffDetailsCommand, Result<StaffDto>>
+{
+    public async Task<Result<StaffDto>> Handle(UpdateStaffDetailsCommand request,
+        CancellationToken cancellationToken)
+    {
+        var sp = await db.StaffProfiles.FirstOrDefaultAsync(x => x.Id == request.StaffProfileId, cancellationToken);
+        if (sp is null) return Result<StaffDto>.Fail("NOT_FOUND", "Staff profile not found.");
+        sp.UpdateProfile(request.FirstName, request.LastName, request.PhoneNumber, request.Description);
+        await db.SaveChangesAsync(cancellationToken);
+        var user = await db.Users.FirstAsync(x => x.Id == sp.UserId, cancellationToken);
+        return Result<StaffDto>.Ok(new StaffDto(sp.Id, sp.UserId, user.Email, sp.EmploymentType,
+            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description));
     }
 }
 
@@ -88,6 +117,8 @@ public sealed class GetMyStaffProfileQueryHandler(IApplicationDbContext db, ICur
         if (match is null)
             return Result<StaffDto>.Fail("NOT_FOUND", "No staff profile is linked to this account.");
 
-        return Result<StaffDto>.Ok(new StaffDto(match.s.Id, match.s.UserId, match.u.Email, match.s.EmploymentType));
+        return Result<StaffDto>.Ok(new StaffDto(
+            match.s.Id, match.s.UserId, match.u.Email, match.s.EmploymentType,
+            match.s.FirstName, match.s.LastName, match.s.PhoneNumber, match.s.Description));
     }
 }
