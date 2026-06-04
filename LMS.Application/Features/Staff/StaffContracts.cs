@@ -4,7 +4,15 @@ using MediatR;
 
 namespace LMS.Application.Features.Staff;
 
-public sealed record StaffDto(Guid Id, Guid UserId, string Email, EmploymentType EmploymentType);
+public sealed record StaffDto(
+    Guid Id,
+    Guid UserId,
+    string Email,
+    EmploymentType EmploymentType,
+    string? FirstName,
+    string? LastName,
+    string? PhoneNumber,
+    string? Description);
 
 public sealed record StaffPingCommand : IRequest<Result<string>>;
 
@@ -20,6 +28,17 @@ public sealed record CreateStaffCommand(Guid UserId, EmploymentType EmploymentTy
 
 public sealed record UpdateStaffProfileCommand(Guid StaffProfileId, EmploymentType EmploymentType)
     : IRequest<Result<StaffDto>>;
+
+/// <summary>
+/// Updates the editable profile fields (name, phone, description). Employment
+/// type is updated separately via <see cref="UpdateStaffProfileCommand"/>.
+/// </summary>
+public sealed record UpdateStaffDetailsCommand(
+    Guid StaffProfileId,
+    string? FirstName,
+    string? LastName,
+    string? PhoneNumber,
+    string? Description) : IRequest<Result<StaffDto>>;
 
 public sealed record GetStaffQuery(int Page = 1, int PageSize = 25, string? Search = null)
     : IRequest<Result<PagedResult<StaffDto>>>;
