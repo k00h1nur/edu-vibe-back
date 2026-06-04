@@ -11,19 +11,21 @@ using Microsoft.EntityFrameworkCore;
 namespace LMS.WebApi.Security;
 
 /// <summary>
-/// Ensures one demo user per role exists with a known password so every panel
-/// of the LMS admin is loginable out of the box on a fresh database. Strictly
-/// idempotent — checks by email and skips if the user is already there, so
-/// running it twice is a no-op and running it on a populated database doesn't
-/// disturb real accounts.
+/// Ensures one demo user per *primary* role exists with a known password so
+/// every panel of the LMS admin is loginable out of the box on a fresh
+/// database. Strictly idempotent — checks by email and skips if the user is
+/// already there, so running it twice is a no-op and running it on a
+/// populated database doesn't disturb real accounts.
+///
+/// We seed only the three roles the UI actually surfaces. The legacy roles
+/// (SuperAdmin, AcademyDirector, OfficeAdmin, SupportTeacher) still exist in
+/// the <c>roles</c> table so historical user assignments survive — they're
+/// simply not seeded with demo users anymore. <see cref="RolePermissionSeederHostedService"/>
+/// likewise only tops up the three primary roles.
 ///
 /// What gets created (per role, only if the email is unused):
-///   superadmin@eduvibe.local       → SuperAdmin
 ///   admin@eduvibe.local            → Admin
-///   director@eduvibe.local         → AcademyDirector
-///   office@eduvibe.local           → OfficeAdmin
-///   teacher@eduvibe.local          → Teacher       + StaffProfile (FullTime)
-///   support@eduvibe.local          → SupportTeacher + StaffProfile (FullTime)
+///   teacher@eduvibe.local          → Teacher        + StaffProfile (FullTime)
 ///   student@eduvibe.local          → Student        + StudentProfile
 ///
 /// Default password for all of them: <c>Demo!2026</c>.
@@ -65,15 +67,14 @@ public sealed class DemoUsersSeederHostedService(
             return;
         }
 
+        // The three primary roles surfaced by the UI. Admin gets a StaffProfile
+        // so the /admin/staff/me lookup returns a row — without it admin pages
+        // that hit that endpoint render an empty profile.
         var spec = new (string LocalPart, string RoleCode, ProfileKind Profile)[]
         {
-            ("superadmin", RoleCodes.SuperAdmin,      ProfileKind.None),
-            ("admin",      RoleCodes.Admin,           ProfileKind.None),
-            ("director",   RoleCodes.AcademyDirector, ProfileKind.Staff),
-            ("office",     RoleCodes.OfficeAdmin,     ProfileKind.Staff),
-            ("teacher",    RoleCodes.Teacher,         ProfileKind.Staff),
-            ("support",    RoleCodes.SupportTeacher,  ProfileKind.Staff),
-            ("student",    RoleCodes.Student,         ProfileKind.Student),
+            ("admin",   RoleCodes.Admin,   ProfileKind.Staff),
+            ("teacher", RoleCodes.Teacher, ProfileKind.Staff),
+            ("student", RoleCodes.Student, ProfileKind.Student),
         };
 
         var created = 0;

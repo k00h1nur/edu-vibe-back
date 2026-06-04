@@ -63,16 +63,17 @@ public sealed class RolePermissionSeederHostedService(
 
         var topUp = configuration.GetValue("RolePermissions:TopUpDefaults", false);
 
-        // (RoleCode → matrix defaults).
+        // (RoleCode → matrix defaults). We only seed the three primary roles
+        // the UI surfaces. SuperAdmin/AcademyDirector/OfficeAdmin/SupportTeacher
+        // rows still exist in the roles table for backward compatibility with
+        // any historical user assignments, but they receive no automatic
+        // matrix top-ups — if you still need them, manage their grants
+        // explicitly via the /api/Roles admin endpoints.
         var defaults = new (string RoleCode, IEnumerable<string> Codes)[]
         {
-            (RoleCodes.SuperAdmin,      Permissions.All),
-            (RoleCodes.Admin,           Permissions.All),
-            (RoleCodes.AcademyDirector, RolePermissionMatrix.ForAcademyDirector),
-            (RoleCodes.OfficeAdmin,     RolePermissionMatrix.ForOfficeAdmin),
-            (RoleCodes.Teacher,         RolePermissionMatrix.ForTeacher),
-            (RoleCodes.SupportTeacher,  RolePermissionMatrix.ForSupportTeacher),
-            (RoleCodes.Student,         RolePermissionMatrix.ForStudent),
+            (RoleCodes.Admin,   Permissions.All),
+            (RoleCodes.Teacher, RolePermissionMatrix.ForTeacher),
+            (RoleCodes.Student, RolePermissionMatrix.ForStudent),
         };
 
         var bootstrappedRoles = 0;
