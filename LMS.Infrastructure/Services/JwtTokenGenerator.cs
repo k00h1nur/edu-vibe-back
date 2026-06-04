@@ -7,9 +7,42 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace LMS.Infrastructure.Services;
 
-public sealed class JwtTokenGenerator(IConfiguration configuration) : IJwtTokenGenerator
+/// <summary>
+/// Signs short-lived access tokens. Registered as a singleton — the signing
+/// key is loaded once at construction so each token issuance only does the
+/// claim marshalling, not config re-reads + key allocation.
+/// </summary>
+public sealed class JwtTokenGenerator : IJwtTokenGenerator
 {
-    private const string FallbackJwtKey = "EduVibe-Fallback-Secret-Key-At-Least-32-Chars";
+    private readonly SigningCredentials _signingCredentials;
+    private readonly string? _issuer;
+    private readonly string? _audience;
+    private readonly TimeSpan _accessTokenLifetime;
+    private readonly JwtSecurityTokenHandler _handler = new();
+
+    public JwtTokenGenerator(IConfiguration configuration)
+    {
+        var key = configuration["Jwt:Key"]
+            ?? throw new InvalidOperationException(
+                "Jwt:Key is required. Set it via configuration or the Jwt__Key environment variable.");
+
+        var keyBytes = Encoding.UTF8.GetBytes(key);
+        if (keyBytes.Length < 32)
+        {
+            throw new InvalidOperationException(
+                "Jwt:Key must be at least 32 bytes for HS256.");
+        }
+
+        _signingCredentials = new SigningCredentials(
+            new SymmetricSecurityKey(keyBytes), SecurityAlgorithms.HmacSha256);
+        _issuer = configuration["Jwt:Issuer"];
+        _audience = configuration["Jwt:Audience"];
+        // Default 30 min — short enough that a stolen token is mostly stale, long
+        // enough that legitimate users don't refresh every other request.
+        // Refresh tokens live for 7 days, so silent renewal handles the rest.
+        _accessTokenLifetime = TimeSpan.FromMinutes(
+            configuration.GetValue("Jwt:AccessTokenMinutes", 30));
+    }
 
     public string Generate(
         Guid userId,
@@ -22,7 +55,8 @@ public sealed class JwtTokenGenerator(IConfiguration configuration) : IJwtTokenG
         var claims = new List<Claim>
         {
             new("userId", userId.ToString()),
-            new(JwtRegisteredClaimNames.Email, email)
+            new(JwtRegisteredClaimNames.Email, email),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
         };
         claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
         claims.AddRange(permissions.Select(p => new Claim("permission", p)));
@@ -32,23 +66,13 @@ public sealed class JwtTokenGenerator(IConfiguration configuration) : IJwtTokenG
         if (staffProfileId.HasValue)
             claims.Add(new Claim("staffProfileId", staffProfileId.Value.ToString()));
 
-        var configuredKey = configuration["Jwt:Key"];
-        var jwtKey = string.IsNullOrWhiteSpace(configuredKey) ? FallbackJwtKey : configuredKey;
-        var keyBytes = Encoding.UTF8.GetBytes(jwtKey);
-        if (keyBytes.Length < 32)
-        {
-            throw new InvalidOperationException(
-                "JWT key must be at least 32 bytes for HS256. Update Jwt:Key in configuration.");
-        }
-
-        var key = new SymmetricSecurityKey(keyBytes);
         var token = new JwtSecurityToken(
-            configuration["Jwt:Issuer"],
-            configuration["Jwt:Audience"],
+            _issuer,
+            _audience,
             claims,
-            expires: DateTime.UtcNow.AddHours(8),
-            signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256));
+            expires: DateTime.UtcNow.Add(_accessTokenLifetime),
+            signingCredentials: _signingCredentials);
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        return _handler.WriteToken(token);
     }
 }
