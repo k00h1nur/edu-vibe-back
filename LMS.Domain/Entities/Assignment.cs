@@ -6,6 +6,9 @@ namespace LMS.Domain.Entities;
 
 public sealed class Assignment : BaseEntity
 {
+    // EF materialisation constructor — fields are populated reflectively by
+    // EF Core when reading from the database. Public callers must use the
+    // parameterised ctor below, which enforces all invariants.
     private Assignment()
     {
     }
@@ -26,7 +29,10 @@ public sealed class Assignment : BaseEntity
     public Guid ClassId { get; private set; }
     public Class? Class { get; private set; }
 
-    public string Title { get; private set; }
+    // null! signals to the nullable analyser that the EF materialisation
+    // path will populate this — the public ctor always sets it before the
+    // entity is observable.
+    public string Title { get; private set; } = null!;
     public AssignmentStatus Status { get; private set; }
 
     public Guid CreatedByTeacherId { get; private set; }
