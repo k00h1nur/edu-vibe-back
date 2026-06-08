@@ -24,9 +24,11 @@ namespace LMS.WebApi.Security;
 /// likewise only tops up the three primary roles.
 ///
 /// What gets created (per role, only if the email is unused):
-///   admin@eduvibe.local            → Admin
-///   teacher@eduvibe.local          → Teacher        + StaffProfile (FullTime)
-///   student@eduvibe.local          → Student        + StudentProfile
+///   admin@eduvibe.local            → Admin   + StaffProfile (FullTime), first/last name set
+///   teacher@eduvibe.local          → Teacher + StaffProfile (FullTime), first/last name set
+///   student@eduvibe.local          → Student + StudentProfile, first/last/phone/description set
+///   plus 5 sample students (sarah.chen@, …) so the Manage Roster modal
+///   has a non-empty list out of the box.
 ///
 /// Default password for all of them: <c>Demo!2026</c>.
 /// Override the password (and toggle the seeder off entirely) via config:
@@ -42,6 +44,28 @@ public sealed class DemoUsersSeederHostedService(
     ILogger<DemoUsersSeederHostedService> logger)
     : IHostedService
 {
+    /// <summary>
+    /// Tuple of (localPart, RoleCode, ProfileKind, FirstName, LastName, PhoneNumber,
+    /// Description). Profile fields are optional — null skips them.
+    /// </summary>
+    private static readonly DemoUserSpec[] Spec =
+    {
+        // Primary role accounts — one per panel, with sensible profile data so
+        // every screen renders with real names instead of email-derived
+        // fallbacks.
+        new("admin",   RoleCodes.Admin,   ProfileKind.Staff,   "Nigora",  "Karimova", "+998 90 100 00 01", "Academy director"),
+        new("teacher", RoleCodes.Teacher, ProfileKind.Staff,   "Dilshod", "Tursunov", "+998 90 100 00 02", "Lead instructor"),
+        new("student", RoleCodes.Student, ProfileKind.Student, "Aziza",   "Karimova", "+998 90 100 00 03", "Sample CEFR B1 learner"),
+
+        // Five extra students so the roster picker in /admin/classes/* isn't
+        // empty. Phone numbers are obviously fake (UZ +998 placeholder).
+        new("sarah.chen",   RoleCodes.Student, ProfileKind.Student, "Sarah",   "Chen",      "+998 90 200 00 01", null),
+        new("mike.brown",   RoleCodes.Student, ProfileKind.Student, "Michael", "Brown",     "+998 90 200 00 02", null),
+        new("anna.ivanova", RoleCodes.Student, ProfileKind.Student, "Anna",    "Ivanova",   "+998 90 200 00 03", null),
+        new("jamol.alimov", RoleCodes.Student, ProfileKind.Student, "Jamol",   "Alimov",    "+998 90 200 00 04", null),
+        new("nadia.usmon",  RoleCodes.Student, ProfileKind.Student, "Nadia",   "Usmonova",  "+998 90 200 00 05", null),
+    };
+
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         if (!configuration.GetValue("DemoUsers:Enabled", true))
@@ -67,45 +91,41 @@ public sealed class DemoUsersSeederHostedService(
             return;
         }
 
-        // The three primary roles surfaced by the UI. Admin gets a StaffProfile
-        // so the /admin/staff/me lookup returns a row — without it admin pages
-        // that hit that endpoint render an empty profile.
-        var spec = new (string LocalPart, string RoleCode, ProfileKind Profile)[]
-        {
-            ("admin",   RoleCodes.Admin,   ProfileKind.Staff),
-            ("teacher", RoleCodes.Teacher, ProfileKind.Staff),
-            ("student", RoleCodes.Student, ProfileKind.Student),
-        };
-
         var created = 0;
+        var profilesPatched = 0;
         var passwordHash = hasher.Hash(password);
 
-        foreach (var (localPart, roleCode, profile) in spec)
+        foreach (var s in Spec)
         {
-            var email = $"{localPart}@{domain}".ToLowerInvariant();
+            var email = $"{s.LocalPart}@{domain}".ToLowerInvariant();
 
-            if (!roleIdByCode.TryGetValue(roleCode, out var roleId))
+            if (!roleIdByCode.TryGetValue(s.RoleCode, out var roleId))
             {
-                logger.LogWarning("Role {Role} missing — skipping demo user {Email}.", roleCode, email);
+                logger.LogWarning("Role {Role} missing — skipping demo user {Email}.", s.RoleCode, email);
                 continue;
             }
 
             var existing = await db.Users
                 .Include(u => u.UserRoles)
                 .FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
+
             if (existing is not null)
             {
-                // Belt-and-braces: a previously-seeded user might be missing its
-                // role assignment if someone wiped the user_roles table. Add it
-                // back without touching the existing password or profile.
+                // Belt-and-braces: a previously-seeded user might be missing
+                // its role assignment if someone wiped the user_roles table.
+                // Add it back without touching the existing password or profile.
                 if (!existing.UserRoles.Any(ur => ur.RoleId == roleId))
                 {
                     await db.UserRoles.AddAsync(new UserRoleEntity(existing.Id, roleId), cancellationToken);
                     await db.SaveChangesAsync(cancellationToken);
                     logger.LogInformation(
                         "Demo user {Email} existed but was missing role {Role} — re-attached.",
-                        email, roleCode);
+                        email, s.RoleCode);
                 }
+                // Patch in profile fields that were added in later migrations
+                // (FirstName / LastName / PhoneNumber). Existing seeded users
+                // pre-dating those migrations would otherwise stay blank.
+                profilesPatched += await PatchProfileFieldsAsync(db, existing.Id, s, cancellationToken);
                 continue;
             }
 
@@ -115,15 +135,23 @@ public sealed class DemoUsersSeederHostedService(
 
             await db.UserRoles.AddAsync(new UserRoleEntity(user.Id, roleId), cancellationToken);
 
-            switch (profile)
+            switch (s.Profile)
             {
                 case ProfileKind.Staff:
-                    await db.StaffProfiles.AddAsync(
-                        new StaffProfile(user.Id, EmploymentType.FullTime), cancellationToken);
+                    var staff = new StaffProfile(user.Id, EmploymentType.FullTime);
+                    if (HasAnyProfileField(s))
+                    {
+                        staff.UpdateProfile(s.FirstName, s.LastName, s.PhoneNumber, s.Description);
+                    }
+                    await db.StaffProfiles.AddAsync(staff, cancellationToken);
                     break;
                 case ProfileKind.Student:
-                    await db.StudentProfiles.AddAsync(
-                        new StudentProfile(user.Id, user), cancellationToken);
+                    var student = new StudentProfile(user.Id, user);
+                    if (HasAnyProfileField(s))
+                    {
+                        student.UpdateProfile(s.FirstName, s.LastName, s.PhoneNumber, s.Description);
+                    }
+                    await db.StudentProfiles.AddAsync(student, cancellationToken);
                     break;
                 case ProfileKind.None:
                     break;
@@ -131,7 +159,7 @@ public sealed class DemoUsersSeederHostedService(
 
             await db.SaveChangesAsync(cancellationToken);
             created++;
-            logger.LogInformation("Demo user created: {Email} ({Role}).", email, roleCode);
+            logger.LogInformation("Demo user created: {Email} ({Role}).", email, s.RoleCode);
         }
 
         if (created > 0)
@@ -140,9 +168,65 @@ public sealed class DemoUsersSeederHostedService(
                 "Demo users ready. Default password: {Password} — change before exposing to anyone.",
                 password);
         }
+        if (profilesPatched > 0)
+        {
+            logger.LogInformation(
+                "Patched profile fields (name/phone/description) onto {Count} pre-existing demo user(s).",
+                profilesPatched);
+        }
     }
+
+    /// <summary>
+    /// Fills in StudentProfile / StaffProfile fields when an old seeded user
+    /// is missing them. Idempotent — only writes when at least one target
+    /// field is currently null AND the spec has a value for it.
+    /// </summary>
+    private static async Task<int> PatchProfileFieldsAsync(
+        IApplicationDbContext db, Guid userId, DemoUserSpec s, CancellationToken ct)
+    {
+        if (!HasAnyProfileField(s)) return 0;
+
+        switch (s.Profile)
+        {
+            case ProfileKind.Staff:
+            {
+                var profile = await db.StaffProfiles.FirstOrDefaultAsync(p => p.UserId == userId, ct);
+                if (profile is null) return 0;
+                if (profile.FirstName != null && profile.LastName != null && profile.PhoneNumber != null) return 0;
+                profile.UpdateProfile(s.FirstName, s.LastName, s.PhoneNumber, s.Description);
+                await db.SaveChangesAsync(ct);
+                return 1;
+            }
+            case ProfileKind.Student:
+            {
+                var profile = await db.StudentProfiles.FirstOrDefaultAsync(p => p.UserId == userId, ct);
+                if (profile is null) return 0;
+                if (profile.FirstName != null && profile.LastName != null && profile.PhoneNumber != null) return 0;
+                profile.UpdateProfile(s.FirstName, s.LastName, s.PhoneNumber, s.Description);
+                await db.SaveChangesAsync(ct);
+                return 1;
+            }
+            default:
+                return 0;
+        }
+    }
+
+    private static bool HasAnyProfileField(DemoUserSpec s) =>
+        !string.IsNullOrWhiteSpace(s.FirstName) ||
+        !string.IsNullOrWhiteSpace(s.LastName) ||
+        !string.IsNullOrWhiteSpace(s.PhoneNumber) ||
+        !string.IsNullOrWhiteSpace(s.Description);
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     private enum ProfileKind { None, Staff, Student }
+
+    private sealed record DemoUserSpec(
+        string LocalPart,
+        string RoleCode,
+        ProfileKind Profile,
+        string? FirstName,
+        string? LastName,
+        string? PhoneNumber,
+        string? Description);
 }
