@@ -24,6 +24,21 @@ public sealed class ClassSessionsController(ISender sender, ICurrentUserService 
     }
 
     /// <summary>
+    /// Single-session lookup by id. Powers the per-session attendance marker —
+    /// without it the frontend had to walk every class's session list to find
+    /// the session by its id.
+    /// </summary>
+    [HttpGet("{id:guid}")]
+    [PermissionAuthorize(Permissions.Sessions.Read)]
+    public async Task<ActionResult<ApiResponse<SessionDto>>> Get(Guid id, CancellationToken ct)
+    {
+        var r = await sender.Send(new GetSessionByIdQuery(id), ct);
+        return r.Success
+            ? Ok(ApiResponse<SessionDto>.Ok(r.Data, r.Message))
+            : NotFound(ApiResponse<SessionDto>.Fail(r.Message ?? "Not found"));
+    }
+
+    /// <summary>
     /// The caller's own schedule. Self-only — the route id must match the
     /// authenticated user, otherwise 403. The userId is kept as a route param
     /// for wire-compat; new clients can ignore the value and rely on the JWT.

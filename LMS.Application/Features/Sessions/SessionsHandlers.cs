@@ -11,6 +11,7 @@ public sealed class SessionsHandlers(IApplicationDbContext db) :
     IRequestHandler<UpdateClassSessionCommand, Result<SessionDto>>,
     IRequestHandler<CancelClassSessionCommand, Result>,
     IRequestHandler<GetClassSessionsQuery, Result<IReadOnlyCollection<SessionDto>>>,
+    IRequestHandler<GetSessionByIdQuery, Result<SessionDto>>,
     IRequestHandler<GetMyScheduleQuery, Result<IReadOnlyCollection<SessionDto>>>,
     IRequestHandler<GetUpcomingSessionsQuery, Result<IReadOnlyCollection<SessionDto>>>
 {
@@ -39,6 +40,18 @@ public sealed class SessionsHandlers(IApplicationDbContext db) :
             .Where(x => x.ClassId == request.ClassId)
             .Select(x => new SessionDto(x.Id, x.ClassId, x.SessionDate, x.StartsAt, x.EndsAt, x.RoomId))
             .ToListAsync(cancellationToken));
+    }
+
+    public async Task<Result<SessionDto>> Handle(GetSessionByIdQuery request,
+        CancellationToken cancellationToken)
+    {
+        var dto = await db.ClassSessions.AsNoTracking()
+            .Where(x => x.Id == request.SessionId)
+            .Select(x => new SessionDto(x.Id, x.ClassId, x.SessionDate, x.StartsAt, x.EndsAt, x.RoomId))
+            .FirstOrDefaultAsync(cancellationToken);
+        return dto is null
+            ? Result<SessionDto>.Fail("NOT_FOUND", "Session not found.")
+            : Result<SessionDto>.Ok(dto);
     }
 
     public async Task<Result<IReadOnlyCollection<SessionDto>>> Handle(GetMyScheduleQuery request,
