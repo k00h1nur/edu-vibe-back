@@ -39,6 +39,11 @@ public sealed class StaffProfile : BaseEntity
         AvatarUrl = string.IsNullOrWhiteSpace(avatarUrl) ? null : avatarUrl.Trim();
         Touch();
     }
+    /// Teaching specializations (Math, Physics, Chinese, …). Admin-curated
+    /// list (see <see cref="Specialization"/>) — the teacher picks one or
+    /// more from their profile page.
+    /// </summary>
+    public ICollection<StaffSpecialization> Specializations { get; } = new List<StaffSpecialization>();
 
     public void SetEmploymentType(EmploymentType employmentType)
     {

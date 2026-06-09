@@ -222,6 +222,15 @@ public static class Permissions
     {
         public const string Read = "Reminders.Read";
         public const string Manage = "Reminders.Manage";
+    /// <summary>
+    /// Specialization catalogue — admin manages the list, teachers pick from it.
+    /// Read is granted to teacher+student so they can render the chips; Manage
+    /// only goes to admin.
+    /// </summary>
+    public static class Specializations
+    {
+        public const string Read = "Specializations.Read";
+        public const string Manage = "Specializations.Manage";
     }
 
     /// <summary>Flat list of every permission code — used by seed data and tests.</summary>
@@ -256,6 +265,7 @@ public static class Permissions
         Reports.Read,
         Practice.Read,
         Reminders.Read, Reminders.Manage,
+        Specializations.Read, Specializations.Manage,
     };
 }
 
@@ -356,6 +366,9 @@ public static class RolePermissionMatrix
         Permissions.Materials.Read, Permissions.Materials.Manage,
         Permissions.Analytics.Read,
         Permissions.Reminders.Read, Permissions.Reminders.Manage,
+        // Teachers can read the specialization catalogue to pick their own;
+        // they cannot manage the list (that's admin-only).
+        Permissions.Specializations.Read,
     };
 
     public static IReadOnlyCollection<string> ForSupportTeacher { get; } = new[]
