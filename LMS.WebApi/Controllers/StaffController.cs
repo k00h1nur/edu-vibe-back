@@ -72,4 +72,40 @@ public sealed class StaffController(ISender sender) : ControllerBase
             ? Ok(ApiResponse<StaffDto>.Ok(r.Data, r.Message))
             : BadRequest(ApiResponse<StaffDto>.Fail(r.Message ?? "Failed"));
     }
+
+    /// <summary>
+    /// Uploads a new avatar for the staff member and stores its name on the
+    /// profile. Returns the updated DTO so the frontend can swap the image
+    /// in immediately.
+    /// </summary>
+    [HttpPost("{id:guid}/avatar")]
+    [PermissionAuthorize(Permissions.Staff.Update)]
+    [RequestSizeLimit(2 * 1024 * 1024)]
+    public async Task<ActionResult<ApiResponse<StaffDto>>> UploadAvatar(Guid id,
+        [FromForm] IFormFile file,
+        [FromServices] LMS.Application.Common.Abstractions.IAvatarFileStore store,
+        CancellationToken ct)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(ApiResponse<StaffDto>.Fail("File is required."));
+
+        string storedName;
+        try
+        {
+            await using var stream = file.OpenReadStream();
+            storedName = await store.SaveAsync(stream, file.FileName, file.ContentType, ct);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ApiResponse<StaffDto>.Fail(ex.Message));
+        }
+
+        var r = await sender.Send(new SetStaffAvatarCommand(id, $"/uploads/avatars/{storedName}"), ct);
+        if (!r.Success)
+        {
+            await store.DeleteAsync(storedName, ct);
+            return BadRequest(ApiResponse<StaffDto>.Fail(r.Message ?? "Failed"));
+        }
+        return Ok(ApiResponse<StaffDto>.Ok(r.Data, r.Message));
+    }
 }

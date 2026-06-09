@@ -26,6 +26,20 @@ public sealed class StaffProfile : BaseEntity
     public string? PhoneNumber { get; private set; }
     public string? Description { get; private set; }
 
+    /// <summary>
+    /// Relative path under /uploads/avatars/ of the user's avatar image, or
+    /// null if they haven't uploaded one. The file itself is served by the
+    /// static file middleware; this field carries only the filename so the
+    /// frontend can build a URL.
+    /// </summary>
+    public string? AvatarUrl { get; private set; }
+
+    public void SetAvatarUrl(string? avatarUrl)
+    {
+        AvatarUrl = string.IsNullOrWhiteSpace(avatarUrl) ? null : avatarUrl.Trim();
+        Touch();
+    }
+
     public void SetEmploymentType(EmploymentType employmentType)
     {
         EmploymentType = employmentType;

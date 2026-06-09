@@ -430,3 +430,18 @@ public sealed class VisitorMessageConfiguration : IEntityTypeConfiguration<Visit
         b.HasIndex(x => new { x.IsRead, x.CreatedAt }).HasDatabaseName("ix_visitor_messages_inbox");
     }
 }
+
+
+public sealed class ReminderConfiguration : IEntityTypeConfiguration<Reminder>
+{
+    public void Configure(EntityTypeBuilder<Reminder> b)
+    {
+        b.ToTable("reminders");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Title).IsRequired().HasMaxLength(256);
+        b.Property(x => x.Notes).HasMaxLength(2000);
+        b.HasOne(x => x.OwnerUser).WithMany().HasForeignKey(x => x.OwnerUserId).OnDelete(DeleteBehavior.Cascade);
+        b.HasIndex(x => new { x.OwnerUserId, x.DueAt }).HasDatabaseName("ix_reminders_owner_due");
+        b.HasIndex(x => new { x.OwnerUserId, x.IsCompleted }).HasDatabaseName("ix_reminders_owner_status");
+    }
+}

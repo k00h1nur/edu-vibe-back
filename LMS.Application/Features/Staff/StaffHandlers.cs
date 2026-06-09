@@ -42,7 +42,7 @@ public sealed class GetStaffQueryHandler(IApplicationDbContext db)
             .Take(page.NormalizedPageSize)
             .Select(x => new StaffDto(
                 x.s.Id, x.s.UserId, x.u.Email, x.s.EmploymentType,
-                x.s.FirstName, x.s.LastName, x.s.PhoneNumber, x.s.Description))
+                x.s.FirstName, x.s.LastName, x.s.PhoneNumber, x.s.Description, x.s.AvatarUrl))
             .ToListAsync(cancellationToken);
 
         return Result<PagedResult<StaffDto>>.Ok(PagedResult<StaffDto>.From(items, total, page));
@@ -63,7 +63,7 @@ public sealed class CreateStaffCommandHandler(IApplicationDbContext db)
         await db.StaffProfiles.AddAsync(sp, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return Result<StaffDto>.Ok(new StaffDto(sp.Id, sp.UserId, user.Email, sp.EmploymentType,
-            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description));
+            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description, sp.AvatarUrl));
     }
 }
 
@@ -78,7 +78,7 @@ public sealed class UpdateStaffProfileCommandHandler(IApplicationDbContext db)
         await db.SaveChangesAsync(cancellationToken);
         var user = await db.Users.FirstAsync(x => x.Id == sp.UserId, cancellationToken);
         return Result<StaffDto>.Ok(new StaffDto(sp.Id, sp.UserId, user.Email, sp.EmploymentType,
-            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description));
+            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description, sp.AvatarUrl));
     }
 }
 
@@ -94,7 +94,7 @@ public sealed class UpdateStaffDetailsCommandHandler(IApplicationDbContext db)
         await db.SaveChangesAsync(cancellationToken);
         var user = await db.Users.FirstAsync(x => x.Id == sp.UserId, cancellationToken);
         return Result<StaffDto>.Ok(new StaffDto(sp.Id, sp.UserId, user.Email, sp.EmploymentType,
-            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description));
+            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description, sp.AvatarUrl));
     }
 }
 
@@ -119,6 +119,21 @@ public sealed class GetMyStaffProfileQueryHandler(IApplicationDbContext db, ICur
 
         return Result<StaffDto>.Ok(new StaffDto(
             match.s.Id, match.s.UserId, match.u.Email, match.s.EmploymentType,
-            match.s.FirstName, match.s.LastName, match.s.PhoneNumber, match.s.Description));
+            match.s.FirstName, match.s.LastName, match.s.PhoneNumber, match.s.Description, match.s.AvatarUrl));
+    }
+}
+
+public sealed class SetStaffAvatarCommandHandler(IApplicationDbContext db)
+    : IRequestHandler<SetStaffAvatarCommand, Result<StaffDto>>
+{
+    public async Task<Result<StaffDto>> Handle(SetStaffAvatarCommand request, CancellationToken ct)
+    {
+        var sp = await db.StaffProfiles.FirstOrDefaultAsync(x => x.Id == request.StaffProfileId, ct);
+        if (sp is null) return Result<StaffDto>.Fail("NOT_FOUND", "Staff profile not found.");
+        sp.SetAvatarUrl(request.AvatarUrl);
+        await db.SaveChangesAsync(ct);
+        var user = await db.Users.FirstAsync(x => x.Id == sp.UserId, ct);
+        return Result<StaffDto>.Ok(new StaffDto(sp.Id, sp.UserId, user.Email, sp.EmploymentType,
+            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description, sp.AvatarUrl));
     }
 }

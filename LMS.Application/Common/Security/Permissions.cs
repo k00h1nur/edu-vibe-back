@@ -217,6 +217,13 @@ public static class Permissions
         public const string Read = "Practice.Read";
     }
 
+    /// <summary>Personal reminders — every signed-in user gets these.</summary>
+    public static class Reminders
+    {
+        public const string Read = "Reminders.Read";
+        public const string Manage = "Reminders.Manage";
+    }
+
     /// <summary>Flat list of every permission code — used by seed data and tests.</summary>
     public static IReadOnlyCollection<string> All { get; } = new[]
     {
@@ -248,6 +255,7 @@ public static class Permissions
         Analytics.Read,
         Reports.Read,
         Practice.Read,
+        Reminders.Read, Reminders.Manage,
     };
 }
 
@@ -347,6 +355,7 @@ public static class RolePermissionMatrix
         // UI capability gates — Teacher curates materials + sees class-level analytics.
         Permissions.Materials.Read, Permissions.Materials.Manage,
         Permissions.Analytics.Read,
+        Permissions.Reminders.Read, Permissions.Reminders.Manage,
     };
 
     public static IReadOnlyCollection<string> ForSupportTeacher { get; } = new[]
@@ -385,5 +394,6 @@ public static class RolePermissionMatrix
         // UI capability gates — Student gets self-directed practice + reference materials.
         Permissions.Materials.Read,
         Permissions.Practice.Read,
+        Permissions.Reminders.Read, Permissions.Reminders.Manage,
     };
 }

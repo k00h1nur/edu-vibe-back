@@ -84,4 +84,48 @@ public sealed class StudentsController(ISender sender) : ControllerBase
             ? Ok(ApiResponse<StudentDto>.Ok(r.Data, r.Message))
             : BadRequest(ApiResponse<StudentDto>.Fail(r.Message ?? "Failed"));
     }
+
+    /// <summary>Admin-only fields: parent phone number, CEFR level.</summary>
+    [HttpPut("{id:guid}/admin-fields")]
+    [PermissionAuthorize(Permissions.Students.Update)]
+    public async Task<ActionResult<ApiResponse<StudentDto>>> UpdateAdminFields(
+        Guid id, [FromBody] UpdateStudentAdminFieldsCommand cmd, CancellationToken ct)
+    {
+        var r = await sender.Send(cmd with { StudentProfileId = id }, ct);
+        return r.Success
+            ? Ok(ApiResponse<StudentDto>.Ok(r.Data, r.Message))
+            : BadRequest(ApiResponse<StudentDto>.Fail(r.Message ?? "Failed"));
+    }
+
+    /// <summary>Multipart avatar upload — students or admins.</summary>
+    [HttpPost("{id:guid}/avatar")]
+    [PermissionAuthorize(Permissions.Students.Update)]
+    [RequestSizeLimit(2 * 1024 * 1024)]
+    public async Task<ActionResult<ApiResponse<StudentDto>>> UploadAvatar(Guid id,
+        [FromForm] IFormFile file,
+        [FromServices] LMS.Application.Common.Abstractions.IAvatarFileStore store,
+        CancellationToken ct)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(ApiResponse<StudentDto>.Fail("File is required."));
+
+        string storedName;
+        try
+        {
+            await using var stream = file.OpenReadStream();
+            storedName = await store.SaveAsync(stream, file.FileName, file.ContentType, ct);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ApiResponse<StudentDto>.Fail(ex.Message));
+        }
+
+        var r = await sender.Send(new SetStudentAvatarCommand(id, $"/uploads/avatars/{storedName}"), ct);
+        if (!r.Success)
+        {
+            await store.DeleteAsync(storedName, ct);
+            return BadRequest(ApiResponse<StudentDto>.Fail(r.Message ?? "Failed"));
+        }
+        return Ok(ApiResponse<StudentDto>.Ok(r.Data, r.Message));
+    }
 }
