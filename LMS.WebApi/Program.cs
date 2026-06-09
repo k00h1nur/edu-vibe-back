@@ -33,9 +33,13 @@ builder.Services.AddAuthorizationPolicies();
 builder.Services.AddSwagger();
 
 // ---- Hosted services (boot order matters) ---------------------------------
-// PermissionDiscoveryHostedService must finish first so the Permission rows
-// exist before RolePermissionSeederHostedService maps role→permission. The
-// demo-user seeder runs last so role + permission lookups succeed.
+// DatabaseInitializerHostedService applies any pending EF migrations first
+// (Development default) so the rest of the chain doesn't query a schema that
+// doesn't exist yet. PermissionDiscoveryHostedService follows so the
+// Permission rows exist before RolePermissionSeederHostedService maps
+// role→permission. The demo-user seeder runs last so role + permission
+// lookups succeed.
+builder.Services.AddHostedService<DatabaseInitializerHostedService>();
 builder.Services.AddHostedService<PermissionDiscoveryHostedService>();
 builder.Services.AddHostedService<RolePermissionSeederHostedService>();
 builder.Services.AddHostedService<DemoUsersSeederHostedService>();
