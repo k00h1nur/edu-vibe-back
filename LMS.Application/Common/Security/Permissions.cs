@@ -217,6 +217,20 @@ public static class Permissions
         public const string Read = "Practice.Read";
     }
 
+    /// <summary>Office info (academy contacts, social links, hero content).</summary>
+    public static class OfficeInfoPermissions
+    {
+        public const string Read = "OfficeInfo.Read";
+        public const string Manage = "OfficeInfo.Manage";
+    }
+
+    /// <summary>Public announcements shown to students on dashboard.</summary>
+    public static class Announcements
+    {
+        public const string Read = "Announcements.Read";
+        public const string Manage = "Announcements.Manage";
+    }
+
     /// <summary>Flat list of every permission code — used by seed data and tests.</summary>
     public static IReadOnlyCollection<string> All { get; } = new[]
     {
@@ -248,6 +262,8 @@ public static class Permissions
         Analytics.Read,
         Reports.Read,
         Practice.Read,
+        OfficeInfoPermissions.Read, OfficeInfoPermissions.Manage,
+        Announcements.Read, Announcements.Manage,
     };
 }
 
@@ -347,6 +363,8 @@ public static class RolePermissionMatrix
         // UI capability gates — Teacher curates materials + sees class-level analytics.
         Permissions.Materials.Read, Permissions.Materials.Manage,
         Permissions.Analytics.Read,
+        Permissions.Announcements.Read,
+        Permissions.OfficeInfoPermissions.Read,
     };
 
     public static IReadOnlyCollection<string> ForSupportTeacher { get; } = new[]
@@ -385,5 +403,7 @@ public static class RolePermissionMatrix
         // UI capability gates — Student gets self-directed practice + reference materials.
         Permissions.Materials.Read,
         Permissions.Practice.Read,
+        Permissions.Announcements.Read,
+        Permissions.OfficeInfoPermissions.Read,
     };
 }

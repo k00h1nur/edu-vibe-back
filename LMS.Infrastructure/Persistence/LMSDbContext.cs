@@ -42,6 +42,10 @@ public sealed class LMSDbContext : DbContext, IApplicationDbContext
     public DbSet<AssignmentAssignee> AssignmentAssignees => Set<AssignmentAssignee>();
     public DbSet<LearningTask> LearningTasks => Set<LearningTask>();
     public DbSet<TaskSubmission> TaskSubmissions => Set<TaskSubmission>();
+    public DbSet<Material> Materials => Set<Material>();
+    public DbSet<MaterialClass> MaterialClasses => Set<MaterialClass>();
+    public DbSet<OfficeInfo> OfficeInfos => Set<OfficeInfo>();
+    public DbSet<Announcement> Announcements => Set<Announcement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

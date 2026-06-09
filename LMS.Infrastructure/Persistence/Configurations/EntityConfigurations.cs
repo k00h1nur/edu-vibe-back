@@ -430,3 +430,70 @@ public sealed class VisitorMessageConfiguration : IEntityTypeConfiguration<Visit
         b.HasIndex(x => new { x.IsRead, x.CreatedAt }).HasDatabaseName("ix_visitor_messages_inbox");
     }
 }
+
+
+public sealed class MaterialConfiguration : IEntityTypeConfiguration<Material>
+{
+    public void Configure(EntityTypeBuilder<Material> b)
+    {
+        b.ToTable("materials");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Title).IsRequired().HasMaxLength(256);
+        b.Property(x => x.Description).HasMaxLength(2000);
+        b.Property(x => x.Visibility).IsRequired();
+        b.Property(x => x.StoredFileName).IsRequired().HasMaxLength(256);
+        b.Property(x => x.OriginalFileName).IsRequired().HasMaxLength(256);
+        b.Property(x => x.MimeType).IsRequired().HasMaxLength(128);
+        b.HasOne(x => x.UploadedByUser).WithMany().HasForeignKey(x => x.UploadedByUserId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => x.Visibility);
+        b.HasIndex(x => x.UploadedByUserId);
+    }
+}
+
+public sealed class MaterialClassConfiguration : IEntityTypeConfiguration<MaterialClass>
+{
+    public void Configure(EntityTypeBuilder<MaterialClass> b)
+    {
+        b.ToTable("material_classes");
+        b.HasKey(x => x.Id);
+        b.HasOne(x => x.Material).WithMany(x => x.Classes).HasForeignKey(x => x.MaterialId).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne(x => x.Class).WithMany().HasForeignKey(x => x.ClassId).OnDelete(DeleteBehavior.Cascade);
+        b.HasIndex(x => new { x.MaterialId, x.ClassId }).IsUnique();
+        b.HasIndex(x => x.ClassId);
+    }
+}
+
+public sealed class OfficeInfoConfiguration : IEntityTypeConfiguration<OfficeInfo>
+{
+    public void Configure(EntityTypeBuilder<OfficeInfo> b)
+    {
+        b.ToTable("office_info");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.AcademyName).HasMaxLength(128);
+        b.Property(x => x.Phone).HasMaxLength(64);
+        b.Property(x => x.Email).HasMaxLength(320);
+        b.Property(x => x.Address).HasMaxLength(512);
+        b.Property(x => x.ResultsContent).HasMaxLength(8000);
+        b.Property(x => x.TeachersIntro).HasMaxLength(2000);
+        b.Property(x => x.HeroContent).HasMaxLength(2000);
+        b.Property(x => x.InstagramUrl).HasMaxLength(1024);
+        b.Property(x => x.FacebookUrl).HasMaxLength(1024);
+        b.Property(x => x.TelegramUrl).HasMaxLength(1024);
+        b.Property(x => x.YoutubeUrl).HasMaxLength(1024);
+        b.Property(x => x.TiktokUrl).HasMaxLength(1024);
+        b.Property(x => x.LinkedInUrl).HasMaxLength(1024);
+    }
+}
+
+public sealed class AnnouncementConfiguration : IEntityTypeConfiguration<Announcement>
+{
+    public void Configure(EntityTypeBuilder<Announcement> b)
+    {
+        b.ToTable("announcements");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Title).IsRequired().HasMaxLength(256);
+        b.Property(x => x.Body).IsRequired().HasMaxLength(4000);
+        b.HasOne(x => x.AuthorUser).WithMany().HasForeignKey(x => x.AuthorUserId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.IsPublished, x.PublishedAt }).HasDatabaseName("ix_announcements_feed");
+    }
+}
