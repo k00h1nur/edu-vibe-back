@@ -12,7 +12,11 @@ public sealed record StaffDto(
     string? FirstName,
     string? LastName,
     string? PhoneNumber,
-    string? Description);
+    string? Description,
+    string? AvatarUrl);
+
+public sealed record SetStaffAvatarCommand(Guid StaffProfileId, string? AvatarUrl)
+    : IRequest<Result<StaffDto>>;
 
 public sealed record StaffPingCommand : IRequest<Result<string>>;
 

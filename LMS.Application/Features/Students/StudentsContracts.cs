@@ -12,7 +12,18 @@ public sealed record StudentDto(
     string? FirstName,
     string? LastName,
     string? PhoneNumber,
-    string? Description);
+    string? Description,
+    string? ParentPhoneNumber,
+    string? Level,
+    string? AvatarUrl);
+
+public sealed record UpdateStudentAdminFieldsCommand(
+    Guid StudentProfileId,
+    string? ParentPhoneNumber,
+    string? Level) : IRequest<Result<StudentDto>>;
+
+public sealed record SetStudentAvatarCommand(Guid StudentProfileId, string? AvatarUrl)
+    : IRequest<Result<StudentDto>>;
 
 public sealed record StudentsPingCommand : IRequest<Result<string>>;
 

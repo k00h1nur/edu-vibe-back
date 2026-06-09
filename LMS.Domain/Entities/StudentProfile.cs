@@ -39,6 +39,14 @@ public sealed class StudentProfile : BaseEntity
     public string? PhoneNumber { get; private set; }
     public string? Description { get; private set; }
 
+    /// <summary>Phone number of the student's parent / guardian. Admin-tracked.</summary>
+    public string? ParentPhoneNumber { get; private set; }
+
+    /// <summary>CEFR-style level label admin can set (A1, A2, B1, …). Free-text up to 16 chars.</summary>
+    public string? Level { get; private set; }
+
+    public string? AvatarUrl { get; private set; }
+
     public ICollection<Enrollment> Enrollments { get; } = new List<Enrollment>();
     public ICollection<Attendance> Attendances { get; } = new List<Attendance>();
     public ICollection<Submission> Submissions { get; } = new List<Submission>();
@@ -72,6 +80,24 @@ public sealed class StudentProfile : BaseEntity
         LastName = NormalizeOrNull(lastName, maxLength: 128, fieldName: nameof(LastName));
         PhoneNumber = NormalizeOrNull(phoneNumber, maxLength: 32, fieldName: nameof(PhoneNumber));
         Description = NormalizeOrNull(description, maxLength: 2000, fieldName: nameof(Description));
+        Touch();
+    }
+
+    public void SetParentPhoneNumber(string? parentPhoneNumber)
+    {
+        ParentPhoneNumber = NormalizeOrNull(parentPhoneNumber, maxLength: 32, fieldName: nameof(ParentPhoneNumber));
+        Touch();
+    }
+
+    public void SetLevel(string? level)
+    {
+        Level = NormalizeOrNull(level, maxLength: 16, fieldName: nameof(Level));
+        Touch();
+    }
+
+    public void SetAvatarUrl(string? avatarUrl)
+    {
+        AvatarUrl = string.IsNullOrWhiteSpace(avatarUrl) ? null : avatarUrl.Trim();
         Touch();
     }
 

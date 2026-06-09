@@ -68,6 +68,7 @@ public static class DependencyInjection
         services.AddHostedService<TelegramSenderHostedService>();
 
         services.AddSingleton<ITaskGrader, TaskGrader>();
+        services.AddSingleton<IAvatarFileStore, LocalAvatarFileStore>();
         return services;
     }
 
