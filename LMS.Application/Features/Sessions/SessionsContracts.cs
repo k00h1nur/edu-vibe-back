@@ -39,6 +39,12 @@ public sealed record CancelClassSessionCommand(Guid SessionId) : IRequest<Result
 
 public sealed record GetClassSessionsQuery(Guid ClassId) : IRequest<Result<IReadOnlyCollection<SessionDto>>>;
 
+/// <summary>
+/// Single-session lookup by id — powers the per-session marking pages in the
+/// frontend. Without it, callers walk every class's session list to find one.
+/// </summary>
+public sealed record GetSessionByIdQuery(Guid SessionId) : IRequest<Result<SessionDto>>;
+
 public sealed record GetMyScheduleQuery(Guid UserId) : IRequest<Result<IReadOnlyCollection<SessionDto>>>;
 
 /// <summary>
