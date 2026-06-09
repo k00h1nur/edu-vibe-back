@@ -222,191 +222,194 @@ public static class Permissions
     {
         public const string Read = "Reminders.Read";
         public const string Manage = "Reminders.Manage";
-    /// <summary>
-    /// Specialization catalogue — admin manages the list, teachers pick from it.
-    /// Read is granted to teacher+student so they can render the chips; Manage
-    /// only goes to admin.
-    /// </summary>
-    public static class Specializations
-    {
-        public const string Read = "Specializations.Read";
-        public const string Manage = "Specializations.Manage";
     }
 
-    /// <summary>Flat list of every permission code — used by seed data and tests.</summary>
-    public static IReadOnlyCollection<string> All { get; } = new[]
-    {
-        Auth.AssignRole,
-        Users.Read, Users.Create, Users.Update, Users.Delete,
-        Students.Read, Students.Create, Students.Update,
-        Staff.Read, Staff.Create, Staff.Update,
-        Classes.Read, Classes.Create, Classes.Update, Classes.Delete, Classes.Enroll,
-        Sessions.Read, Sessions.Create, Sessions.Update, Sessions.Delete,
-        Assignments.Read, Assignments.Create, Assignments.Update, Assignments.Publish, Assignments.Close,
-        Submissions.Read, Submissions.Create, Submissions.Grade,
-        Attendance.Read, Attendance.Mark, Attendance.Update,
-        Payments.Read, Payments.Create, Payments.Update,
-        Badges.Read, Badges.Create, Badges.Update, Badges.Award,
-        Xp.Read, Xp.Grant,
-        Conversations.Read, Conversations.Create, Conversations.ManageParticipants,
-        Messages.Read, Messages.Send,
-        Courses.Read, Courses.Manage,
-        Rooms.Read, Rooms.Manage,
-        Dashboard.Director, Dashboard.Office, Dashboard.Teacher, Dashboard.Student,
-        VisitorMessages.Read, VisitorMessages.Update,
-        Books.Read, Books.Manage,
-        Tasks.Read, Tasks.Manage,
-        TaskSubmissions.Read, TaskSubmissions.Submit, TaskSubmissions.Grade,
-        Results.Read, Results.Create, Results.Update, Results.Delete,
-        Roles.Read, Roles.Create, Roles.Update, Roles.Delete, Roles.AssignPermissions,
-        PermissionsCatalog.Read, PermissionsCatalog.Create, PermissionsCatalog.Update, PermissionsCatalog.Delete,
-        Materials.Read, Materials.Manage,
-        Analytics.Read,
-        Reports.Read,
-        Practice.Read,
-        Reminders.Read, Reminders.Manage,
-        Specializations.Read, Specializations.Manage,
-    };
-}
+    /// <summary>
+        /// Specialization catalogue — admin manages the list, teachers pick from it.
+        /// Read is granted to teacher+student so they can render the chips; Manage
+        /// only goes to admin.
+        /// </summary>
+        public static class Specializations
+        {
+            public const string Read = "Specializations.Read";
+            public const string Manage = "Specializations.Manage";
+        }
 
-/// <summary>
-/// Default permission grants per role, applied in EF seed data. Edit here when
-/// adding new permissions or rebalancing roles.
-///
-/// SuperAdmin and Admin are not listed — they bypass via the
-/// <see cref="LMS.WebApi.Security.PermissionAuthorizationHandler"/> SuperAdmin
-/// short-circuit (SuperAdmin) or by being granted <see cref="Permissions.All"/>
-/// in the seeder (Admin).
-/// </summary>
-public static class RolePermissionMatrix
-{
-    public static IReadOnlyCollection<string> ForAcademyDirector { get; } = new[]
-    {
-        Permissions.Dashboard.Director, Permissions.Dashboard.Office,
-        Permissions.Users.Read, Permissions.Users.Update,
-        Permissions.Students.Read, Permissions.Students.Update,
-        Permissions.Staff.Read, Permissions.Staff.Update,
-        Permissions.Classes.Read, Permissions.Classes.Update,
-        Permissions.Sessions.Read,
-        Permissions.Assignments.Read,
-        Permissions.Submissions.Read,
-        Permissions.Attendance.Read,
-        Permissions.Payments.Read, Permissions.Payments.Create, Permissions.Payments.Update,
-        Permissions.Badges.Read, Permissions.Badges.Create,
-        Permissions.Xp.Read,
-        Permissions.Conversations.Read, Permissions.Conversations.Create,
-        Permissions.Messages.Read, Permissions.Messages.Send,
-        Permissions.Courses.Read, Permissions.Courses.Manage,
-        Permissions.Rooms.Read, Permissions.Rooms.Manage,
-        Permissions.Results.Read, Permissions.Results.Create, Permissions.Results.Update,
-        Permissions.VisitorMessages.Read, Permissions.VisitorMessages.Update,
-        Permissions.Books.Read,
-        Permissions.Tasks.Read,
-        Permissions.TaskSubmissions.Read,
-        Permissions.Roles.Read,
-        // UI capability gates — Director sees the analytics-heavy view + reports.
-        Permissions.Materials.Read,
-        Permissions.Analytics.Read,
-        Permissions.Reports.Read,
-    };
+        /// <summary>Flat list of every permission code — used by seed data and tests.</summary>
+        public static IReadOnlyCollection<string> All { get; } = new[]
+        {
+            Auth.AssignRole,
+            Users.Read, Users.Create, Users.Update, Users.Delete,
+            Students.Read, Students.Create, Students.Update,
+            Staff.Read, Staff.Create, Staff.Update,
+            Classes.Read, Classes.Create, Classes.Update, Classes.Delete, Classes.Enroll,
+            Sessions.Read, Sessions.Create, Sessions.Update, Sessions.Delete,
+            Assignments.Read, Assignments.Create, Assignments.Update, Assignments.Publish, Assignments.Close,
+            Submissions.Read, Submissions.Create, Submissions.Grade,
+            Attendance.Read, Attendance.Mark, Attendance.Update,
+            Payments.Read, Payments.Create, Payments.Update,
+            Badges.Read, Badges.Create, Badges.Update, Badges.Award,
+            Xp.Read, Xp.Grant,
+            Conversations.Read, Conversations.Create, Conversations.ManageParticipants,
+            Messages.Read, Messages.Send,
+            Courses.Read, Courses.Manage,
+            Rooms.Read, Rooms.Manage,
+            Dashboard.Director, Dashboard.Office, Dashboard.Teacher, Dashboard.Student,
+            VisitorMessages.Read, VisitorMessages.Update,
+            Books.Read, Books.Manage,
+            Tasks.Read, Tasks.Manage,
+            TaskSubmissions.Read, TaskSubmissions.Submit, TaskSubmissions.Grade,
+            Results.Read, Results.Create, Results.Update, Results.Delete,
+            Roles.Read, Roles.Create, Roles.Update, Roles.Delete, Roles.AssignPermissions,
+            PermissionsCatalog.Read, PermissionsCatalog.Create, PermissionsCatalog.Update, PermissionsCatalog.Delete,
+            Materials.Read, Materials.Manage,
+            Analytics.Read,
+            Reports.Read,
+            Practice.Read,
+            Reminders.Read, Reminders.Manage,
+            Specializations.Read, Specializations.Manage,
+        };
+    }
 
-    public static IReadOnlyCollection<string> ForOfficeAdmin { get; } = new[]
+    /// <summary>
+    /// Default permission grants per role, applied in EF seed data. Edit here when
+    /// adding new permissions or rebalancing roles.
+    ///
+    /// SuperAdmin and Admin are not listed — they bypass via the
+    /// <see cref="LMS.WebApi.Security.PermissionAuthorizationHandler"/> SuperAdmin
+    /// short-circuit (SuperAdmin) or by being granted <see cref="Permissions.All"/>
+    /// in the seeder (Admin).
+    /// </summary>
+    public static class RolePermissionMatrix
     {
-        Permissions.Dashboard.Office,
-        Permissions.Auth.AssignRole,
-        Permissions.Users.Read, Permissions.Users.Create, Permissions.Users.Update,
-        Permissions.Students.Read, Permissions.Students.Create, Permissions.Students.Update,
-        Permissions.Staff.Read, Permissions.Staff.Create, Permissions.Staff.Update,
-        Permissions.Classes.Read, Permissions.Classes.Create, Permissions.Classes.Update,
-        Permissions.Classes.Delete, Permissions.Classes.Enroll,
-        Permissions.Sessions.Read, Permissions.Sessions.Create, Permissions.Sessions.Update,
-        Permissions.Sessions.Delete,
-        Permissions.Assignments.Read,
-        Permissions.Submissions.Read,
-        Permissions.Attendance.Read, Permissions.Attendance.Mark, Permissions.Attendance.Update,
-        Permissions.Payments.Read, Permissions.Payments.Create, Permissions.Payments.Update,
-        Permissions.Badges.Read, Permissions.Badges.Create, Permissions.Badges.Award,
-        Permissions.Xp.Read, Permissions.Xp.Grant,
-        Permissions.Conversations.Read, Permissions.Conversations.Create,
-        Permissions.Conversations.ManageParticipants,
-        Permissions.Messages.Read, Permissions.Messages.Send,
-        Permissions.Courses.Read, Permissions.Courses.Manage,
-        Permissions.Rooms.Read, Permissions.Rooms.Manage,
-        Permissions.VisitorMessages.Read, Permissions.VisitorMessages.Update,
-        Permissions.Books.Read, Permissions.Books.Manage,
-        Permissions.Tasks.Read,
-        Permissions.TaskSubmissions.Read,
-        Permissions.Roles.Read,
-        // UI capability gates — Office sees materials + ops reports, no analytics drill-down.
-        Permissions.Materials.Read, Permissions.Materials.Manage,
-        Permissions.Reports.Read,
-    };
+        public static IReadOnlyCollection<string> ForAcademyDirector { get; } = new[]
+        {
+            Permissions.Dashboard.Director, Permissions.Dashboard.Office,
+            Permissions.Users.Read, Permissions.Users.Update,
+            Permissions.Students.Read, Permissions.Students.Update,
+            Permissions.Staff.Read, Permissions.Staff.Update,
+            Permissions.Classes.Read, Permissions.Classes.Update,
+            Permissions.Sessions.Read,
+            Permissions.Assignments.Read,
+            Permissions.Submissions.Read,
+            Permissions.Attendance.Read,
+            Permissions.Payments.Read, Permissions.Payments.Create, Permissions.Payments.Update,
+            Permissions.Badges.Read, Permissions.Badges.Create,
+            Permissions.Xp.Read,
+            Permissions.Conversations.Read, Permissions.Conversations.Create,
+            Permissions.Messages.Read, Permissions.Messages.Send,
+            Permissions.Courses.Read, Permissions.Courses.Manage,
+            Permissions.Rooms.Read, Permissions.Rooms.Manage,
+            Permissions.Results.Read, Permissions.Results.Create, Permissions.Results.Update,
+            Permissions.VisitorMessages.Read, Permissions.VisitorMessages.Update,
+            Permissions.Books.Read,
+            Permissions.Tasks.Read,
+            Permissions.TaskSubmissions.Read,
+            Permissions.Roles.Read,
+            // UI capability gates — Director sees the analytics-heavy view + reports.
+            Permissions.Materials.Read,
+            Permissions.Analytics.Read,
+            Permissions.Reports.Read,
+        };
 
-    public static IReadOnlyCollection<string> ForTeacher { get; } = new[]
-    {
-        Permissions.Dashboard.Teacher,
-        Permissions.Students.Read,
-        Permissions.Classes.Read,
-        Permissions.Sessions.Read, Permissions.Sessions.Create, Permissions.Sessions.Update,
-        Permissions.Assignments.Read, Permissions.Assignments.Create, Permissions.Assignments.Update,
-        Permissions.Assignments.Publish, Permissions.Assignments.Close,
-        Permissions.Submissions.Read, Permissions.Submissions.Grade,
-        Permissions.Attendance.Read, Permissions.Attendance.Mark, Permissions.Attendance.Update,
-        Permissions.Badges.Read, Permissions.Badges.Award,
-        Permissions.Xp.Read, Permissions.Xp.Grant,
-        Permissions.Conversations.Read, Permissions.Conversations.Create,
-        Permissions.Messages.Read, Permissions.Messages.Send,
-        Permissions.Results.Read,
-        Permissions.Courses.Read,
-        Permissions.Rooms.Read,
-        Permissions.Books.Read,
-        Permissions.Tasks.Read, Permissions.Tasks.Manage,
-        Permissions.TaskSubmissions.Read, Permissions.TaskSubmissions.Grade,
-        // UI capability gates — Teacher curates materials + sees class-level analytics.
-        Permissions.Materials.Read, Permissions.Materials.Manage,
-        Permissions.Analytics.Read,
-        Permissions.Reminders.Read, Permissions.Reminders.Manage,
-        // Teachers can read the specialization catalogue to pick their own;
-        // they cannot manage the list (that's admin-only).
-        Permissions.Specializations.Read,
-    };
+        public static IReadOnlyCollection<string> ForOfficeAdmin { get; } = new[]
+        {
+            Permissions.Dashboard.Office,
+            Permissions.Auth.AssignRole,
+            Permissions.Users.Read, Permissions.Users.Create, Permissions.Users.Update,
+            Permissions.Students.Read, Permissions.Students.Create, Permissions.Students.Update,
+            Permissions.Staff.Read, Permissions.Staff.Create, Permissions.Staff.Update,
+            Permissions.Classes.Read, Permissions.Classes.Create, Permissions.Classes.Update,
+            Permissions.Classes.Delete, Permissions.Classes.Enroll,
+            Permissions.Sessions.Read, Permissions.Sessions.Create, Permissions.Sessions.Update,
+            Permissions.Sessions.Delete,
+            Permissions.Assignments.Read,
+            Permissions.Submissions.Read,
+            Permissions.Attendance.Read, Permissions.Attendance.Mark, Permissions.Attendance.Update,
+            Permissions.Payments.Read, Permissions.Payments.Create, Permissions.Payments.Update,
+            Permissions.Badges.Read, Permissions.Badges.Create, Permissions.Badges.Award,
+            Permissions.Xp.Read, Permissions.Xp.Grant,
+            Permissions.Conversations.Read, Permissions.Conversations.Create,
+            Permissions.Conversations.ManageParticipants,
+            Permissions.Messages.Read, Permissions.Messages.Send,
+            Permissions.Courses.Read, Permissions.Courses.Manage,
+            Permissions.Rooms.Read, Permissions.Rooms.Manage,
+            Permissions.VisitorMessages.Read, Permissions.VisitorMessages.Update,
+            Permissions.Books.Read, Permissions.Books.Manage,
+            Permissions.Tasks.Read,
+            Permissions.TaskSubmissions.Read,
+            Permissions.Roles.Read,
+            // UI capability gates — Office sees materials + ops reports, no analytics drill-down.
+            Permissions.Materials.Read, Permissions.Materials.Manage,
+            Permissions.Reports.Read,
+        };
 
-    public static IReadOnlyCollection<string> ForSupportTeacher { get; } = new[]
-    {
-        Permissions.Dashboard.Teacher,
-        Permissions.Students.Read,
-        Permissions.Classes.Read,
-        Permissions.Sessions.Read,
-        Permissions.Assignments.Read,
-        Permissions.Submissions.Read,
-        Permissions.Attendance.Read, Permissions.Attendance.Mark,
-        Permissions.Conversations.Read,
-        Permissions.Messages.Read, Permissions.Messages.Send,
-        Permissions.Courses.Read,
-        Permissions.Books.Read,
-        Permissions.Tasks.Read, Permissions.Tasks.Manage,
-        Permissions.TaskSubmissions.Read, Permissions.TaskSubmissions.Grade,
-        // UI capability gates — Support gets read-only materials, no analytics surface.
-        Permissions.Materials.Read,
-    };
+        public static IReadOnlyCollection<string> ForTeacher { get; } = new[]
+        {
+            Permissions.Dashboard.Teacher,
+            Permissions.Students.Read,
+            Permissions.Classes.Read,
+            Permissions.Sessions.Read, Permissions.Sessions.Create, Permissions.Sessions.Update,
+            Permissions.Assignments.Read, Permissions.Assignments.Create, Permissions.Assignments.Update,
+            Permissions.Assignments.Publish, Permissions.Assignments.Close,
+            Permissions.Submissions.Read, Permissions.Submissions.Grade,
+            Permissions.Attendance.Read, Permissions.Attendance.Mark, Permissions.Attendance.Update,
+            Permissions.Badges.Read, Permissions.Badges.Award,
+            Permissions.Xp.Read, Permissions.Xp.Grant,
+            Permissions.Conversations.Read, Permissions.Conversations.Create,
+            Permissions.Messages.Read, Permissions.Messages.Send,
+            Permissions.Results.Read,
+            Permissions.Courses.Read,
+            Permissions.Rooms.Read,
+            Permissions.Books.Read,
+            Permissions.Tasks.Read, Permissions.Tasks.Manage,
+            Permissions.TaskSubmissions.Read, Permissions.TaskSubmissions.Grade,
+            // UI capability gates — Teacher curates materials + sees class-level analytics.
+            Permissions.Materials.Read, Permissions.Materials.Manage,
+            Permissions.Analytics.Read,
+            Permissions.Reminders.Read, Permissions.Reminders.Manage,
+            // Teachers can read the specialization catalogue to pick their own;
+            // they cannot manage the list (that's admin-only).
+            Permissions.Specializations.Read,
+        };
 
-    public static IReadOnlyCollection<string> ForStudent { get; } = new[]
-    {
-        Permissions.Dashboard.Student,
-        Permissions.Assignments.Read,
-        Permissions.Submissions.Read, Permissions.Submissions.Create,
-        Permissions.Attendance.Read,
-        Permissions.Badges.Read,
-        Permissions.Xp.Read,
-        Permissions.Conversations.Read,
-        Permissions.Messages.Read, Permissions.Messages.Send,
-        Permissions.Results.Read,
-        Permissions.Books.Read,
-        Permissions.Tasks.Read,
-        Permissions.TaskSubmissions.Submit, Permissions.TaskSubmissions.Read,
-        // UI capability gates — Student gets self-directed practice + reference materials.
-        Permissions.Materials.Read,
-        Permissions.Practice.Read,
-        Permissions.Reminders.Read, Permissions.Reminders.Manage,
-    };
-}
+        public static IReadOnlyCollection<string> ForSupportTeacher { get; } = new[]
+        {
+            Permissions.Dashboard.Teacher,
+            Permissions.Students.Read,
+            Permissions.Classes.Read,
+            Permissions.Sessions.Read,
+            Permissions.Assignments.Read,
+            Permissions.Submissions.Read,
+            Permissions.Attendance.Read, Permissions.Attendance.Mark,
+            Permissions.Conversations.Read,
+            Permissions.Messages.Read, Permissions.Messages.Send,
+            Permissions.Courses.Read,
+            Permissions.Books.Read,
+            Permissions.Tasks.Read, Permissions.Tasks.Manage,
+            Permissions.TaskSubmissions.Read, Permissions.TaskSubmissions.Grade,
+            // UI capability gates — Support gets read-only materials, no analytics surface.
+            Permissions.Materials.Read,
+        };
+
+        public static IReadOnlyCollection<string> ForStudent { get; } = new[]
+        {
+            Permissions.Dashboard.Student,
+            Permissions.Assignments.Read,
+            Permissions.Submissions.Read, Permissions.Submissions.Create,
+            Permissions.Attendance.Read,
+            Permissions.Badges.Read,
+            Permissions.Xp.Read,
+            Permissions.Conversations.Read,
+            Permissions.Messages.Read, Permissions.Messages.Send,
+            Permissions.Results.Read,
+            Permissions.Books.Read,
+            Permissions.Tasks.Read,
+            Permissions.TaskSubmissions.Submit, Permissions.TaskSubmissions.Read,
+            // UI capability gates — Student gets self-directed practice + reference materials.
+            Permissions.Materials.Read,
+            Permissions.Practice.Read,
+            Permissions.Reminders.Read, Permissions.Reminders.Manage,
+        };
+    }
+

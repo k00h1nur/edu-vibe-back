@@ -443,6 +443,9 @@ public sealed class ReminderConfiguration : IEntityTypeConfiguration<Reminder>
         b.HasOne(x => x.OwnerUser).WithMany().HasForeignKey(x => x.OwnerUserId).OnDelete(DeleteBehavior.Cascade);
         b.HasIndex(x => new { x.OwnerUserId, x.DueAt }).HasDatabaseName("ix_reminders_owner_due");
         b.HasIndex(x => new { x.OwnerUserId, x.IsCompleted }).HasDatabaseName("ix_reminders_owner_status");
+    }
+}
+
 public sealed class SpecializationConfiguration : IEntityTypeConfiguration<Specialization>
 {
     public void Configure(EntityTypeBuilder<Specialization> b)
