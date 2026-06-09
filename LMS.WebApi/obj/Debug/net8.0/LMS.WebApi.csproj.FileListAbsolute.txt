@@ -294,3 +294,4 @@ C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microso
 C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions.dll
 C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore.dll
 C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microsoft.Extensions.Hosting.Abstractions.dll
+C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\appsettings.Production.example.json

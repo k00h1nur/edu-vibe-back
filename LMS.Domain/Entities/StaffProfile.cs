@@ -26,6 +26,13 @@ public sealed class StaffProfile : BaseEntity
     public string? PhoneNumber { get; private set; }
     public string? Description { get; private set; }
 
+    /// <summary>
+    /// Teaching specializations (Math, Physics, Chinese, …). Admin-curated
+    /// list (see <see cref="Specialization"/>) — the teacher picks one or
+    /// more from their profile page.
+    /// </summary>
+    public ICollection<StaffSpecialization> Specializations { get; } = new List<StaffSpecialization>();
+
     public void SetEmploymentType(EmploymentType employmentType)
     {
         EmploymentType = employmentType;
