@@ -37,5 +37,7 @@ public interface IApplicationDbContext
     DbSet<AssignmentAssignee> AssignmentAssignees { get; }
     DbSet<LearningTask> LearningTasks { get; }
     DbSet<TaskSubmission> TaskSubmissions { get; }
+    DbSet<Specialization> Specializations { get; }
+    DbSet<StaffSpecialization> StaffSpecializations { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }

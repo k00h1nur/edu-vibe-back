@@ -430,3 +430,35 @@ public sealed class VisitorMessageConfiguration : IEntityTypeConfiguration<Visit
         b.HasIndex(x => new { x.IsRead, x.CreatedAt }).HasDatabaseName("ix_visitor_messages_inbox");
     }
 }
+
+
+public sealed class SpecializationConfiguration : IEntityTypeConfiguration<Specialization>
+{
+    public void Configure(EntityTypeBuilder<Specialization> b)
+    {
+        b.ToTable("specializations");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).IsRequired().HasMaxLength(64);
+        b.Property(x => x.Name).IsRequired().HasMaxLength(128);
+        b.Property(x => x.IsActive).IsRequired();
+        b.HasIndex(x => x.Code).IsUnique();
+    }
+}
+
+public sealed class StaffSpecializationConfiguration : IEntityTypeConfiguration<StaffSpecialization>
+{
+    public void Configure(EntityTypeBuilder<StaffSpecialization> b)
+    {
+        b.ToTable("staff_specializations");
+        b.HasKey(x => x.Id);
+        b.HasOne(x => x.StaffProfile)
+            .WithMany(x => x.Specializations)
+            .HasForeignKey(x => x.StaffProfileId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.HasOne(x => x.Specialization)
+            .WithMany(x => x.StaffLinks)
+            .HasForeignKey(x => x.SpecializationId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.HasIndex(x => new { x.StaffProfileId, x.SpecializationId }).IsUnique();
+    }
+}
