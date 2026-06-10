@@ -34,17 +34,25 @@ public sealed class CoursesHandlers(IApplicationDbContext db) :
 
     public async Task<Result<CourseDto>> Handle(GetCourseByIdQuery request, CancellationToken cancellationToken)
     {
-        var c = await db.Courses.FirstOrDefaultAsync(x => x.Id == request.CourseId, cancellationToken);
+        // Read-only projection — AsNoTracking skips change-tracker overhead.
+        var c = await db.Courses.AsNoTracking()
+            .Where(x => x.Id == request.CourseId)
+            .Select(x => new CourseDto(x.Id, x.Code, x.Name))
+            .FirstOrDefaultAsync(cancellationToken);
         return c is null
             ? Result<CourseDto>.Fail("NOT_FOUND", "Course not found.")
-            : Result<CourseDto>.Ok(new CourseDto(c.Id, c.Code, c.Name));
+            : Result<CourseDto>.Ok(c);
     }
 
     public async Task<Result<IReadOnlyCollection<CourseDto>>> Handle(GetCoursesQuery request,
         CancellationToken cancellationToken)
     {
-        return Result<IReadOnlyCollection<CourseDto>>.Ok(await db.Courses
-            .Select(x => new CourseDto(x.Id, x.Code, x.Name)).ToListAsync(cancellationToken));
+        // OrderBy gives a stable client-visible order; AsNoTracking is free
+        // because we're projecting to a DTO anyway.
+        return Result<IReadOnlyCollection<CourseDto>>.Ok(await db.Courses.AsNoTracking()
+            .OrderBy(x => x.Name)
+            .Select(x => new CourseDto(x.Id, x.Code, x.Name))
+            .ToListAsync(cancellationToken));
     }
 
     public async Task<Result<CourseDto>> Handle(UpdateCourseCommand request, CancellationToken cancellationToken)
