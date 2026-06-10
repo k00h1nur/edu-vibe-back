@@ -81,8 +81,9 @@ public sealed class StaffController(ISender sender) : ControllerBase
     [HttpPost("{id:guid}/avatar")]
     [PermissionAuthorize(Permissions.Staff.Update)]
     [RequestSizeLimit(2 * 1024 * 1024)]
+    [Consumes("multipart/form-data")]
     public async Task<ActionResult<ApiResponse<StaffDto>>> UploadAvatar(Guid id,
-        [FromForm] IFormFile file,
+        IFormFile file,
         [FromServices] LMS.Application.Common.Abstractions.IAvatarFileStore store,
         CancellationToken ct)
     {

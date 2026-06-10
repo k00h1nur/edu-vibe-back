@@ -77,6 +77,7 @@ public sealed class ResultsController(ISender sender) : ControllerBase
 
     [HttpPost("admin/results/{id:guid}/images")]
     [PermissionAuthorize("Results.Update")]
+    [Consumes("multipart/form-data")]
     public async Task<ActionResult<ApiResponse<ResultImageDto>>> UploadImage(Guid id, IFormFile file, [FromQuery] bool isMain = false,
         CancellationToken cancellationToken = default)
     {
@@ -87,6 +88,7 @@ public sealed class ResultsController(ISender sender) : ControllerBase
 
     [HttpPut("admin/results/{id:guid}/images/{imageId:guid}")]
     [PermissionAuthorize("Results.Update")]
+    [Consumes("multipart/form-data")]
     public async Task<ActionResult<ApiResponse<ResultImageDto>>> ReplaceImage(Guid id, Guid imageId, IFormFile file,
         CancellationToken cancellationToken = default)
     {
