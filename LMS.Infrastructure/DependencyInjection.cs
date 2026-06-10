@@ -69,6 +69,7 @@ public static class DependencyInjection
 
         services.AddSingleton<ITaskGrader, TaskGrader>();
         services.AddSingleton<IAvatarFileStore, LocalAvatarFileStore>();
+        services.AddSingleton<IMaterialFileStore, LocalMaterialFileStore>();
         return services;
     }
 

@@ -57,13 +57,16 @@ public sealed class ClassesHandlers(IApplicationDbContext db) :
     {
         return Result<IReadOnlyCollection<ClassDto>>.Ok(await db.Classes
             .Where(x => x.TeacherUserId == request.TeacherUserId)
-            .Select(c => new ClassDto(c.Id, c.Title, c.MaxStudents, c.Modality, c.Status, c.TeacherUserId))
+            .Select(c => new ClassDto(c.Id, c.Title, c.MaxStudents, c.Modality, c.Status, c.TeacherUserId,
+                c.Enrollments.Count(e => e.Status == EnrollmentStatus.Active)))
             .ToListAsync(cancellationToken));
     }
 
     public async Task<Result<ClassDto>> Handle(GetClassByIdQuery request, CancellationToken cancellationToken)
     {
-        var c = await db.Classes.FirstOrDefaultAsync(x => x.Id == request.ClassId, cancellationToken);
+        var c = await db.Classes
+            .Include(x => x.Enrollments)
+            .FirstOrDefaultAsync(x => x.Id == request.ClassId, cancellationToken);
         return c is null ? Result<ClassDto>.Fail("NOT_FOUND", "Class not found.") : Result<ClassDto>.Ok(Map(c));
     }
 
@@ -86,7 +89,8 @@ public sealed class ClassesHandlers(IApplicationDbContext db) :
             .OrderBy(c => c.Title)
             .Skip(page.Skip)
             .Take(page.NormalizedPageSize)
-            .Select(c => new ClassDto(c.Id, c.Title, c.MaxStudents, c.Modality, c.Status, c.TeacherUserId))
+            .Select(c => new ClassDto(c.Id, c.Title, c.MaxStudents, c.Modality, c.Status, c.TeacherUserId,
+                c.Enrollments.Count(e => e.Status == EnrollmentStatus.Active)))
             .ToListAsync(cancellationToken);
 
         return Result<PagedResult<ClassDto>>.Ok(PagedResult<ClassDto>.From(items, total, page));
@@ -128,6 +132,11 @@ public sealed class ClassesHandlers(IApplicationDbContext db) :
 
     private static ClassDto Map(Class c)
     {
-        return new ClassDto(c.Id, c.Title, c.MaxStudents, c.Modality, c.Status, c.TeacherUserId);
+        // For single-entity reads we use the in-memory Enrollments count —
+        // entity has already been materialised so this avoids a second
+        // round-trip. Returns 0 if Include(Enrollments) wasn't applied,
+        // which is the safe default for callers that don't need the count.
+        var active = c.Enrollments?.Count(e => e.Status == EnrollmentStatus.Active) ?? 0;
+        return new ClassDto(c.Id, c.Title, c.MaxStudents, c.Modality, c.Status, c.TeacherUserId, active);
     }
 }

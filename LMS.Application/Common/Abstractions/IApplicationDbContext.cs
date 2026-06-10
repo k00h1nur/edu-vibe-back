@@ -40,5 +40,7 @@ public interface IApplicationDbContext
     DbSet<Reminder> Reminders { get; }
     DbSet<Specialization> Specializations { get; }
     DbSet<StaffSpecialization> StaffSpecializations { get; }
+    DbSet<Material> Materials { get; }
+    DbSet<MaterialClass> MaterialClasses { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }

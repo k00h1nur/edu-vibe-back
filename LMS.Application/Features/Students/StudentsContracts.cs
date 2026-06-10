@@ -1,4 +1,5 @@
 using LMS.Application.Common.Models;
+using LMS.Domain.Enums;
 using MediatR;
 
 namespace LMS.Application.Features.Students;
@@ -15,7 +16,11 @@ public sealed record StudentDto(
     string? Description,
     string? ParentPhoneNumber,
     string? Level,
-    string? AvatarUrl);
+    string? AvatarUrl,
+    UserStatus Status);
+
+public sealed record SetStudentStatusCommand(Guid StudentProfileId, UserStatus Status)
+    : IRequest<Result<StudentDto>>;
 
 public sealed record UpdateStudentAdminFieldsCommand(
     Guid StudentProfileId,

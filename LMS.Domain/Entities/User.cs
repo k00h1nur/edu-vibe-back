@@ -73,4 +73,21 @@ public sealed class User : BaseEntity
         Status = UserStatus.Active;
         Touch();
     }
+
+    /// <summary>
+    /// Admin entry point — freeze/block/restore an account. Backs the
+    /// /api/Staff/{id}/status and /api/Students/{id}/status endpoints.
+    /// Distinct from <see cref="Activate"/> / <see cref="Deactivate"/>
+    /// because admin can also push to <see cref="UserStatus.Blocked"/>,
+    /// which the login flow refuses outright (compared to Inactive which
+    /// can be reactivated by the user later via a different flow).
+    /// </summary>
+    public void SetStatus(UserStatus status)
+    {
+        if (!Enum.IsDefined(typeof(UserStatus), status))
+            throw new DomainException("Unknown user status.");
+        Status = status;
+        if (status != UserStatus.Active) ClearRefreshToken();
+        Touch();
+    }
 }

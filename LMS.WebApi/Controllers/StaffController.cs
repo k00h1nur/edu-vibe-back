@@ -1,6 +1,7 @@
 using LMS.Application.Common.Models;
 using LMS.Application.Common.Security;
 using LMS.Application.Features.Staff;
+using LMS.Domain.Enums;
 using LMS.WebApi.Common;
 using LMS.WebApi.Security;
 using MediatR;
@@ -74,6 +75,25 @@ public sealed class StaffController(ISender sender) : ControllerBase
     }
 
     /// <summary>
+    /// Admin freeze/block/restore. Body shape: { "status": 1|2|3 } where
+    /// 1=Active, 2=Inactive, 3=Blocked (UserStatus enum). The login flow
+    /// rejects non-Active accounts so the lock takes effect on the next
+    /// auth attempt — current sessions are also invalidated because
+    /// <see cref="LMS.Domain.Entities.User.SetStatus"/> wipes the refresh
+    /// token when status leaves Active.
+    /// </summary>
+    [HttpPost("{id:guid}/status")]
+    [PermissionAuthorize(Permissions.Staff.Update)]
+    public async Task<ActionResult<ApiResponse<StaffDto>>> SetStatus(Guid id,
+        [FromBody] SetUserStatusRequest body, CancellationToken ct)
+    {
+        var r = await sender.Send(new SetStaffStatusCommand(id, body.Status), ct);
+        return r.Success
+            ? Ok(ApiResponse<StaffDto>.Ok(r.Data, r.Message))
+            : BadRequest(ApiResponse<StaffDto>.Fail(r.Message ?? "Failed"));
+    }
+
+    /// <summary>
     /// Uploads a new avatar for the staff member and stores its name on the
     /// profile. Returns the updated DTO so the frontend can swap the image
     /// in immediately.
@@ -110,3 +130,10 @@ public sealed class StaffController(ISender sender) : ControllerBase
         return Ok(ApiResponse<StaffDto>.Ok(r.Data, r.Message));
     }
 }
+
+/// <summary>
+/// Shared body for the freeze/block endpoint on Staff + Students. Lives next
+/// to the controllers because both shapes are identical and the admin UI
+/// posts the same JSON to either.
+/// </summary>
+public sealed record SetUserStatusRequest(UserStatus Status);

@@ -72,6 +72,35 @@ public sealed class ClassSessionsController(ISender sender, ICurrentUserService 
         return Ok(ApiResponse<IReadOnlyCollection<SessionDto>>.Ok(r.Data, r.Message));
     }
 
+    /// <summary>
+    /// Admin "today's lessons" entry point — every session scheduled on a
+    /// given date across every class. Used by the admin attendance flow to
+    /// turn "make attendance" into a one-click list of today's sessions.
+    /// </summary>
+    [HttpGet("on/{date}")]
+    [PermissionAuthorize(Permissions.Sessions.Read)]
+    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<SessionDto>>>> OnDate(
+        DateOnly date, [FromQuery] Guid? classId, CancellationToken ct)
+    {
+        var r = await sender.Send(new GetSessionsForDateQuery(date, classId), ct);
+        return Ok(ApiResponse<IReadOnlyCollection<SessionDto>>.Ok(r.Data, r.Message));
+    }
+
+    /// <summary>
+    /// Schedule view across a date range, joined with the parent class so the
+    /// admin schedule grid renders without N+1 lookups. Inclusive on both ends.
+    /// </summary>
+    [HttpGet("schedule")]
+    [PermissionAuthorize(Permissions.Sessions.Read)]
+    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<ScheduleEntryDto>>>> Schedule(
+        [FromQuery] DateOnly from, [FromQuery] DateOnly to, CancellationToken ct)
+    {
+        var r = await sender.Send(new GetScheduleQuery(from, to), ct);
+        return r.Success
+            ? Ok(ApiResponse<IReadOnlyCollection<ScheduleEntryDto>>.Ok(r.Data, r.Message))
+            : BadRequest(ApiResponse<IReadOnlyCollection<ScheduleEntryDto>>.Fail(r.Message ?? "Failed"));
+    }
+
     [HttpPost]
     [PermissionAuthorize(Permissions.Sessions.Create)]
     public async Task<ActionResult<ApiResponse<SessionDto>>> Create([FromBody] CreateClassSessionCommand cmd,

@@ -1,6 +1,7 @@
 using LMS.Application.Common.Models;
 using LMS.Application.Common.Security;
 using LMS.Application.Features.Students;
+using LMS.Domain.Enums;
 using LMS.WebApi.Common;
 using LMS.WebApi.Security;
 using MediatR;
@@ -92,6 +93,22 @@ public sealed class StudentsController(ISender sender) : ControllerBase
         Guid id, [FromBody] UpdateStudentAdminFieldsCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd with { StudentProfileId = id }, ct);
+        return r.Success
+            ? Ok(ApiResponse<StudentDto>.Ok(r.Data, r.Message))
+            : BadRequest(ApiResponse<StudentDto>.Fail(r.Message ?? "Failed"));
+    }
+
+    /// <summary>
+    /// Admin freeze/block/restore. See StaffController.SetStatus for semantics —
+    /// flipping out of Active also invalidates the student's refresh token so
+    /// existing sessions can't survive past the next access-token refresh.
+    /// </summary>
+    [HttpPost("{id:guid}/status")]
+    [PermissionAuthorize(Permissions.Students.Update)]
+    public async Task<ActionResult<ApiResponse<StudentDto>>> SetStatus(Guid id,
+        [FromBody] SetUserStatusRequest body, CancellationToken ct)
+    {
+        var r = await sender.Send(new SetStudentStatusCommand(id, body.Status), ct);
         return r.Success
             ? Ok(ApiResponse<StudentDto>.Ok(r.Data, r.Message))
             : BadRequest(ApiResponse<StudentDto>.Fail(r.Message ?? "Failed"));

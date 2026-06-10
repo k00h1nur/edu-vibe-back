@@ -476,3 +476,38 @@ public sealed class StaffSpecializationConfiguration : IEntityTypeConfiguration<
         b.HasIndex(x => new { x.StaffProfileId, x.SpecializationId }).IsUnique();
     }
 }
+
+public sealed class MaterialConfiguration : IEntityTypeConfiguration<Material>
+{
+    public void Configure(EntityTypeBuilder<Material> b)
+    {
+        b.ToTable("materials");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Title).IsRequired().HasMaxLength(256);
+        b.Property(x => x.Description).HasMaxLength(2000);
+        b.Property(x => x.StoredFileName).IsRequired().HasMaxLength(256);
+        b.Property(x => x.OriginalFileName).IsRequired().HasMaxLength(256);
+        b.Property(x => x.MimeType).IsRequired().HasMaxLength(128);
+        // Admin list orders by CreatedAt desc + filters by uploader / visibility.
+        b.HasIndex(x => x.CreatedAt).HasDatabaseName("ix_materials_created_at");
+        b.HasIndex(x => x.UploadedByUserId).HasDatabaseName("ix_materials_uploaded_by");
+        b.HasIndex(x => x.Visibility).HasDatabaseName("ix_materials_visibility");
+        b.HasOne(x => x.UploadedByUser).WithMany().HasForeignKey(x => x.UploadedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public sealed class MaterialClassConfiguration : IEntityTypeConfiguration<MaterialClass>
+{
+    public void Configure(EntityTypeBuilder<MaterialClass> b)
+    {
+        b.ToTable("material_classes");
+        b.HasKey(x => x.Id);
+        b.HasIndex(x => new { x.MaterialId, x.ClassId }).IsUnique();
+        b.HasIndex(x => x.ClassId).HasDatabaseName("ix_material_classes_class_id");
+        b.HasOne(x => x.Material).WithMany(x => x.ClassLinks)
+            .HasForeignKey(x => x.MaterialId).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne(x => x.Class).WithMany()
+            .HasForeignKey(x => x.ClassId).OnDelete(DeleteBehavior.Cascade);
+    }
+}

@@ -42,7 +42,8 @@ public sealed class GetStudentsQueryHandler(IApplicationDbContext db)
             .Take(page.NormalizedPageSize)
             .Select(x => new StudentDto(
                 x.s.Id, x.s.UserId, x.u.Email, x.s.XP, x.s.Streak,
-                x.s.FirstName, x.s.LastName, x.s.PhoneNumber, x.s.Description, x.s.ParentPhoneNumber, x.s.Level, x.s.AvatarUrl))
+                x.s.FirstName, x.s.LastName, x.s.PhoneNumber, x.s.Description,
+                x.s.ParentPhoneNumber, x.s.Level, x.s.AvatarUrl, x.u.Status))
             .ToListAsync(cancellationToken);
 
         return Result<PagedResult<StudentDto>>.Ok(PagedResult<StudentDto>.From(items, total, page));
@@ -61,7 +62,7 @@ public sealed class GetStudentDetailQueryHandler(IApplicationDbContext db)
         return Result<StudentDto>.Ok(new StudentDto(
             sp.s.Id, sp.s.UserId, sp.u.Email, sp.s.XP, sp.s.Streak,
             sp.s.FirstName, sp.s.LastName, sp.s.PhoneNumber, sp.s.Description,
-            sp.s.ParentPhoneNumber, sp.s.Level, sp.s.AvatarUrl));
+            sp.s.ParentPhoneNumber, sp.s.Level, sp.s.AvatarUrl, sp.u.Status));
     }
 }
 
@@ -76,14 +77,16 @@ public sealed class RegisterStudentCommandHandler(IApplicationDbContext db)
         if (existing is not null)
             return Result<StudentDto>.Ok(
                 new StudentDto(existing.Id, existing.UserId, user.Email, existing.XP, existing.Streak,
-                    existing.FirstName, existing.LastName, existing.PhoneNumber, existing.Description, existing.ParentPhoneNumber, existing.Level, existing.AvatarUrl),
+                    existing.FirstName, existing.LastName, existing.PhoneNumber, existing.Description,
+                    existing.ParentPhoneNumber, existing.Level, existing.AvatarUrl, user.Status),
                 "Already exists.");
 
         var sp = new StudentProfile(user.Id, user);
         await db.StudentProfiles.AddAsync(sp, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return Result<StudentDto>.Ok(new StudentDto(sp.Id, sp.UserId, user.Email, sp.XP, sp.Streak,
-            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description, sp.ParentPhoneNumber, sp.Level, sp.AvatarUrl));
+            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description,
+            sp.ParentPhoneNumber, sp.Level, sp.AvatarUrl, user.Status));
     }
 }
 
@@ -100,7 +103,8 @@ public sealed class UpdateStudentProfileCommandHandler(IApplicationDbContext db)
         await db.SaveChangesAsync(cancellationToken);
         var user = await db.Users.FirstAsync(x => x.Id == sp.UserId, cancellationToken);
         return Result<StudentDto>.Ok(new StudentDto(sp.Id, sp.UserId, user.Email, sp.XP, sp.Streak,
-            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description, sp.ParentPhoneNumber, sp.Level, sp.AvatarUrl));
+            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description,
+            sp.ParentPhoneNumber, sp.Level, sp.AvatarUrl, user.Status));
     }
 }
 
@@ -116,7 +120,8 @@ public sealed class UpdateStudentDetailsCommandHandler(IApplicationDbContext db)
         await db.SaveChangesAsync(cancellationToken);
         var user = await db.Users.FirstAsync(x => x.Id == sp.UserId, cancellationToken);
         return Result<StudentDto>.Ok(new StudentDto(sp.Id, sp.UserId, user.Email, sp.XP, sp.Streak,
-            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description, sp.ParentPhoneNumber, sp.Level, sp.AvatarUrl));
+            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description,
+            sp.ParentPhoneNumber, sp.Level, sp.AvatarUrl, user.Status));
     }
 }
 
@@ -141,7 +146,8 @@ public sealed class GetMyStudentProfileQueryHandler(IApplicationDbContext db, IC
 
         return Result<StudentDto>.Ok(new StudentDto(
             match.s.Id, match.s.UserId, match.u.Email, match.s.XP, match.s.Streak,
-            match.s.FirstName, match.s.LastName, match.s.PhoneNumber, match.s.Description, match.s.ParentPhoneNumber, match.s.Level, match.s.AvatarUrl));
+            match.s.FirstName, match.s.LastName, match.s.PhoneNumber, match.s.Description,
+            match.s.ParentPhoneNumber, match.s.Level, match.s.AvatarUrl, match.u.Status));
     }
 }
 
@@ -157,7 +163,8 @@ public sealed class UpdateStudentAdminFieldsCommandHandler(IApplicationDbContext
         await db.SaveChangesAsync(ct);
         var user = await db.Users.FirstAsync(x => x.Id == sp.UserId, ct);
         return Result<StudentDto>.Ok(new StudentDto(sp.Id, sp.UserId, user.Email, sp.XP, sp.Streak,
-            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description, sp.ParentPhoneNumber, sp.Level, sp.AvatarUrl));
+            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description,
+            sp.ParentPhoneNumber, sp.Level, sp.AvatarUrl, user.Status));
     }
 }
 
@@ -172,6 +179,33 @@ public sealed class SetStudentAvatarCommandHandler(IApplicationDbContext db)
         await db.SaveChangesAsync(ct);
         var user = await db.Users.FirstAsync(x => x.Id == sp.UserId, ct);
         return Result<StudentDto>.Ok(new StudentDto(sp.Id, sp.UserId, user.Email, sp.XP, sp.Streak,
-            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description, sp.ParentPhoneNumber, sp.Level, sp.AvatarUrl));
+            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description,
+            sp.ParentPhoneNumber, sp.Level, sp.AvatarUrl, user.Status));
+    }
+}
+
+/// <summary>
+/// Admin freeze/block/restore for a student. Same pattern as
+/// <see cref="LMS.Application.Features.Staff.SetStaffStatusCommandHandler"/>.
+/// </summary>
+public sealed class SetStudentStatusCommandHandler(IApplicationDbContext db, ICurrentUserService currentUser)
+    : IRequestHandler<SetStudentStatusCommand, Result<StudentDto>>
+{
+    public async Task<Result<StudentDto>> Handle(SetStudentStatusCommand request, CancellationToken ct)
+    {
+        var sp = await db.StudentProfiles.FirstOrDefaultAsync(x => x.Id == request.StudentProfileId, ct);
+        if (sp is null) return Result<StudentDto>.Fail("NOT_FOUND", "Student profile not found.");
+        var user = await db.Users.FirstOrDefaultAsync(x => x.Id == sp.UserId, ct);
+        if (user is null) return Result<StudentDto>.Fail("NOT_FOUND", "Linked user not found.");
+
+        if (currentUser.UserId == user.Id && request.Status != Domain.Enums.UserStatus.Active)
+            return Result<StudentDto>.Fail("VALIDATION", "Cannot change your own status.");
+
+        user.SetStatus(request.Status);
+        await db.SaveChangesAsync(ct);
+
+        return Result<StudentDto>.Ok(new StudentDto(sp.Id, sp.UserId, user.Email, sp.XP, sp.Streak,
+            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description,
+            sp.ParentPhoneNumber, sp.Level, sp.AvatarUrl, user.Status));
     }
 }

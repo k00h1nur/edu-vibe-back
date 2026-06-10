@@ -13,7 +13,9 @@ public sealed class SessionsHandlers(IApplicationDbContext db) :
     IRequestHandler<GetClassSessionsQuery, Result<IReadOnlyCollection<SessionDto>>>,
     IRequestHandler<GetSessionByIdQuery, Result<SessionDto>>,
     IRequestHandler<GetMyScheduleQuery, Result<IReadOnlyCollection<SessionDto>>>,
-    IRequestHandler<GetUpcomingSessionsQuery, Result<IReadOnlyCollection<SessionDto>>>
+    IRequestHandler<GetUpcomingSessionsQuery, Result<IReadOnlyCollection<SessionDto>>>,
+    IRequestHandler<GetSessionsForDateQuery, Result<IReadOnlyCollection<SessionDto>>>,
+    IRequestHandler<GetScheduleQuery, Result<IReadOnlyCollection<ScheduleEntryDto>>>
 {
     public async Task<Result> Handle(CancelClassSessionCommand request, CancellationToken cancellationToken)
     {
@@ -113,5 +115,36 @@ public sealed class SessionsHandlers(IApplicationDbContext db) :
     private static SessionDto Map(ClassSession s)
     {
         return new SessionDto(s.Id, s.ClassId, s.SessionDate, s.StartsAt, s.EndsAt, s.RoomId);
+    }
+
+    public async Task<Result<IReadOnlyCollection<SessionDto>>> Handle(GetSessionsForDateQuery request,
+        CancellationToken ct)
+    {
+        var q = db.ClassSessions.AsNoTracking().Where(x => x.SessionDate == request.Date);
+        if (request.ClassId is { } classId) q = q.Where(x => x.ClassId == classId);
+
+        var data = await q
+            .OrderBy(x => x.StartsAt)
+            .Select(x => new SessionDto(x.Id, x.ClassId, x.SessionDate, x.StartsAt, x.EndsAt, x.RoomId))
+            .ToListAsync(ct);
+        return Result<IReadOnlyCollection<SessionDto>>.Ok(data);
+    }
+
+    public async Task<Result<IReadOnlyCollection<ScheduleEntryDto>>> Handle(GetScheduleQuery request,
+        CancellationToken ct)
+    {
+        if (request.To < request.From)
+            return Result<IReadOnlyCollection<ScheduleEntryDto>>.Fail("VALIDATION", "To must be on or after From.");
+
+        var data = await (
+            from s in db.ClassSessions.AsNoTracking()
+            join c in db.Classes.AsNoTracking() on s.ClassId equals c.Id
+            where s.SessionDate >= request.From && s.SessionDate <= request.To
+            orderby s.SessionDate, s.StartsAt
+            select new ScheduleEntryDto(
+                s.Id, s.ClassId, c.Title, c.TeacherUserId,
+                s.SessionDate, s.StartsAt, s.EndsAt, s.RoomId))
+            .ToListAsync(ct);
+        return Result<IReadOnlyCollection<ScheduleEntryDto>>.Ok(data);
     }
 }

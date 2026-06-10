@@ -42,7 +42,8 @@ public sealed class GetStaffQueryHandler(IApplicationDbContext db)
             .Take(page.NormalizedPageSize)
             .Select(x => new StaffDto(
                 x.s.Id, x.s.UserId, x.u.Email, x.s.EmploymentType,
-                x.s.FirstName, x.s.LastName, x.s.PhoneNumber, x.s.Description, x.s.AvatarUrl))
+                x.s.FirstName, x.s.LastName, x.s.PhoneNumber, x.s.Description, x.s.AvatarUrl,
+                x.u.Status))
             .ToListAsync(cancellationToken);
 
         return Result<PagedResult<StaffDto>>.Ok(PagedResult<StaffDto>.From(items, total, page));
@@ -63,7 +64,7 @@ public sealed class CreateStaffCommandHandler(IApplicationDbContext db)
         await db.StaffProfiles.AddAsync(sp, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return Result<StaffDto>.Ok(new StaffDto(sp.Id, sp.UserId, user.Email, sp.EmploymentType,
-            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description, sp.AvatarUrl));
+            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description, sp.AvatarUrl, user.Status));
     }
 }
 
@@ -78,7 +79,7 @@ public sealed class UpdateStaffProfileCommandHandler(IApplicationDbContext db)
         await db.SaveChangesAsync(cancellationToken);
         var user = await db.Users.FirstAsync(x => x.Id == sp.UserId, cancellationToken);
         return Result<StaffDto>.Ok(new StaffDto(sp.Id, sp.UserId, user.Email, sp.EmploymentType,
-            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description, sp.AvatarUrl));
+            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description, sp.AvatarUrl, user.Status));
     }
 }
 
@@ -94,7 +95,7 @@ public sealed class UpdateStaffDetailsCommandHandler(IApplicationDbContext db)
         await db.SaveChangesAsync(cancellationToken);
         var user = await db.Users.FirstAsync(x => x.Id == sp.UserId, cancellationToken);
         return Result<StaffDto>.Ok(new StaffDto(sp.Id, sp.UserId, user.Email, sp.EmploymentType,
-            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description, sp.AvatarUrl));
+            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description, sp.AvatarUrl, user.Status));
     }
 }
 
@@ -119,7 +120,8 @@ public sealed class GetMyStaffProfileQueryHandler(IApplicationDbContext db, ICur
 
         return Result<StaffDto>.Ok(new StaffDto(
             match.s.Id, match.s.UserId, match.u.Email, match.s.EmploymentType,
-            match.s.FirstName, match.s.LastName, match.s.PhoneNumber, match.s.Description, match.s.AvatarUrl));
+            match.s.FirstName, match.s.LastName, match.s.PhoneNumber, match.s.Description, match.s.AvatarUrl,
+            match.u.Status));
     }
 }
 
@@ -134,6 +136,36 @@ public sealed class SetStaffAvatarCommandHandler(IApplicationDbContext db)
         await db.SaveChangesAsync(ct);
         var user = await db.Users.FirstAsync(x => x.Id == sp.UserId, ct);
         return Result<StaffDto>.Ok(new StaffDto(sp.Id, sp.UserId, user.Email, sp.EmploymentType,
-            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description, sp.AvatarUrl));
+            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description, sp.AvatarUrl, user.Status));
+    }
+}
+
+/// <summary>
+/// Admin can freeze/block/restore a staff account from the Staff Management
+/// screen. Flips the underlying <c>User.Status</c> — the login flow refuses
+/// non-Active accounts, so the staff member is effectively locked out the
+/// moment this saves. We don't delete the row — keeping the historical
+/// identity matters for assignments/attendance audits.
+/// </summary>
+public sealed class SetStaffStatusCommandHandler(IApplicationDbContext db, ICurrentUserService currentUser)
+    : IRequestHandler<SetStaffStatusCommand, Result<StaffDto>>
+{
+    public async Task<Result<StaffDto>> Handle(SetStaffStatusCommand request, CancellationToken ct)
+    {
+        var sp = await db.StaffProfiles.FirstOrDefaultAsync(x => x.Id == request.StaffProfileId, ct);
+        if (sp is null) return Result<StaffDto>.Fail("NOT_FOUND", "Staff profile not found.");
+
+        var user = await db.Users.FirstOrDefaultAsync(x => x.Id == sp.UserId, ct);
+        if (user is null) return Result<StaffDto>.Fail("NOT_FOUND", "Linked user not found.");
+
+        // Guard against an admin freezing themselves and locking the panel.
+        if (currentUser.UserId == user.Id && request.Status != Domain.Enums.UserStatus.Active)
+            return Result<StaffDto>.Fail("VALIDATION", "Cannot change your own status.");
+
+        user.SetStatus(request.Status);
+        await db.SaveChangesAsync(ct);
+
+        return Result<StaffDto>.Ok(new StaffDto(sp.Id, sp.UserId, user.Email, sp.EmploymentType,
+            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description, sp.AvatarUrl, user.Status));
     }
 }

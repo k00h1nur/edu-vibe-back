@@ -10,7 +10,8 @@ public sealed record ClassDto(
     int MaxStudents,
     Modality Modality,
     ClassStatus Status,
-    Guid? TeacherUserId);
+    Guid? TeacherUserId,
+    int EnrolledCount);
 
 public sealed record ClassesPingCommand : IRequest<Result<string>>;
 

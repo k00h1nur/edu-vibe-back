@@ -13,7 +13,11 @@ public sealed record StaffDto(
     string? LastName,
     string? PhoneNumber,
     string? Description,
-    string? AvatarUrl);
+    string? AvatarUrl,
+    UserStatus Status);
+
+public sealed record SetStaffStatusCommand(Guid StaffProfileId, UserStatus Status)
+    : IRequest<Result<StaffDto>>;
 
 public sealed record SetStaffAvatarCommand(Guid StaffProfileId, string? AvatarUrl)
     : IRequest<Result<StaffDto>>;
