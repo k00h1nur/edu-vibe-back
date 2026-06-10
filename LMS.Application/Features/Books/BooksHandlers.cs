@@ -18,7 +18,9 @@ public sealed class BooksHandlers(IApplicationDbContext db) :
     {
         var page = new PageRequest(request.Page, request.PageSize, request.Search);
 
-        var query = db.Books.AsQueryable();
+        // Read-only list — AsNoTracking saves the change-tracker snapshot
+        // EF would otherwise create for every row in the page.
+        var query = db.Books.AsNoTracking();
 
         if (page.NormalizedSearch is { } search)
         {
@@ -45,7 +47,10 @@ public sealed class BooksHandlers(IApplicationDbContext db) :
 
     public async Task<Result<BookDto>> Handle(GetBookByIdQuery request, CancellationToken cancellationToken)
     {
-        var b = await db.Books.FirstOrDefaultAsync(x => x.Id == request.BookId, cancellationToken);
+        // Read-only lookup — AsNoTracking is meaningful here because the
+        // detail page often gets hit repeatedly while editing other entities.
+        var b = await db.Books.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == request.BookId, cancellationToken);
         if (b is null) return Result<BookDto>.Fail("NOT_FOUND", "Book not found.");
         return Result<BookDto>.Ok(Map(b));
     }

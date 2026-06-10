@@ -34,8 +34,12 @@ public sealed class RoomsHandlers(IApplicationDbContext db) :
     public async Task<Result<IReadOnlyCollection<RoomDto>>> Handle(GetRoomsQuery request,
         CancellationToken cancellationToken)
     {
-        return Result<IReadOnlyCollection<RoomDto>>.Ok(await db.Rooms
-            .Select(x => new RoomDto(x.Id, x.Name, x.Capacity, x.MeetingLink)).ToListAsync(cancellationToken));
+        // Stable order + AsNoTracking — pure DTO projection so no entity
+        // ever enters the change tracker.
+        return Result<IReadOnlyCollection<RoomDto>>.Ok(await db.Rooms.AsNoTracking()
+            .OrderBy(x => x.Name)
+            .Select(x => new RoomDto(x.Id, x.Name, x.Capacity, x.MeetingLink))
+            .ToListAsync(cancellationToken));
     }
 
     public async Task<Result<RoomDto>> Handle(UpdateRoomCommand request, CancellationToken cancellationToken)

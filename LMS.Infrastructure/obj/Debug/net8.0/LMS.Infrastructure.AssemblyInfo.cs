@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("LMS.Infrastructure")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+08e3db2cbe8bab246fc16ca51f0327ad72d69d11")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f8415407cd5ff5195957bc338f6104a677ba7222")]
 [assembly: System.Reflection.AssemblyProductAttribute("LMS.Infrastructure")]
 [assembly: System.Reflection.AssemblyTitleAttribute("LMS.Infrastructure")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
