@@ -24,6 +24,18 @@ public sealed class SpecializationsController(ISender sender) : ControllerBase
         return Ok(ApiResponse<IReadOnlyCollection<SpecializationDto>>.Ok(r.Data, r.Message));
     }
 
+    /// <summary>
+    /// Anonymous read for the marketing site — only active specializations.
+    /// The marketing site lists these as "what we teach" chips.
+    /// </summary>
+    [HttpGet("public")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<SpecializationDto>>>> Public(CancellationToken ct)
+    {
+        var r = await sender.Send(new GetSpecializationsQuery(IncludeInactive: false), ct);
+        return Ok(ApiResponse<IReadOnlyCollection<SpecializationDto>>.Ok(r.Data, r.Message));
+    }
+
     [HttpPost]
     [PermissionAuthorize(Permissions.Specializations.Manage)]
     public async Task<ActionResult<ApiResponse<SpecializationDto>>> Create(

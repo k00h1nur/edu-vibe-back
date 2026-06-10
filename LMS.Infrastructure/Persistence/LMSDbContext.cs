@@ -47,6 +47,8 @@ public sealed class LMSDbContext : DbContext, IApplicationDbContext
     public DbSet<StaffSpecialization> StaffSpecializations => Set<StaffSpecialization>();
     public DbSet<Material> Materials => Set<Material>();
     public DbSet<MaterialClass> MaterialClasses => Set<MaterialClass>();
+    public DbSet<OfficeInfo> OfficeInfo => Set<OfficeInfo>();
+    public DbSet<Announcement> Announcements => Set<Announcement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

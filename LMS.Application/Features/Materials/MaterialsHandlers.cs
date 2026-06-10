@@ -22,8 +22,10 @@ namespace LMS.Application.Features.Materials;
 /// </summary>
 public sealed class MaterialsHandlers(IApplicationDbContext db, ICurrentUserService currentUser) :
     IRequestHandler<GetMaterialsQuery, Result<IReadOnlyCollection<MaterialDto>>>,
+    IRequestHandler<GetPublicMaterialsQuery, Result<IReadOnlyCollection<MaterialDto>>>,
     IRequestHandler<GetMaterialByIdQuery, Result<MaterialDto>>,
     IRequestHandler<GetMaterialForDownloadQuery, Result<MaterialDownloadDto>>,
+    IRequestHandler<GetPublicMaterialDownloadQuery, Result<MaterialDownloadDto>>,
     IRequestHandler<UploadMaterialCommand, Result<MaterialDto>>,
     IRequestHandler<UpdateMaterialCommand, Result<MaterialDto>>,
     IRequestHandler<DeleteMaterialCommand, Result<string>>
@@ -56,6 +58,23 @@ public sealed class MaterialsHandlers(IApplicationDbContext db, ICurrentUserServ
         return Result<IReadOnlyCollection<MaterialDto>>.Ok(items);
     }
 
+    public async Task<Result<IReadOnlyCollection<MaterialDto>>> Handle(
+        GetPublicMaterialsQuery request, CancellationToken ct)
+    {
+        var take = Math.Clamp(request.Take, 1, 100);
+        var items = await db.Materials.AsNoTracking()
+            .Where(m => m.Visibility == MaterialVisibility.Public)
+            .OrderByDescending(m => m.CreatedAt)
+            .Take(take)
+            .Select(m => new MaterialDto(
+                m.Id, m.Title, m.Description, m.Visibility,
+                m.OriginalFileName, m.MimeType, m.FileSize,
+                m.UploadedByUserId, m.CreatedAt,
+                m.ClassLinks.Select(l => l.ClassId).ToList()))
+            .ToListAsync(ct);
+        return Result<IReadOnlyCollection<MaterialDto>>.Ok(items);
+    }
+
     public async Task<Result<MaterialDto>> Handle(GetMaterialByIdQuery request, CancellationToken ct)
     {
         var allowedIds = await VisibleMaterialIds(ct);
@@ -71,6 +90,21 @@ public sealed class MaterialsHandlers(IApplicationDbContext db, ICurrentUserServ
         return m is null
             ? Result<MaterialDto>.Fail("NOT_FOUND", "Material not found.")
             : Result<MaterialDto>.Ok(m);
+    }
+
+    public async Task<Result<MaterialDownloadDto>> Handle(
+        GetPublicMaterialDownloadQuery request, CancellationToken ct)
+    {
+        // Public-only — no role check, no allowlist filter. The Where on
+        // visibility = Public guarantees Private rows can't be enumerated
+        // by id-guessing the public endpoint.
+        var m = await db.Materials.AsNoTracking()
+            .Where(x => x.Id == request.MaterialId && x.Visibility == MaterialVisibility.Public)
+            .Select(x => new MaterialDownloadDto(x.Id, x.StoredFileName, x.OriginalFileName, x.MimeType))
+            .FirstOrDefaultAsync(ct);
+        return m is null
+            ? Result<MaterialDownloadDto>.Fail("NOT_FOUND", "Material not found.")
+            : Result<MaterialDownloadDto>.Ok(m);
     }
 
     public async Task<Result<MaterialDownloadDto>> Handle(GetMaterialForDownloadQuery request, CancellationToken ct)

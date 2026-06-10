@@ -44,6 +44,20 @@ public sealed class MaterialsController(
         return Ok(ApiResponse<IReadOnlyCollection<MaterialDto>>.Ok(r.Data, r.Message));
     }
 
+    /// <summary>
+    /// Anonymous endpoint for the marketing site — only Public materials,
+    /// capped to <paramref name="take"/>. The handler still applies the
+    /// visibility filter so Private rows can never leak.
+    /// </summary>
+    [HttpGet("public")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<MaterialDto>>>> Public(
+        [FromQuery] int take = 24, CancellationToken ct = default)
+    {
+        var r = await sender.Send(new GetPublicMaterialsQuery(take), ct);
+        return Ok(ApiResponse<IReadOnlyCollection<MaterialDto>>.Ok(r.Data, r.Message));
+    }
+
     [HttpGet("{id:guid}")]
     [PermissionAuthorize(Permissions.Materials.Read)]
     public async Task<ActionResult<ApiResponse<MaterialDto>>> Get(Guid id, CancellationToken ct)
@@ -64,6 +78,24 @@ public sealed class MaterialsController(
     public async Task<IActionResult> Download(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new GetMaterialForDownloadQuery(id), ct);
+        if (!r.Success || r.Data is null) return NotFound();
+
+        var stream = await store.OpenAsync(r.Data.StoredFileName, ct);
+        if (stream is null) return NotFound();
+
+        return File(stream, r.Data.MimeType, r.Data.OriginalFileName);
+    }
+
+    /// <summary>
+    /// Anonymous download — only Public materials. Used by the marketing site
+    /// download buttons. Private materials 404 here even though they may
+    /// exist; same approach as the signed-in path to avoid existence leaks.
+    /// </summary>
+    [HttpGet("{id:guid}/download/public")]
+    [AllowAnonymous]
+    public async Task<IActionResult> DownloadPublic(Guid id, CancellationToken ct)
+    {
+        var r = await sender.Send(new GetPublicMaterialDownloadQuery(id), ct);
         if (!r.Success || r.Data is null) return NotFound();
 
         var stream = await store.OpenAsync(r.Data.StoredFileName, ct);

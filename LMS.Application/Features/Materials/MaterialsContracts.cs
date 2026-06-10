@@ -27,6 +27,13 @@ public sealed record MaterialDto(
 /// </summary>
 public sealed record GetMaterialsQuery(Guid? ClassId = null) : IRequest<Result<IReadOnlyCollection<MaterialDto>>>;
 
+/// <summary>
+/// Marketing-site feed — only Public materials, no role checks, no class
+/// scope. Capped by <paramref name="Take"/>.
+/// </summary>
+public sealed record GetPublicMaterialsQuery(int Take = 24)
+    : IRequest<Result<IReadOnlyCollection<MaterialDto>>>;
+
 public sealed record GetMaterialByIdQuery(Guid MaterialId) : IRequest<Result<MaterialDto>>;
 
 /// <summary>
@@ -35,6 +42,13 @@ public sealed record GetMaterialByIdQuery(Guid MaterialId) : IRequest<Result<Mat
 /// visibility checks as <see cref="GetMaterialsQuery"/>.
 /// </summary>
 public sealed record GetMaterialForDownloadQuery(Guid MaterialId)
+    : IRequest<Result<MaterialDownloadDto>>;
+
+/// <summary>
+/// Marketing-site download. Returns the blob descriptor only when the
+/// material is Public — never leaks Private rows even by id guess.
+/// </summary>
+public sealed record GetPublicMaterialDownloadQuery(Guid MaterialId)
     : IRequest<Result<MaterialDownloadDto>>;
 
 public sealed record MaterialDownloadDto(

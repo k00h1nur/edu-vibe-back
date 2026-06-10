@@ -42,5 +42,7 @@ public interface IApplicationDbContext
     DbSet<StaffSpecialization> StaffSpecializations { get; }
     DbSet<Material> Materials { get; }
     DbSet<MaterialClass> MaterialClasses { get; }
+    DbSet<OfficeInfo> OfficeInfo { get; }
+    DbSet<Announcement> Announcements { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }

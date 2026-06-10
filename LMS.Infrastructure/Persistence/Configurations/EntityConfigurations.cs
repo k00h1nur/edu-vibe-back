@@ -511,3 +511,41 @@ public sealed class MaterialClassConfiguration : IEntityTypeConfiguration<Materi
             .HasForeignKey(x => x.ClassId).OnDelete(DeleteBehavior.Cascade);
     }
 }
+
+public sealed class OfficeInfoConfiguration : IEntityTypeConfiguration<OfficeInfo>
+{
+    public void Configure(EntityTypeBuilder<OfficeInfo> b)
+    {
+        b.ToTable("office_info");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.AcademyName).IsRequired().HasMaxLength(256);
+        b.Property(x => x.Tagline).HasMaxLength(256);
+        b.Property(x => x.PhoneNumber).HasMaxLength(64);
+        b.Property(x => x.SecondaryPhone).HasMaxLength(64);
+        b.Property(x => x.Email).HasMaxLength(320);
+        b.Property(x => x.Address).HasMaxLength(512);
+        b.Property(x => x.WorkingHours).HasMaxLength(256);
+        b.Property(x => x.TelegramUrl).HasMaxLength(512);
+        b.Property(x => x.InstagramUrl).HasMaxLength(512);
+        b.Property(x => x.FacebookUrl).HasMaxLength(512);
+        b.Property(x => x.YoutubeUrl).HasMaxLength(512);
+        b.Property(x => x.WebsiteUrl).HasMaxLength(512);
+        b.Property(x => x.AboutHtml).HasMaxLength(8000);
+    }
+}
+
+public sealed class AnnouncementConfiguration : IEntityTypeConfiguration<Announcement>
+{
+    public void Configure(EntityTypeBuilder<Announcement> b)
+    {
+        b.ToTable("announcements");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Title).IsRequired().HasMaxLength(256);
+        b.Property(x => x.Body).IsRequired().HasMaxLength(4000);
+        b.HasIndex(x => new { x.IsPublic, x.PublishesAt, x.ExpiresAt })
+            .HasDatabaseName("ix_announcements_visibility_window");
+        b.HasIndex(x => x.CreatedAt).HasDatabaseName("ix_announcements_created_at");
+        b.HasOne(x => x.AuthorUser).WithMany()
+            .HasForeignKey(x => x.AuthorUserId).OnDelete(DeleteBehavior.Restrict);
+    }
+}

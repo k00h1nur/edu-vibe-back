@@ -235,6 +235,28 @@ public static class Permissions
             public const string Manage = "Specializations.Manage";
         }
 
+        /// <summary>
+        /// Office contact / branding (the singleton row that drives the
+        /// marketing site's contact section). Read is open via the
+        /// /api/OfficeInfo/public endpoint; Manage is admin/office only.
+        /// </summary>
+        public static class OfficeInfo
+        {
+            public const string Read = "OfficeInfo.Read";
+            public const string Manage = "OfficeInfo.Manage";
+        }
+
+        /// <summary>
+        /// Academy-wide announcements. Read = anyone signed in;
+        /// Manage = admin/office for authoring; the public marketing-site
+        /// feed runs unauthenticated via /api/Announcements/public.
+        /// </summary>
+        public static class Announcements
+        {
+            public const string Read = "Announcements.Read";
+            public const string Manage = "Announcements.Manage";
+        }
+
         /// <summary>Flat list of every permission code — used by seed data and tests.</summary>
         public static IReadOnlyCollection<string> All { get; } = new[]
         {
@@ -268,6 +290,8 @@ public static class Permissions
             Practice.Read,
             Reminders.Read, Reminders.Manage,
             Specializations.Read, Specializations.Manage,
+            OfficeInfo.Read, OfficeInfo.Manage,
+            Announcements.Read, Announcements.Manage,
         };
     }
 
@@ -342,6 +366,9 @@ public static class Permissions
             // UI capability gates — Office sees materials + ops reports, no analytics drill-down.
             Permissions.Materials.Read, Permissions.Materials.Manage,
             Permissions.Reports.Read,
+            // Office admin manages the public face of the academy.
+            Permissions.OfficeInfo.Read, Permissions.OfficeInfo.Manage,
+            Permissions.Announcements.Read, Permissions.Announcements.Manage,
         };
 
         public static IReadOnlyCollection<string> ForTeacher { get; } = new[]
@@ -371,6 +398,9 @@ public static class Permissions
             // Teachers can read the specialization catalogue to pick their own;
             // they cannot manage the list (that's admin-only).
             Permissions.Specializations.Read,
+            // Teachers see announcements but don't author them.
+            Permissions.Announcements.Read,
+            Permissions.OfficeInfo.Read,
         };
 
         public static IReadOnlyCollection<string> ForSupportTeacher { get; } = new[]
@@ -410,6 +440,8 @@ public static class Permissions
             Permissions.Materials.Read,
             Permissions.Practice.Read,
             Permissions.Reminders.Read, Permissions.Reminders.Manage,
+            Permissions.Announcements.Read,
+            Permissions.OfficeInfo.Read,
         };
     }
 
