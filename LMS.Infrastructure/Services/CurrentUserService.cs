@@ -20,7 +20,14 @@ public sealed class CurrentUserService(IHttpContextAccessor httpContextAccessor)
 
     public bool IsInRole(string role)
     {
-        return Roles.Contains(role);
+        // Case-insensitive on purpose. The JWT carries the role exactly as
+        // it sits in the database (e.g. "Admin"), but feature handlers tend
+        // to write role names lowercase ("admin"). A case-sensitive match
+        // here turned every "RoleAdmin = \"admin\"" check into a silent
+        // false for admins, which made the MaterialsHandlers crash
+        // ("Empty collections are not supported as inline query roots")
+        // when admins hit GET /api/Materials.
+        return Roles.Contains(role, StringComparer.OrdinalIgnoreCase);
     }
 
     private Guid? TryReadGuid(string claimType)

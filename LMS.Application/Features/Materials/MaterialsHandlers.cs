@@ -228,7 +228,11 @@ public sealed class MaterialsHandlers(IApplicationDbContext db, ICurrentUserServ
             .Where(m => m.Visibility == MaterialVisibility.Public)
             .Select(m => m.Id);
 
-        IQueryable<Guid> privateIds = Enumerable.Empty<Guid>().AsQueryable();
+        // Stays null when the caller is neither teacher nor student —
+        // avoids `publicIds.Concat(Enumerable.Empty<Guid>().AsQueryable())`,
+        // which EF Core 8 can't translate ("Empty collections are not
+        // supported as inline query roots").
+        IQueryable<Guid>? privateIds = null;
 
         if (isTeacher)
         {
@@ -257,7 +261,8 @@ public sealed class MaterialsHandlers(IApplicationDbContext db, ICurrentUserServ
                 .Select(m => m.Id);
         }
 
-        var ids = await publicIds.Concat(privateIds).Distinct().ToListAsync(ct);
+        var combined = privateIds is null ? publicIds : publicIds.Concat(privateIds).Distinct();
+        var ids = await combined.ToListAsync(ct);
         return new HashSet<Guid>(ids);
     }
 
