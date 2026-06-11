@@ -1,6 +1,7 @@
 using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Models;
 using LMS.Domain.Entities;
+using LMS.Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,6 +23,12 @@ public sealed class AnnouncementsHandlers(IApplicationDbContext db) :
         {
             q = q.Where(a => (a.PublishesAt == null || a.PublishesAt <= now)
                           && (a.ExpiresAt == null || a.ExpiresAt >= now));
+        }
+        if (request.AudienceFilter is { } aud)
+        {
+            // Everyone always wins; the role-specific filters only allow rows
+            // tagged for that exact role.
+            q = q.Where(a => a.Audience == AnnouncementAudience.Everyone || a.Audience == aud);
         }
         var items = await q
             .OrderByDescending(a => a.CreatedAt)
@@ -49,7 +56,7 @@ public sealed class AnnouncementsHandlers(IApplicationDbContext db) :
     public async Task<Result<AnnouncementDto>> Handle(CreateAnnouncementCommand request, CancellationToken ct)
     {
         var entity = new Announcement(
-            request.Title, request.Body, request.IsPublic,
+            request.Title, request.Body, request.IsPublic, request.Audience,
             request.PublishesAt, request.ExpiresAt, request.AuthorUserId);
         await db.Announcements.AddAsync(entity, ct);
         await db.SaveChangesAsync(ct);
@@ -60,7 +67,8 @@ public sealed class AnnouncementsHandlers(IApplicationDbContext db) :
     {
         var entity = await db.Announcements.FirstOrDefaultAsync(a => a.Id == request.AnnouncementId, ct);
         if (entity is null) return Result<AnnouncementDto>.Fail("NOT_FOUND", "Announcement not found.");
-        entity.Update(request.Title, request.Body, request.IsPublic, request.PublishesAt, request.ExpiresAt);
+        entity.Update(request.Title, request.Body, request.IsPublic, request.Audience,
+            request.PublishesAt, request.ExpiresAt);
         await db.SaveChangesAsync(ct);
         return Result<AnnouncementDto>.Ok(Map(entity));
     }
@@ -76,10 +84,10 @@ public sealed class AnnouncementsHandlers(IApplicationDbContext db) :
 
     private static System.Linq.Expressions.Expression<Func<Announcement, AnnouncementDto>> Project()
         => a => new AnnouncementDto(
-            a.Id, a.Title, a.Body, a.IsPublic, a.PublishesAt, a.ExpiresAt,
-            a.AuthorUserId, a.CreatedAt);
+            a.Id, a.Title, a.Body, a.IsPublic, a.Audience,
+            a.PublishesAt, a.ExpiresAt, a.AuthorUserId, a.CreatedAt);
 
     private static AnnouncementDto Map(Announcement a) => new(
-        a.Id, a.Title, a.Body, a.IsPublic, a.PublishesAt, a.ExpiresAt,
-        a.AuthorUserId, a.CreatedAt);
+        a.Id, a.Title, a.Body, a.IsPublic, a.Audience,
+        a.PublishesAt, a.ExpiresAt, a.AuthorUserId, a.CreatedAt);
 }

@@ -257,6 +257,15 @@ public static class Permissions
             public const string Manage = "Announcements.Manage";
         }
 
+        /// <summary>
+        /// Marketing-site CMS — Courses + Videos. Admin-only Manage; public
+        /// reads run unauthenticated through the /public endpoints.
+        /// </summary>
+        public static class Marketing
+        {
+            public const string Manage = "Marketing.Manage";
+        }
+
         /// <summary>Flat list of every permission code — used by seed data and tests.</summary>
         public static IReadOnlyCollection<string> All { get; } = new[]
         {
@@ -292,6 +301,7 @@ public static class Permissions
             Specializations.Read, Specializations.Manage,
             OfficeInfo.Read, OfficeInfo.Manage,
             Announcements.Read, Announcements.Manage,
+            Marketing.Manage,
         };
     }
 
@@ -369,6 +379,7 @@ public static class Permissions
             // Office admin manages the public face of the academy.
             Permissions.OfficeInfo.Read, Permissions.OfficeInfo.Manage,
             Permissions.Announcements.Read, Permissions.Announcements.Manage,
+            Permissions.Marketing.Manage,
         };
 
         public static IReadOnlyCollection<string> ForTeacher { get; } = new[]

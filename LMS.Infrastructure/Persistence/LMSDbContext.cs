@@ -49,6 +49,8 @@ public sealed class LMSDbContext : DbContext, IApplicationDbContext
     public DbSet<MaterialClass> MaterialClasses => Set<MaterialClass>();
     public DbSet<OfficeInfo> OfficeInfo => Set<OfficeInfo>();
     public DbSet<Announcement> Announcements => Set<Announcement>();
+    public DbSet<MarketingCourse> MarketingCourses => Set<MarketingCourse>();
+    public DbSet<MarketingVideo> MarketingVideos => Set<MarketingVideo>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -3,6 +3,7 @@ using LMS.Application.Common.Models;
 using LMS.Domain.Entities;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using static LMS.Application.Features.Staff.StaffMapper;
 
 namespace LMS.Application.Features.Staff;
 
@@ -14,10 +15,6 @@ public sealed class GetStaffQueryHandler(IApplicationDbContext db)
     {
         var page = new PageRequest(request.Page, request.PageSize, request.Search);
 
-        // Join to an anonymous shape and project to the DTO LAST so EF can
-        // translate the whole query. Previous shape projected `new StaffDto(...)`
-        // before Where/OrderBy, which EF cannot push into SQL — it threw at
-        // runtime on every list / search request.
         var query =
             from s in db.StaffProfiles.AsNoTracking()
             join u in db.Users.AsNoTracking() on s.UserId equals u.Id
@@ -25,14 +22,12 @@ public sealed class GetStaffQueryHandler(IApplicationDbContext db)
 
         if (page.NormalizedSearch is { } search)
         {
-            // Match against email AND the new firstName / lastName / phone
-            // fields so the office admin can search by any of them. Matches
-            // the StudentProfile shape so the two list pages behave identically.
             query = query.Where(x =>
                 x.u.Email.ToLower().Contains(search) ||
                 (x.s.FirstName != null && x.s.FirstName.ToLower().Contains(search)) ||
                 (x.s.LastName != null && x.s.LastName.ToLower().Contains(search)) ||
-                (x.s.PhoneNumber != null && x.s.PhoneNumber.Contains(search)));
+                (x.s.PhoneNumber != null && x.s.PhoneNumber.Contains(search)) ||
+                (x.s.Position != null && x.s.Position.ToLower().Contains(search)));
         }
 
         var total = await query.CountAsync(cancellationToken);
@@ -43,7 +38,7 @@ public sealed class GetStaffQueryHandler(IApplicationDbContext db)
             .Select(x => new StaffDto(
                 x.s.Id, x.s.UserId, x.u.Email, x.s.EmploymentType,
                 x.s.FirstName, x.s.LastName, x.s.PhoneNumber, x.s.Description, x.s.AvatarUrl,
-                x.u.Status))
+                x.u.Status, x.s.Position, x.s.IsPubliclyVisible))
             .ToListAsync(cancellationToken);
 
         return Result<PagedResult<StaffDto>>.Ok(PagedResult<StaffDto>.From(items, total, page));
@@ -63,8 +58,7 @@ public sealed class CreateStaffCommandHandler(IApplicationDbContext db)
         var sp = new StaffProfile(request.UserId, request.EmploymentType);
         await db.StaffProfiles.AddAsync(sp, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
-        return Result<StaffDto>.Ok(new StaffDto(sp.Id, sp.UserId, user.Email, sp.EmploymentType,
-            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description, sp.AvatarUrl, user.Status));
+        return Result<StaffDto>.Ok(Map(sp, user.Email, user.Status));
     }
 }
 
@@ -78,8 +72,7 @@ public sealed class UpdateStaffProfileCommandHandler(IApplicationDbContext db)
         sp.SetEmploymentType(request.EmploymentType);
         await db.SaveChangesAsync(cancellationToken);
         var user = await db.Users.FirstAsync(x => x.Id == sp.UserId, cancellationToken);
-        return Result<StaffDto>.Ok(new StaffDto(sp.Id, sp.UserId, user.Email, sp.EmploymentType,
-            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description, sp.AvatarUrl, user.Status));
+        return Result<StaffDto>.Ok(Map(sp, user.Email, user.Status));
     }
 }
 
@@ -91,11 +84,10 @@ public sealed class UpdateStaffDetailsCommandHandler(IApplicationDbContext db)
     {
         var sp = await db.StaffProfiles.FirstOrDefaultAsync(x => x.Id == request.StaffProfileId, cancellationToken);
         if (sp is null) return Result<StaffDto>.Fail("NOT_FOUND", "Staff profile not found.");
-        sp.UpdateProfile(request.FirstName, request.LastName, request.PhoneNumber, request.Description);
+        sp.UpdateProfile(request.FirstName, request.LastName, request.PhoneNumber, request.Description, request.Position);
         await db.SaveChangesAsync(cancellationToken);
         var user = await db.Users.FirstAsync(x => x.Id == sp.UserId, cancellationToken);
-        return Result<StaffDto>.Ok(new StaffDto(sp.Id, sp.UserId, user.Email, sp.EmploymentType,
-            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description, sp.AvatarUrl, user.Status));
+        return Result<StaffDto>.Ok(Map(sp, user.Email, user.Status));
     }
 }
 
@@ -118,10 +110,7 @@ public sealed class GetMyStaffProfileQueryHandler(IApplicationDbContext db, ICur
         if (match is null)
             return Result<StaffDto>.Fail("NOT_FOUND", "No staff profile is linked to this account.");
 
-        return Result<StaffDto>.Ok(new StaffDto(
-            match.s.Id, match.s.UserId, match.u.Email, match.s.EmploymentType,
-            match.s.FirstName, match.s.LastName, match.s.PhoneNumber, match.s.Description, match.s.AvatarUrl,
-            match.u.Status));
+        return Result<StaffDto>.Ok(Map(match.s, match.u.Email, match.u.Status));
     }
 }
 
@@ -135,18 +124,10 @@ public sealed class SetStaffAvatarCommandHandler(IApplicationDbContext db)
         sp.SetAvatarUrl(request.AvatarUrl);
         await db.SaveChangesAsync(ct);
         var user = await db.Users.FirstAsync(x => x.Id == sp.UserId, ct);
-        return Result<StaffDto>.Ok(new StaffDto(sp.Id, sp.UserId, user.Email, sp.EmploymentType,
-            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description, sp.AvatarUrl, user.Status));
+        return Result<StaffDto>.Ok(Map(sp, user.Email, user.Status));
     }
 }
 
-/// <summary>
-/// Admin can freeze/block/restore a staff account from the Staff Management
-/// screen. Flips the underlying <c>User.Status</c> — the login flow refuses
-/// non-Active accounts, so the staff member is effectively locked out the
-/// moment this saves. We don't delete the row — keeping the historical
-/// identity matters for assignments/attendance audits.
-/// </summary>
 public sealed class SetStaffStatusCommandHandler(IApplicationDbContext db, ICurrentUserService currentUser)
     : IRequestHandler<SetStaffStatusCommand, Result<StaffDto>>
 {
@@ -158,14 +139,78 @@ public sealed class SetStaffStatusCommandHandler(IApplicationDbContext db, ICurr
         var user = await db.Users.FirstOrDefaultAsync(x => x.Id == sp.UserId, ct);
         if (user is null) return Result<StaffDto>.Fail("NOT_FOUND", "Linked user not found.");
 
-        // Guard against an admin freezing themselves and locking the panel.
         if (currentUser.UserId == user.Id && request.Status != Domain.Enums.UserStatus.Active)
             return Result<StaffDto>.Fail("VALIDATION", "Cannot change your own status.");
 
         user.SetStatus(request.Status);
         await db.SaveChangesAsync(ct);
 
-        return Result<StaffDto>.Ok(new StaffDto(sp.Id, sp.UserId, user.Email, sp.EmploymentType,
-            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description, sp.AvatarUrl, user.Status));
+        return Result<StaffDto>.Ok(Map(sp, user.Email, user.Status));
+    }
+}
+
+public sealed class SetStaffPublicVisibilityCommandHandler(IApplicationDbContext db)
+    : IRequestHandler<SetStaffPublicVisibilityCommand, Result<StaffDto>>
+{
+    public async Task<Result<StaffDto>> Handle(SetStaffPublicVisibilityCommand request, CancellationToken ct)
+    {
+        var sp = await db.StaffProfiles.FirstOrDefaultAsync(x => x.Id == request.StaffProfileId, ct);
+        if (sp is null) return Result<StaffDto>.Fail("NOT_FOUND", "Staff profile not found.");
+        sp.SetPubliclyVisible(request.IsPubliclyVisible);
+        await db.SaveChangesAsync(ct);
+        var user = await db.Users.FirstAsync(x => x.Id == sp.UserId, ct);
+        return Result<StaffDto>.Ok(Map(sp, user.Email, user.Status));
+    }
+}
+
+internal static class StaffMapper
+{
+    public static StaffDto Map(StaffProfile sp, string email, Domain.Enums.UserStatus status) => new(
+        sp.Id, sp.UserId, email, sp.EmploymentType,
+        sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description, sp.AvatarUrl,
+        status, sp.Position, sp.IsPubliclyVisible);
+}
+
+public sealed class GetPublicTeachersQueryHandler(IApplicationDbContext db)
+    : IRequestHandler<GetPublicTeachersQuery, Result<IReadOnlyCollection<PublicTeacherDto>>>
+{
+    public async Task<Result<IReadOnlyCollection<PublicTeacherDto>>> Handle(
+        GetPublicTeachersQuery request, CancellationToken ct)
+    {
+        var take = Math.Clamp(request.Take, 1, 100);
+        // Only IsPubliclyVisible + currently Active accounts surface — admins
+        // freezing an account should hide them from the marketing site too.
+        var rows = await db.StaffProfiles.AsNoTracking()
+            .Where(s => s.IsPubliclyVisible)
+            .Join(db.Users.AsNoTracking(),
+                  s => s.UserId, u => u.Id,
+                  (s, u) => new { s, u })
+            .Where(x => x.u.Status == Domain.Enums.UserStatus.Active)
+            .OrderBy(x => x.s.LastName).ThenBy(x => x.s.FirstName)
+            .Take(take)
+            .Select(x => new
+            {
+                x.s.Id,
+                x.s.FirstName,
+                x.s.LastName,
+                x.s.Position,
+                x.s.Description,
+                x.s.AvatarUrl,
+                Specs = x.s.Specializations
+                    .Where(ss => ss.Specialization != null && ss.Specialization.IsActive)
+                    .Select(ss => ss.Specialization!.Name).ToList(),
+            })
+            .ToListAsync(ct);
+
+        var items = rows.Select(r =>
+        {
+            var name = string.Join(" ", new[] { r.FirstName, r.LastName }
+                .Where(s => !string.IsNullOrWhiteSpace(s)));
+            if (string.IsNullOrWhiteSpace(name)) name = "Staff member";
+            return new PublicTeacherDto(r.Id, name, r.Position, r.Description, r.AvatarUrl,
+                (IReadOnlyCollection<string>)r.Specs);
+        }).ToList();
+
+        return Result<IReadOnlyCollection<PublicTeacherDto>>.Ok(items);
     }
 }

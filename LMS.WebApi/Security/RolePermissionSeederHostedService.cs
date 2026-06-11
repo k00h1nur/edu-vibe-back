@@ -89,7 +89,18 @@ public sealed class RolePermissionSeederHostedService(
             }
 
             var isInitialized = initialized.Contains(roleId);
-            if (isInitialized && !topUp)
+
+            // Admin role is special: it represents the full permission catalog
+            // (Permissions.All). When a new permission is added to the catalog
+            // it MUST land on Admin or admin features start 401'ing — which is
+            // exactly the failure mode that caused "Unauthorized" on the new
+            // Specializations/OfficeInfo/Announcements/Materials.Manage gates.
+            // So Admin always gets a top-up; the bootstrap-once safety only
+            // applies to Teacher/Student where admins may have deliberately
+            // pruned grants.
+            var forceTopUp = roleCode.Equals(RoleCodes.Admin, StringComparison.OrdinalIgnoreCase);
+
+            if (isInitialized && !topUp && !forceTopUp)
             {
                 logger.LogDebug(
                     "Role {Role} already has grants — leaving admin configuration untouched.",
