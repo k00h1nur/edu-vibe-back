@@ -91,6 +91,36 @@ public sealed class UpdateStaffDetailsCommandHandler(IApplicationDbContext db)
     }
 }
 
+/// <summary>
+/// Self-edit: looks up the caller's staff profile from
+/// <see cref="ICurrentUserService.UserId"/>, then delegates to the same
+/// domain method as the admin path. Position is intentionally NOT exposed
+/// here — only an admin sets a teacher's job title.
+/// </summary>
+public sealed class UpdateMyStaffDetailsCommandHandler(
+    IApplicationDbContext db,
+    ICurrentUserService currentUser)
+    : IRequestHandler<UpdateMyStaffDetailsCommand, Result<StaffDto>>
+{
+    public async Task<Result<StaffDto>> Handle(UpdateMyStaffDetailsCommand request,
+        CancellationToken cancellationToken)
+    {
+        if (currentUser.UserId is null)
+            return Result<StaffDto>.Fail("UNAUTHENTICATED", "No authenticated user.");
+
+        var sp = await db.StaffProfiles
+            .FirstOrDefaultAsync(x => x.UserId == currentUser.UserId.Value, cancellationToken);
+        if (sp is null) return Result<StaffDto>.Fail("NOT_FOUND", "Staff profile not found for this user.");
+
+        // Preserve existing position — admins set it via the full
+        // UpdateStaffDetailsCommand; self-edit must not change it.
+        sp.UpdateProfile(request.FirstName, request.LastName, request.PhoneNumber, request.Description, sp.Position);
+        await db.SaveChangesAsync(cancellationToken);
+        var user = await db.Users.FirstAsync(x => x.Id == sp.UserId, cancellationToken);
+        return Result<StaffDto>.Ok(Map(sp, user.Email, user.Status));
+    }
+}
+
 public sealed class GetMyStaffProfileQueryHandler(IApplicationDbContext db, ICurrentUserService currentUser)
     : IRequestHandler<GetMyStaffProfileQuery, Result<StaffDto>>
 {

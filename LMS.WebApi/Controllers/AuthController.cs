@@ -71,4 +71,21 @@ public sealed class AuthController(ISender sender) : ControllerBase
         if (!result.Success) return BadRequest(ApiResponse<object>.Fail(result.Message ?? "Assign role failed"));
         return Ok(ApiResponse<object>.Ok(new { }, result.Message));
     }
+
+    /// <summary>
+    /// Self-service password change. Caller is identified from the JWT — the
+    /// body only carries the current + new passwords. Auth rate-limit policy
+    /// applies so a brute-force on the current password is throttled.
+    /// </summary>
+    [HttpPost("change-password")]
+    [Authorize]
+    [EnableRateLimiting("auth-anon")]
+    public async Task<ActionResult<ApiResponse<object>>> ChangePassword(
+        [FromBody] ChangePasswordCommand command, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(command, cancellationToken);
+        if (!result.Success)
+            return BadRequest(ApiResponse<object>.Fail(result.Message ?? "Change password failed"));
+        return Ok(ApiResponse<object>.Ok(new { }, result.Message));
+    }
 }

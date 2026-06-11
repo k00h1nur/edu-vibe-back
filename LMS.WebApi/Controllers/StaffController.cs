@@ -37,6 +37,22 @@ public sealed class StaffController(ISender sender) : ControllerBase
             : NotFound(ApiResponse<StaffDto>.Fail(r.Message ?? "Not found"));
     }
 
+    /// <summary>
+    /// Self-edit: a teacher updates their own profile (name, phone, bio).
+    /// The target profile is resolved from the JWT — body carries no
+    /// profile id, so there's no IDOR surface. Inherits the controller's
+    /// [Authorize] gate; the admin-only Position field stays untouched.
+    /// </summary>
+    [HttpPut("me/details")]
+    public async Task<ActionResult<ApiResponse<StaffDto>>> UpdateMine(
+        [FromBody] UpdateMyStaffDetailsCommand cmd, CancellationToken ct)
+    {
+        var r = await sender.Send(cmd, ct);
+        return r.Success
+            ? Ok(ApiResponse<StaffDto>.Ok(r.Data, r.Message))
+            : BadRequest(ApiResponse<StaffDto>.Fail(r.Message ?? "Failed"));
+    }
+
     [HttpPost]
     [PermissionAuthorize(Permissions.Staff.Create)]
     public async Task<ActionResult<ApiResponse<StaffDto>>> Create([FromBody] CreateStaffCommand cmd,

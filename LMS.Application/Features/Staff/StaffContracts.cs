@@ -64,6 +64,18 @@ public sealed record GetStaffQuery(int Page = 1, int PageSize = 25, string? Sear
 /// <summary>Returns the staff profile linked to the currently authenticated user.</summary>
 public sealed record GetMyStaffProfileQuery : IRequest<Result<StaffDto>>;
 
+/// <summary>
+/// Self-edit variant of <see cref="UpdateStaffDetailsCommand"/>. The target
+/// staff profile is resolved from the caller's JWT, so no profile id is
+/// accepted from the body (rules out IDOR). Used by the teacher-panel
+/// Settings page — controller gate is plain [Authorize].
+/// </summary>
+public sealed record UpdateMyStaffDetailsCommand(
+    string? FirstName,
+    string? LastName,
+    string? PhoneNumber,
+    string? Description) : IRequest<Result<StaffDto>>;
+
 /// <summary>Lean public shape — what the marketing site renders on the teachers grid.</summary>
 public sealed record PublicTeacherDto(
     Guid Id,
