@@ -25,6 +25,17 @@ public sealed class StaffProfile : BaseEntity
     public string? LastName { get; private set; }
     public string? PhoneNumber { get; private set; }
     public string? Description { get; private set; }
+    /// <summary>
+    /// Job position / title — "IELTS Expert", "Math Lead", etc. Surfaced
+    /// on the marketing-site teachers grid.
+    /// </summary>
+    public string? Position { get; private set; }
+    /// <summary>
+    /// Admin toggle — whether this staff member appears on the public
+    /// marketing-site "Meet our teachers" section. Defaults to false so
+    /// new staff don't leak onto the marketing site by accident.
+    /// </summary>
+    public bool IsPubliclyVisible { get; private set; }
 
     /// <summary>
     /// Relative path under /uploads/avatars/ of the user's avatar image, or
@@ -52,15 +63,29 @@ public sealed class StaffProfile : BaseEntity
     }
 
     /// <summary>
-    /// Updates the editable profile fields. All four arguments are always
-    /// passed (no partial-update form) so the caller controls clearing.
+    /// Updates the editable profile fields. All arguments are always passed
+    /// (no partial-update form) so the caller controls clearing.
     /// </summary>
-    public void UpdateProfile(string? firstName, string? lastName, string? phoneNumber, string? description)
+    public void UpdateProfile(
+        string? firstName,
+        string? lastName,
+        string? phoneNumber,
+        string? description,
+        string? position = null)
     {
         FirstName = NormalizeOrNull(firstName, maxLength: 128, fieldName: nameof(FirstName));
         LastName = NormalizeOrNull(lastName, maxLength: 128, fieldName: nameof(LastName));
         PhoneNumber = NormalizeOrNull(phoneNumber, maxLength: 32, fieldName: nameof(PhoneNumber));
         Description = NormalizeOrNull(description, maxLength: 2000, fieldName: nameof(Description));
+        Position = NormalizeOrNull(position, maxLength: 128, fieldName: nameof(Position));
+        Touch();
+    }
+
+    /// <summary>Admin flips this when a staff member should/should not appear on the marketing site.</summary>
+    public void SetPubliclyVisible(bool value)
+    {
+        if (IsPubliclyVisible == value) return;
+        IsPubliclyVisible = value;
         Touch();
     }
 

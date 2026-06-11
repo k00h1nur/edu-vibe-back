@@ -1,4 +1,5 @@
 using LMS.Domain.Common;
+using LMS.Domain.Enums;
 using LMS.Domain.Exceptions;
 
 namespace LMS.Domain.Entities;
@@ -20,6 +21,7 @@ public sealed class Announcement : BaseEntity
         string title,
         string body,
         bool isPublic,
+        AnnouncementAudience audience,
         DateTime? publishesAt,
         DateTime? expiresAt,
         Guid authorUserId)
@@ -27,6 +29,7 @@ public sealed class Announcement : BaseEntity
         Title = NormalizeTitle(title);
         Body = NormalizeBody(body);
         IsPublic = isPublic;
+        Audience = audience;
         PublishesAt = publishesAt;
         ExpiresAt = expiresAt;
         if (authorUserId == Guid.Empty)
@@ -38,6 +41,12 @@ public sealed class Announcement : BaseEntity
     public string Body { get; private set; } = null!;
     public bool IsPublic { get; private set; }
 
+    /// <summary>
+    /// Who sees this when signed in (Everyone, Teachers, Students). Public
+    /// flag bypasses the gate — public rows go to the marketing site too.
+    /// </summary>
+    public AnnouncementAudience Audience { get; private set; }
+
     /// <summary>When the announcement starts being visible. Null = immediately.</summary>
     public DateTime? PublishesAt { get; private set; }
     /// <summary>When the announcement stops being visible. Null = no expiry.</summary>
@@ -46,11 +55,13 @@ public sealed class Announcement : BaseEntity
     public Guid AuthorUserId { get; private set; }
     public User? AuthorUser { get; private set; }
 
-    public void Update(string title, string body, bool isPublic, DateTime? publishesAt, DateTime? expiresAt)
+    public void Update(string title, string body, bool isPublic, AnnouncementAudience audience,
+        DateTime? publishesAt, DateTime? expiresAt)
     {
         Title = NormalizeTitle(title);
         Body = NormalizeBody(body);
         IsPublic = isPublic;
+        Audience = audience;
         PublishesAt = publishesAt;
         ExpiresAt = expiresAt;
         Touch();

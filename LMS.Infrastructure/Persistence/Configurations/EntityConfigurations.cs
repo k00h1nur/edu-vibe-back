@@ -542,10 +542,44 @@ public sealed class AnnouncementConfiguration : IEntityTypeConfiguration<Announc
         b.HasKey(x => x.Id);
         b.Property(x => x.Title).IsRequired().HasMaxLength(256);
         b.Property(x => x.Body).IsRequired().HasMaxLength(4000);
+        b.Property(x => x.Audience).HasConversion<int>();
         b.HasIndex(x => new { x.IsPublic, x.PublishesAt, x.ExpiresAt })
             .HasDatabaseName("ix_announcements_visibility_window");
         b.HasIndex(x => x.CreatedAt).HasDatabaseName("ix_announcements_created_at");
         b.HasOne(x => x.AuthorUser).WithMany()
             .HasForeignKey(x => x.AuthorUserId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public sealed class MarketingCourseConfiguration : IEntityTypeConfiguration<MarketingCourse>
+{
+    public void Configure(EntityTypeBuilder<MarketingCourse> b)
+    {
+        b.ToTable("marketing_courses");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Slug).IsRequired().HasMaxLength(64);
+        b.Property(x => x.Title).IsRequired().HasMaxLength(256);
+        b.Property(x => x.Subtitle).HasMaxLength(256);
+        b.Property(x => x.Description).HasMaxLength(4000);
+        b.Property(x => x.CoverImageUrl).HasMaxLength(1024);
+        b.Property(x => x.PriceText).HasMaxLength(64);
+        b.Property(x => x.DurationText).HasMaxLength(64);
+        b.Property(x => x.LevelText).HasMaxLength(64);
+        b.HasIndex(x => x.Slug).IsUnique();
+        b.HasIndex(x => new { x.IsActive, x.SortOrder });
+    }
+}
+
+public sealed class MarketingVideoConfiguration : IEntityTypeConfiguration<MarketingVideo>
+{
+    public void Configure(EntityTypeBuilder<MarketingVideo> b)
+    {
+        b.ToTable("marketing_videos");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Title).IsRequired().HasMaxLength(256);
+        b.Property(x => x.Description).HasMaxLength(2000);
+        b.Property(x => x.VideoUrl).IsRequired().HasMaxLength(1024);
+        b.Property(x => x.ThumbnailUrl).HasMaxLength(1024);
+        b.HasIndex(x => new { x.IsActive, x.SortOrder });
     }
 }

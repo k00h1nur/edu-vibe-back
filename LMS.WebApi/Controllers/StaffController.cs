@@ -94,6 +94,35 @@ public sealed class StaffController(ISender sender) : ControllerBase
     }
 
     /// <summary>
+    /// Admin toggles whether this staff member appears on the marketing
+    /// site's teachers grid.
+    /// </summary>
+    [HttpPost("{id:guid}/public-visibility")]
+    [PermissionAuthorize(Permissions.Staff.Update)]
+    public async Task<ActionResult<ApiResponse<StaffDto>>> SetPublicVisibility(Guid id,
+        [FromBody] SetPublicVisibilityRequest body, CancellationToken ct)
+    {
+        var r = await sender.Send(new SetStaffPublicVisibilityCommand(id, body.IsPubliclyVisible), ct);
+        return r.Success
+            ? Ok(ApiResponse<StaffDto>.Ok(r.Data, r.Message))
+            : BadRequest(ApiResponse<StaffDto>.Fail(r.Message ?? "Failed"));
+    }
+
+    /// <summary>
+    /// Anonymous public teacher feed for the marketing site. Only staff
+    /// members the admin has flipped IsPubliclyVisible on appear here.
+    /// Returns lean shape — no email/phone leakage.
+    /// </summary>
+    [HttpGet("public")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<PublicTeacherDto>>>> Public(
+        [FromQuery] int take = 30, CancellationToken ct = default)
+    {
+        var r = await sender.Send(new GetPublicTeachersQuery(take), ct);
+        return Ok(ApiResponse<IReadOnlyCollection<PublicTeacherDto>>.Ok(r.Data, r.Message));
+    }
+
+    /// <summary>
     /// Uploads a new avatar for the staff member and stores its name on the
     /// profile. Returns the updated DTO so the frontend can swap the image
     /// in immediately.
@@ -137,3 +166,5 @@ public sealed class StaffController(ISender sender) : ControllerBase
 /// posts the same JSON to either.
 /// </summary>
 public sealed record SetUserStatusRequest(UserStatus Status);
+
+public sealed record SetPublicVisibilityRequest(bool IsPubliclyVisible);
