@@ -147,6 +147,7 @@ C:\Users\PlumTech\OneDrive\Desktop\backend\edu-vibe-back\LMS.WebApi\bin\Debug\ne
 C:\Users\PlumTech\OneDrive\Desktop\backend\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\zh-Hant\Microsoft.CodeAnalysis.Workspaces.resources.dll
 C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\appsettings.Development.json
 C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\appsettings.json
+C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\appsettings.Production.example.json
 C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\LMS.WebApi.staticwebassets.endpoints.json
 C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\LMS.WebApi.exe
 C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\LMS.WebApi.deps.json
@@ -174,6 +175,11 @@ C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microso
 C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microsoft.Extensions.DependencyInjection.dll
 C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microsoft.Extensions.DependencyInjection.Abstractions.dll
 C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microsoft.Extensions.DependencyModel.dll
+C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microsoft.Extensions.Diagnostics.Abstractions.dll
+C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microsoft.Extensions.Diagnostics.HealthChecks.dll
+C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions.dll
+C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore.dll
+C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microsoft.Extensions.Hosting.Abstractions.dll
 C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microsoft.Extensions.Logging.dll
 C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microsoft.Extensions.Logging.Abstractions.dll
 C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microsoft.Extensions.Options.dll
@@ -289,9 +295,3 @@ C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\obj\Debug\net8.0\refint\
 C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\obj\Debug\net8.0\LMS.WebApi.pdb
 C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\obj\Debug\net8.0\LMS.WebApi.genruntimeconfig.cache
 C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\obj\Debug\net8.0\ref\LMS.WebApi.dll
-C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microsoft.Extensions.Diagnostics.Abstractions.dll
-C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microsoft.Extensions.Diagnostics.HealthChecks.dll
-C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions.dll
-C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore.dll
-C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\Microsoft.Extensions.Hosting.Abstractions.dll
-C:\Users\Sevinch\RiderProjects\edu-vibe-back\LMS.WebApi\bin\Debug\net8.0\appsettings.Production.example.json

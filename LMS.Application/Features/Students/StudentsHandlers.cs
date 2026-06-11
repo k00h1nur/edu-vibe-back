@@ -125,6 +125,36 @@ public sealed class UpdateStudentDetailsCommandHandler(IApplicationDbContext db)
     }
 }
 
+/// <summary>
+/// Self-edit: resolves the caller's student profile from
+/// <see cref="ICurrentUserService.UserId"/>, then delegates to the same
+/// domain method as the admin path. Admin-managed fields (parent phone,
+/// CEFR level, XP, streak) are intentionally NOT exposed here.
+/// </summary>
+public sealed class UpdateMyStudentDetailsCommandHandler(
+    IApplicationDbContext db,
+    ICurrentUserService currentUser)
+    : IRequestHandler<UpdateMyStudentDetailsCommand, Result<StudentDto>>
+{
+    public async Task<Result<StudentDto>> Handle(UpdateMyStudentDetailsCommand request,
+        CancellationToken cancellationToken)
+    {
+        if (currentUser.UserId is null)
+            return Result<StudentDto>.Fail("UNAUTHENTICATED", "No authenticated user.");
+
+        var sp = await db.StudentProfiles
+            .FirstOrDefaultAsync(x => x.UserId == currentUser.UserId.Value, cancellationToken);
+        if (sp is null) return Result<StudentDto>.Fail("NOT_FOUND", "Student profile not found for this user.");
+
+        sp.UpdateProfile(request.FirstName, request.LastName, request.PhoneNumber, request.Description);
+        await db.SaveChangesAsync(cancellationToken);
+        var user = await db.Users.FirstAsync(x => x.Id == sp.UserId, cancellationToken);
+        return Result<StudentDto>.Ok(new StudentDto(sp.Id, sp.UserId, user.Email, sp.XP, sp.Streak,
+            sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description,
+            sp.ParentPhoneNumber, sp.Level, sp.AvatarUrl, user.Status));
+    }
+}
+
 public sealed class GetMyStudentProfileQueryHandler(IApplicationDbContext db, ICurrentUserService currentUser)
     : IRequestHandler<GetMyStudentProfileQuery, Result<StudentDto>>
 {

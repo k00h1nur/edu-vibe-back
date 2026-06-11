@@ -56,6 +56,18 @@ public sealed record UpdateStudentDetailsCommand(
     string? PhoneNumber,
     string? Description) : IRequest<Result<StudentDto>>;
 
+/// <summary>
+/// Self-edit variant of <see cref="UpdateStudentDetailsCommand"/>. The
+/// target student profile is resolved from the caller's JWT, so no profile
+/// id is accepted from the body (rules out IDOR). Used by the student-panel
+/// Settings page — controller gate is plain [Authorize].
+/// </summary>
+public sealed record UpdateMyStudentDetailsCommand(
+    string? FirstName,
+    string? LastName,
+    string? PhoneNumber,
+    string? Description) : IRequest<Result<StudentDto>>;
+
 public sealed record GetStudentsQuery(int Page = 1, int PageSize = 25, string? Search = null)
     : IRequest<Result<PagedResult<StudentDto>>>;
 

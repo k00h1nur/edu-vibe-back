@@ -38,6 +38,22 @@ public sealed class StudentsController(ISender sender) : ControllerBase
             : NotFound(ApiResponse<StudentDto>.Fail(r.Message ?? "Not found"));
     }
 
+    /// <summary>
+    /// Self-edit: a student updates their own profile (name, phone, about).
+    /// The target profile is resolved from the JWT — body carries no
+    /// profile id, so there's no IDOR surface. Admin-only fields
+    /// (parent phone, CEFR level, XP, streak) stay untouched.
+    /// </summary>
+    [HttpPut("me/details")]
+    public async Task<ActionResult<ApiResponse<StudentDto>>> UpdateMine(
+        [FromBody] UpdateMyStudentDetailsCommand cmd, CancellationToken ct)
+    {
+        var r = await sender.Send(cmd, ct);
+        return r.Success
+            ? Ok(ApiResponse<StudentDto>.Ok(r.Data, r.Message))
+            : BadRequest(ApiResponse<StudentDto>.Fail(r.Message ?? "Failed"));
+    }
+
     [HttpGet("{id:guid}")]
     [PermissionAuthorize(Permissions.Students.Read)]
     public async Task<ActionResult<ApiResponse<StudentDto>>> Get(Guid id, CancellationToken ct)

@@ -185,6 +185,51 @@ public sealed class RefreshTokenCommandHandler(
     }
 }
 
+/// <summary>
+/// Self-service password change. Validates the current password against the
+/// stored hash, rejects same-as-current, enforces a minimum length, and
+/// wipes the refresh token so any other open session has to re-login.
+/// </summary>
+public sealed class ChangePasswordCommandHandler(
+    IApplicationDbContext dbContext,
+    IPasswordHasher passwordHasher,
+    ICurrentUserService currentUser) : IRequestHandler<ChangePasswordCommand, Result>
+{
+    private const int MinPasswordLength = 8;
+
+    public async Task<Result> Handle(ChangePasswordCommand request, CancellationToken cancellationToken)
+    {
+        if (currentUser.UserId is null)
+            return Result.Fail("UNAUTHENTICATED", "Caller must be authenticated.");
+
+        if (string.IsNullOrWhiteSpace(request.CurrentPassword))
+            return Result.Fail("VALIDATION", "Current password is required.");
+        if (string.IsNullOrWhiteSpace(request.NewPassword))
+            return Result.Fail("VALIDATION", "New password is required.");
+        if (request.NewPassword.Length < MinPasswordLength)
+            return Result.Fail("VALIDATION", $"New password must be at least {MinPasswordLength} characters.");
+        if (request.NewPassword == request.CurrentPassword)
+            return Result.Fail("VALIDATION", "New password must differ from the current one.");
+
+        var user = await dbContext.Users.FirstOrDefaultAsync(
+            x => x.Id == currentUser.UserId.Value, cancellationToken);
+        if (user is null) return Result.Fail("USER_NOT_FOUND", "User not found.");
+
+        if (!passwordHasher.Verify(request.CurrentPassword, user.PasswordHash))
+            return Result.Fail("INVALID_CREDENTIALS", "Current password is incorrect.");
+
+        user.SetPasswordHash(passwordHasher.Hash(request.NewPassword));
+        // Force re-authentication on any other open session. The caller stays
+        // signed in on this device because the access token they're using
+        // remains valid until its TTL; the next refresh will fail and they'll
+        // be sent through login again — that's intentional and matches the
+        // typical "password changed → log everyone out" UX.
+        user.ClearRefreshToken();
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Result.Ok("Password updated.");
+    }
+}
+
 public sealed class AssignRoleCommandHandler(IApplicationDbContext dbContext, ICurrentUserService currentUser)
     : IRequestHandler<AssignRoleCommand, Result>
 {
