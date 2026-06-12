@@ -15,7 +15,9 @@ public sealed class SessionsHandlers(IApplicationDbContext db) :
     IRequestHandler<GetMyScheduleQuery, Result<IReadOnlyCollection<ScheduleEntryDto>>>,
     IRequestHandler<GetUpcomingSessionsQuery, Result<IReadOnlyCollection<ScheduleEntryDto>>>,
     IRequestHandler<GetSessionsForDateQuery, Result<IReadOnlyCollection<SessionDto>>>,
-    IRequestHandler<GetScheduleQuery, Result<IReadOnlyCollection<ScheduleEntryDto>>>
+    IRequestHandler<GetScheduleQuery, Result<IReadOnlyCollection<ScheduleEntryDto>>>,
+    IRequestHandler<GetClassSchedulePatternQuery, Result<SchedulePatternDto>>,
+    IRequestHandler<ApplyClassScheduleCommand, Result<ApplyScheduleResultDto>>
 {
     public async Task<Result> Handle(CancelClassSessionCommand request, CancellationToken cancellationToken)
     {
@@ -151,4 +153,115 @@ public sealed class SessionsHandlers(IApplicationDbContext db) :
             .ToListAsync(ct);
         return Result<IReadOnlyCollection<ScheduleEntryDto>>.Ok(data);
     }
+
+    public async Task<Result<SchedulePatternDto>> Handle(GetClassSchedulePatternQuery request,
+        CancellationToken ct)
+    {
+        var p = await db.ClassSchedulePatterns.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.ClassId == request.ClassId, ct);
+        return p is null
+            ? Result<SchedulePatternDto>.Fail("NOT_FOUND", "No recurring schedule set for this class yet.")
+            : Result<SchedulePatternDto>.Ok(MapPattern(p));
+    }
+
+    /// <summary>
+    /// Upserts the pattern and regenerates the class's sessions.
+    ///
+    /// What gets touched:
+    ///   • Sessions BEFORE today — never (completed history stays intact).
+    ///   • Future sessions WITH attendance marks — never (someone already
+    ///     recorded reality against them).
+    ///   • Every other future session — deleted and replaced by the dates
+    ///     the new pattern produces from max(today, StartDate) to EndDate.
+    ///
+    /// SaveChanges runs once per phase (pattern / deletes / inserts) — the
+    /// PG18 + Npgsql 8 row-count bug fires on mixed-statement batches, the
+    /// same failure EnrollStudent hit before being split.
+    /// </summary>
+    public async Task<Result<ApplyScheduleResultDto>> Handle(ApplyClassScheduleCommand request,
+        CancellationToken ct)
+    {
+        var classExists = await db.Classes.AsNoTracking().AnyAsync(c => c.Id == request.ClassId, ct);
+        if (!classExists) return Result<ApplyScheduleResultDto>.Fail("NOT_FOUND", "Class not found.");
+
+        if (request.EndDate < request.StartDate)
+            return Result<ApplyScheduleResultDto>.Fail("VALIDATION", "End date must be on or after start date.");
+        if (request.EndDate.DayNumber - request.StartDate.DayNumber > 366)
+            return Result<ApplyScheduleResultDto>.Fail("VALIDATION", "Schedule range is capped at one year.");
+        if (request.StartsAt >= request.EndsAt)
+            return Result<ApplyScheduleResultDto>.Fail("VALIDATION", "Start time must be before end time.");
+
+        // Phase 1 — upsert the pattern.
+        var pattern = await db.ClassSchedulePatterns
+            .FirstOrDefaultAsync(x => x.ClassId == request.ClassId, ct);
+        try
+        {
+            if (pattern is null)
+            {
+                pattern = new ClassSchedulePattern(
+                    request.ClassId, request.Type, request.DaysOfWeekMask,
+                    request.StartDate, request.EndDate, request.StartsAt, request.EndsAt, request.RoomId);
+                await db.ClassSchedulePatterns.AddAsync(pattern, ct);
+            }
+            else
+            {
+                pattern.Update(
+                    request.Type, request.DaysOfWeekMask,
+                    request.StartDate, request.EndDate, request.StartsAt, request.EndsAt, request.RoomId);
+            }
+        }
+        catch (LMS.Domain.Exceptions.DomainException ex)
+        {
+            return Result<ApplyScheduleResultDto>.Fail("VALIDATION", ex.Message);
+        }
+        await db.SaveChangesAsync(ct);
+
+        // Phase 2 — drop replaceable future sessions. "Replaceable" = dated
+        // today or later AND has no attendance rows.
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var futureSessions = await db.ClassSessions
+            .Where(s => s.ClassId == request.ClassId && s.SessionDate >= today)
+            .ToListAsync(ct);
+        var protectedSessionIds = (await db.Attendance.AsNoTracking()
+                .Where(a => a.ClassId == request.ClassId)
+                .Select(a => a.SessionId)
+                .Distinct()
+                .ToListAsync(ct))
+            .ToHashSet();
+
+        var removable = futureSessions.Where(s => !protectedSessionIds.Contains(s.Id)).ToList();
+        var preserved = futureSessions.Count - removable.Count;
+        if (removable.Count > 0)
+        {
+            db.ClassSessions.RemoveRange(removable);
+            await db.SaveChangesAsync(ct);
+        }
+
+        // Phase 3 — generate. Dates already occupied by a preserved session
+        // are skipped so the (ClassId, SessionDate, StartsAt) unique index
+        // can't collide with a session we deliberately kept.
+        var occupiedDates = futureSessions
+            .Where(s => protectedSessionIds.Contains(s.Id))
+            .Select(s => s.SessionDate)
+            .ToHashSet();
+
+        var generateFrom = request.StartDate > today ? request.StartDate : today;
+        var generated = 0;
+        for (var d = generateFrom; d <= request.EndDate; d = d.AddDays(1))
+        {
+            if (!pattern.Matches(d) || occupiedDates.Contains(d)) continue;
+            await db.ClassSessions.AddAsync(
+                new ClassSession(request.ClassId, d, request.StartsAt, request.EndsAt, request.RoomId), ct);
+            generated++;
+        }
+        if (generated > 0) await db.SaveChangesAsync(ct);
+
+        return Result<ApplyScheduleResultDto>.Ok(
+            new ApplyScheduleResultDto(MapPattern(pattern), generated, removable.Count, preserved),
+            $"Generated {generated} lesson(s).");
+    }
+
+    private static SchedulePatternDto MapPattern(ClassSchedulePattern p) => new(
+        p.ClassId, p.Type, p.DaysOfWeekMask,
+        p.StartDate, p.EndDate, p.StartsAt, p.EndsAt, p.RoomId, p.UpdatedAt);
 }

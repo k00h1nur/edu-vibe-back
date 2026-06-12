@@ -1,6 +1,7 @@
 using LMS.Application.Common.Models;
 using LMS.Application.Common.Security;
 using LMS.Application.Features.Classes;
+using LMS.Application.Features.Sessions;
 using LMS.WebApi.Common;
 using LMS.WebApi.Security;
 using MediatR;
@@ -51,6 +52,35 @@ public sealed class ClassesController(ISender sender) : ControllerBase
     {
         var r = await sender.Send(new GetClassStudentsQuery(id), ct);
         return Ok(ApiResponse<IReadOnlyCollection<Guid>>.Ok(r.Data, r.Message));
+    }
+
+    /// <summary>The class's recurring schedule pattern; 404 until one is set.</summary>
+    [HttpGet("{id:guid}/schedule-pattern")]
+    [PermissionAuthorize(Permissions.Sessions.Read)]
+    public async Task<ActionResult<ApiResponse<SchedulePatternDto>>> GetSchedulePattern(Guid id, CancellationToken ct)
+    {
+        var r = await sender.Send(new GetClassSchedulePatternQuery(id), ct);
+        return r.Success
+            ? Ok(ApiResponse<SchedulePatternDto>.Ok(r.Data, r.Message))
+            : NotFound(ApiResponse<SchedulePatternDto>.Fail(r.Message ?? "Not found"));
+    }
+
+    /// <summary>
+    /// Upserts the recurring pattern and (re)generates the class's lesson
+    /// sessions from it. Past lessons and lessons that already have
+    /// attendance marks are never touched — only future, unmarked lessons
+    /// are replaced. This is the bulk alternative to creating sessions one
+    /// by one via POST /api/ClassSessions.
+    /// </summary>
+    [HttpPut("{id:guid}/schedule-pattern")]
+    [PermissionAuthorize(Permissions.Sessions.Create)]
+    public async Task<ActionResult<ApiResponse<ApplyScheduleResultDto>>> ApplySchedulePattern(
+        Guid id, [FromBody] ApplyClassScheduleCommand cmd, CancellationToken ct)
+    {
+        var r = await sender.Send(cmd with { ClassId = id }, ct);
+        return r.Success
+            ? Ok(ApiResponse<ApplyScheduleResultDto>.Ok(r.Data, r.Message))
+            : BadRequest(ApiResponse<ApplyScheduleResultDto>.Fail(r.Message ?? "Failed"));
     }
 
     [HttpPost]
