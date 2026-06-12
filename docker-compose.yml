@@ -65,6 +65,7 @@ services:
       # (edu-vibe.uz) calls the API cross-origin once it points at api.edu-vibe.uz.
       Cors__AllowedOrigins__0: ${CORS_ORIGIN_0}
       Cors__AllowedOrigins__1: ${CORS_ORIGIN_1:-https://www.edu-vibe.uz}
+      Cors__AllowedOrigins__2: ${CORS_ORIGIN_2:-https://admin.edu-vibe.uz}
       DemoUsers__Enabled: ${DEMO_USERS_ENABLED:-false}
       DemoUsers__Password: ${DEMO_USERS_PASSWORD:-Demo!2026}
     volumes:
@@ -88,6 +89,21 @@ services:
     # Internal only — Caddy is the public front door now.
     expose:
       - "80"
+
+  # Next.js admin/teacher/student panel (repo: LastChange), served at
+  # admin.edu-vibe.uz. Runs the standalone `next start` server. API calls are
+  # server-side using the session cookie that is first-party to this origin, so
+  # NEXT_PUBLIC_API_BASE_URL points at the public API. Owned by the LastChange
+  # pipeline (it runs `up -d admin`); not in Caddy's depends_on.
+  admin:
+    image: ${ADMIN_IMAGE:-ghcr.io/k00h1nur/lastchange:latest}
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      NODE_ENV: production
+      # Used by next.config rewrites() at runtime (e.g. /uploads -> API).
+      NEXT_PUBLIC_API_BASE_URL: ${ADMIN_API_BASE_URL:-https://api.edu-vibe.uz}
 
   # TLS edge: terminates HTTPS (automatic Let's Encrypt) for edu-vibe.uz,
   # www.edu-vibe.uz and api.edu-vibe.uz, and reverse-proxies to web / api.
