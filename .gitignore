@@ -15,3 +15,6 @@ restore.log
 # OS
 .DS_Store
 Thumbs.db
+
+# Runtime upload storage (avatars, materials)
+LMS.WebApi/uploads/
