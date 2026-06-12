@@ -32,6 +32,24 @@ public sealed record GetSessionAttendanceQuery(Guid SessionId) : IRequest<Result
 public sealed record GetStudentAttendanceQuery(Guid StudentProfileId)
     : IRequest<Result<IReadOnlyCollection<AttendanceDto>>>;
 
+/// <summary>
+/// Enriched attendance row for the STUDENT self-view — joins the class title
+/// and the session date/time so the student panel can render a dated history
+/// without reading /api/Classes or /api/ClassSessions (both of which students
+/// can't access).
+/// </summary>
+public sealed record MyAttendanceDto(
+    Guid Id,
+    Guid ClassId,
+    string ClassTitle,
+    Guid SessionId,
+    DateOnly SessionDate,
+    TimeOnly StartsAt,
+    AttendanceStatus Status);
+
+/// <summary>The caller's own attendance history, resolved from the JWT.</summary>
+public sealed record GetMyAttendanceQuery : IRequest<Result<IReadOnlyCollection<MyAttendanceDto>>>;
+
 /// <summary>Lists attendance records with optional filters; used by admin overview screens.</summary>
 public sealed record GetAttendanceQuery(
     Guid? ClassId = null,

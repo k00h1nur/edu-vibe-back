@@ -53,6 +53,19 @@ public sealed class AttendanceController(ISender sender) : ControllerBase
         return Ok(ApiResponse<IReadOnlyCollection<AttendanceDto>>.Ok(r.Data, r.Message));
     }
 
+    /// <summary>
+    /// The caller's own attendance history, enriched with class title +
+    /// session date. Self-scoped from the JWT — gated by Attendance.Read,
+    /// which students hold, and never exposes another student's record.
+    /// </summary>
+    [HttpGet("mine")]
+    [PermissionAuthorize(Permissions.Attendance.Read)]
+    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<MyAttendanceDto>>>> Mine(CancellationToken ct)
+    {
+        var r = await sender.Send(new GetMyAttendanceQuery(), ct);
+        return Ok(ApiResponse<IReadOnlyCollection<MyAttendanceDto>>.Ok(r.Data, r.Message));
+    }
+
     [HttpPost]
     [PermissionAuthorize(Permissions.Attendance.Mark)]
     public async Task<ActionResult<ApiResponse<AttendanceDto>>> Mark([FromBody] MarkAttendanceCommand cmd,

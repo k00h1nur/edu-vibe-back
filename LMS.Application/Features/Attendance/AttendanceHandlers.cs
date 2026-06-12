@@ -10,6 +10,7 @@ public sealed class AttendanceHandlers(IApplicationDbContext db, ICurrentUserSer
     IRequestHandler<UpdateAttendanceCommand, Result<AttendanceDto>>,
     IRequestHandler<GetSessionAttendanceQuery, Result<IReadOnlyCollection<AttendanceDto>>>,
     IRequestHandler<GetStudentAttendanceQuery, Result<IReadOnlyCollection<AttendanceDto>>>,
+    IRequestHandler<GetMyAttendanceQuery, Result<IReadOnlyCollection<MyAttendanceDto>>>,
     IRequestHandler<GetAttendanceQuery, Result<IReadOnlyCollection<AttendanceDto>>>
 {
     // Roles allowed to read ANY student's attendance. Students hold
@@ -54,6 +55,36 @@ public sealed class AttendanceHandlers(IApplicationDbContext db, ICurrentUserSer
             .Where(x => x.StudentProfileId == request.StudentProfileId)
             .Select(a => new AttendanceDto(a.Id, a.ClassId, a.SessionId, a.StudentProfileId, a.Status))
             .ToListAsync(cancellationToken));
+    }
+
+    public async Task<Result<IReadOnlyCollection<MyAttendanceDto>>> Handle(GetMyAttendanceQuery request,
+        CancellationToken cancellationToken)
+    {
+        // Self-scoped: resolve the caller's own student profile from the JWT.
+        var profileId = currentUser.StudentProfileId;
+        if (profileId is null && currentUser.UserId is { } uid)
+        {
+            profileId = await db.StudentProfiles
+                .Where(sp => sp.UserId == uid)
+                .Select(sp => (Guid?)sp.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+        if (profileId is null)
+            return Result<IReadOnlyCollection<MyAttendanceDto>>.Ok(Array.Empty<MyAttendanceDto>());
+
+        // Join attendance → session (date/time) → class (title). Most-recent
+        // first so the panel leads with the latest marks.
+        var rows = await (
+            from a in db.Attendance.AsNoTracking()
+            where a.StudentProfileId == profileId.Value
+            join s in db.ClassSessions.AsNoTracking() on a.SessionId equals s.Id
+            join c in db.Classes.AsNoTracking() on a.ClassId equals c.Id
+            orderby s.SessionDate descending, s.StartsAt descending
+            select new MyAttendanceDto(
+                a.Id, a.ClassId, c.Title, a.SessionId, s.SessionDate, s.StartsAt, a.Status))
+            .ToListAsync(cancellationToken);
+
+        return Result<IReadOnlyCollection<MyAttendanceDto>>.Ok(rows);
     }
 
     public async Task<Result<AttendanceDto>> Handle(MarkAttendanceCommand request, CancellationToken cancellationToken)
