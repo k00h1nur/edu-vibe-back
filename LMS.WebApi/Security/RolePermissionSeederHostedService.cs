@@ -90,23 +90,15 @@ public sealed class RolePermissionSeederHostedService(
 
             var isInitialized = initialized.Contains(roleId);
 
-            // Admin role is special: it represents the full permission catalog
-            // (Permissions.All). When a new permission is added to the catalog
-            // it MUST land on Admin or admin features start 401'ing — which is
-            // exactly the failure mode that caused "Unauthorized" on the new
-            // Specializations/OfficeInfo/Announcements/Materials.Manage gates.
-            // So Admin always gets a top-up; the bootstrap-once safety only
-            // applies to Teacher/Student where admins may have deliberately
-            // pruned grants.
-            var forceTopUp = roleCode.Equals(RoleCodes.Admin, StringComparison.OrdinalIgnoreCase);
-
-            if (isInitialized && !topUp && !forceTopUp)
-            {
-                logger.LogDebug(
-                    "Role {Role} already has grants — leaving admin configuration untouched.",
-                    roleCode);
-                continue;
-            }
+            // All three primary roles get an additive top-up on every boot:
+            // when the matrix gains a permission (e.g. Practice.Read,
+            // Analytics.Read), existing deployments must receive it or the
+            // permission-gated UI silently hides features. The earlier
+            // "bootstrap-once for Teacher/Student" safety left both roles
+            // without the newer grants — exactly the bug that emptied their
+            // sidebars. Top-up only ever ADDS missing matrix rows; grants an
+            // admin added beyond the matrix are never touched or removed.
+            _ = topUp; // config flag retained for wire-compat; top-up is now always on
 
             var addedThisRole = 0;
             foreach (var code in codes)

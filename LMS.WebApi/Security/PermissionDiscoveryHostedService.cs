@@ -15,7 +15,15 @@ public sealed class PermissionDiscoveryHostedService(IServiceProvider servicePro
         using var scope = serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
 
-        var discovered = DiscoverPermissions().Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        // Controller-attribute scan PLUS the static catalog. UI-only
+        // capability gates (Analytics.Read, Practice.Read, Reports.Read)
+        // appear on no controller — they exist purely to drive nav/feature
+        // visibility — so without the catalog union they never reach the
+        // permissions table and the role seeder can't grant them.
+        var discovered = DiscoverPermissions()
+            .Concat(LMS.Application.Common.Security.Permissions.All)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
         if (discovered.Count == 0) return;
 
         var existing = await db.Permissions.Select(x => x.Code).ToListAsync(cancellationToken);

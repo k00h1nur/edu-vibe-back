@@ -402,9 +402,11 @@ public static class Permissions
             Permissions.Books.Read,
             Permissions.Tasks.Read, Permissions.Tasks.Manage,
             Permissions.TaskSubmissions.Read, Permissions.TaskSubmissions.Grade,
-            // UI capability gates — Teacher curates materials + sees class-level analytics.
+            // UI capability gates — Teacher curates materials, sees class-level
+            // analytics, and authors practice exercises (Practice page).
             Permissions.Materials.Read, Permissions.Materials.Manage,
             Permissions.Analytics.Read,
+            Permissions.Practice.Read,
             Permissions.Reminders.Read, Permissions.Reminders.Manage,
             // Teachers can read the specialization catalogue to pick their own;
             // they cannot manage the list (that's admin-only).
