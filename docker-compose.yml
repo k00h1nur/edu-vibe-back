@@ -61,8 +61,10 @@ services:
       Jwt__Audience: ${JWT_AUDIENCE:-EduVibeClients}
       Telegram__BotToken: ${TELEGRAM_BOT_TOKEN}
       Telegram__ChatId: ${TELEGRAM_CHAT_ID}
-      # Production refuses to boot with an empty CORS origin list.
+      # Production refuses to boot with an empty CORS origin list. The frontend
+      # (edu-vibe.uz) calls the API cross-origin once it points at api.edu-vibe.uz.
       Cors__AllowedOrigins__0: ${CORS_ORIGIN_0}
+      Cors__AllowedOrigins__1: ${CORS_ORIGIN_1:-https://www.edu-vibe.uz}
       DemoUsers__Enabled: ${DEMO_USERS_ENABLED:-false}
       DemoUsers__Password: ${DEMO_USERS_PASSWORD:-Demo!2026}
     volumes:
@@ -83,11 +85,29 @@ services:
   web:
     image: ${WEB_IMAGE:-ghcr.io/k00h1nur/edu-vibe:latest}
     restart: unless-stopped
+    # Internal only — Caddy is the public front door now.
+    expose:
+      - "80"
+
+  # TLS edge: terminates HTTPS (automatic Let's Encrypt) for edu-vibe.uz,
+  # www.edu-vibe.uz and api.edu-vibe.uz, and reverse-proxies to web / api.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+      - api
     ports:
       - "80:80"
-      # - "443:443"   # uncomment once a domain + TLS are configured
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
 
 volumes:
   pgdata:
   redisdata:
   uploads:
+  caddy_data:
+  caddy_config:

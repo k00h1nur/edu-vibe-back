@@ -1,0 +1,20 @@
+# TLS edge for the EduVibe stack. Caddy terminates HTTPS (automatic Let's
+# Encrypt certs + renewal) and reverse-proxies to the internal containers.
+# HTTP is auto-redirected to HTTPS for every configured hostname.
+#
+# api.edu-vibe.uz starts issuing a cert the moment its DNS A record resolves to
+# this server; until then Caddy serves the other sites normally and keeps
+# retrying that one in the background.
+{
+	email usnetflix022@gmail.com
+}
+
+edu-vibe.uz, www.edu-vibe.uz {
+	encode gzip zstd
+	reverse_proxy web:80
+}
+
+api.edu-vibe.uz {
+	encode gzip zstd
+	reverse_proxy api:8080
+}

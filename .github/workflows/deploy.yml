@@ -56,15 +56,15 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Keep the server's compose file in sync with the repo on every deploy.
-      - name: Sync compose file to server
+      # Keep the server's compose + Caddy config in sync with the repo.
+      - name: Sync compose + Caddyfile to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
-          source: docker-compose.yml
+          source: "docker-compose.yml,Caddyfile"
           target: /opt/eduvibe
 
       - name: Deploy over SSH
@@ -82,9 +82,11 @@ jobs:
             # Pin the api image to this commit's sha for an immutable deploy.
             export IMAGE="$IMAGE_REF"
             docker compose pull api
-            # Touch only the backend services; never clobber the web container,
-            # which the frontend repo's pipeline owns.
-            docker compose up -d db redis api
+            # Touch only the backend + edge services; never clobber the web
+            # container, which the frontend repo's pipeline owns.
+            docker compose up -d db redis api caddy
+            # Apply any Caddyfile changes synced above (no-op if unchanged).
+            docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile || true
             docker image prune -f
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
