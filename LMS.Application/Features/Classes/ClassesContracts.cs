@@ -47,3 +47,25 @@ public sealed record EnrollStudentCommand(Guid ClassId, Guid StudentProfileId) :
 public sealed record RemoveStudentFromClassCommand(Guid ClassId, Guid StudentProfileId) : IRequest<Result>;
 
 public sealed record GetClassStudentsQuery(Guid ClassId) : IRequest<Result<IReadOnlyCollection<Guid>>>;
+
+/// <summary>
+/// A class as the enrolled STUDENT sees it. Students can't read /api/Classes
+/// or /api/Staff, so the teacher's display name and the next upcoming
+/// session are joined server-side and handed over in one shape.
+/// </summary>
+public sealed record MyClassDto(
+    Guid Id,
+    string Title,
+    Modality Modality,
+    ClassStatus Status,
+    string? TeacherName,
+    int EnrolledCount,
+    DateOnly? NextSessionDate,
+    TimeOnly? NextSessionStartsAt,
+    TimeOnly? NextSessionEndsAt);
+
+/// <summary>
+/// The caller's enrolled classes, resolved from their student profile on the
+/// JWT. Self-scoped — gated by plain [Authorize], no Classes.Read needed.
+/// </summary>
+public sealed record GetMyClassesQuery : IRequest<Result<IReadOnlyCollection<MyClassDto>>>;

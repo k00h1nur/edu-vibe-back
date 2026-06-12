@@ -46,6 +46,19 @@ public sealed class ClassesController(ISender sender) : ControllerBase
         return Ok(ApiResponse<IReadOnlyCollection<ClassDto>>.Ok(r.Data, r.Message));
     }
 
+    /// <summary>
+    /// The caller's enrolled classes (student self-view) — teacher name and
+    /// next session joined in. Self-scoped from the JWT, so no Classes.Read
+    /// is required; students can open their own classes without the admin
+    /// read permission.
+    /// </summary>
+    [HttpGet("mine")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<MyClassDto>>>> Mine(CancellationToken ct)
+    {
+        var r = await sender.Send(new GetMyClassesQuery(), ct);
+        return Ok(ApiResponse<IReadOnlyCollection<MyClassDto>>.Ok(r.Data, r.Message));
+    }
+
     [HttpGet("{id:guid}/students")]
     [PermissionAuthorize(Permissions.Classes.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<Guid>>>> Students(Guid id, CancellationToken ct)

@@ -7,10 +7,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LMS.Application.Features.Classes;
 
-public sealed class ClassesHandlers(IApplicationDbContext db) :
+public sealed class ClassesHandlers(IApplicationDbContext db, ICurrentUserService currentUser) :
     IRequestHandler<GetClassesQuery, Result<PagedResult<ClassDto>>>,
     IRequestHandler<GetClassByIdQuery, Result<ClassDto>>,
     IRequestHandler<GetAssignedClassesQuery, Result<IReadOnlyCollection<ClassDto>>>,
+    IRequestHandler<GetMyClassesQuery, Result<IReadOnlyCollection<MyClassDto>>>,
     IRequestHandler<CreateClassCommand, Result<ClassDto>>,
     IRequestHandler<UpdateClassCommand, Result<ClassDto>>,
     IRequestHandler<CancelClassCommand, Result>,
@@ -106,6 +107,76 @@ public sealed class ClassesHandlers(IApplicationDbContext db) :
             .Select(c => new ClassDto(c.Id, c.Title, c.MaxStudents, c.Modality, c.Status, c.TeacherUserId,
                 c.Enrollments.Count(e => e.Status == EnrollmentStatus.Active)))
             .ToListAsync(cancellationToken));
+    }
+
+    public async Task<Result<IReadOnlyCollection<MyClassDto>>> Handle(GetMyClassesQuery request,
+        CancellationToken cancellationToken)
+    {
+        // Resolve the caller's student profile — from the JWT claim if the
+        // backend emitted it, otherwise via UserId → StudentProfiles.
+        var profileId = currentUser.StudentProfileId;
+        if (profileId is null && currentUser.UserId is { } uid)
+        {
+            profileId = await db.StudentProfiles
+                .Where(sp => sp.UserId == uid)
+                .Select(sp => (Guid?)sp.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+        if (profileId is null)
+            return Result<IReadOnlyCollection<MyClassDto>>.Ok(Array.Empty<MyClassDto>());
+
+        var enrolledClassIds = await db.Enrollments
+            .Where(e => e.StudentProfileId == profileId.Value && e.Status == EnrollmentStatus.Active)
+            .Select(e => e.ClassId)
+            .ToListAsync(cancellationToken);
+        if (enrolledClassIds.Count == 0)
+            return Result<IReadOnlyCollection<MyClassDto>>.Ok(Array.Empty<MyClassDto>());
+
+        // Class header + the teacher's display name (join staff_profiles on the
+        // class's TeacherUserId — students can't read /api/Staff themselves).
+        var classes = await db.Classes
+            .Where(c => enrolledClassIds.Contains(c.Id))
+            .Select(c => new
+            {
+                c.Id,
+                c.Title,
+                c.Modality,
+                c.Status,
+                Active = c.Enrollments.Count(e => e.Status == EnrollmentStatus.Active),
+                TeacherName = db.StaffProfiles
+                    .Where(sp => sp.UserId == c.TeacherUserId)
+                    .Select(sp => (sp.FirstName ?? "") + " " + (sp.LastName ?? ""))
+                    .FirstOrDefault(),
+            })
+            .ToListAsync(cancellationToken);
+
+        // Next upcoming session per class — fetch the future sessions ordered
+        // and pick the earliest per class in memory (cheap at academy scale).
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var futureSessions = await db.ClassSessions
+            .Where(s => enrolledClassIds.Contains(s.ClassId) && s.SessionDate >= today)
+            .OrderBy(s => s.SessionDate).ThenBy(s => s.StartsAt)
+            .Select(s => new { s.ClassId, s.SessionDate, s.StartsAt, s.EndsAt })
+            .ToListAsync(cancellationToken);
+        var nextByClass = futureSessions
+            .GroupBy(s => s.ClassId)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var dtos = classes
+            .Select(c =>
+            {
+                var name = c.TeacherName?.Trim();
+                nextByClass.TryGetValue(c.Id, out var next);
+                return new MyClassDto(
+                    c.Id, c.Title, c.Modality, c.Status,
+                    string.IsNullOrWhiteSpace(name) ? null : name,
+                    c.Active,
+                    next?.SessionDate, next?.StartsAt, next?.EndsAt);
+            })
+            .OrderBy(c => c.Title)
+            .ToList();
+
+        return Result<IReadOnlyCollection<MyClassDto>>.Ok(dtos);
     }
 
     public async Task<Result<ClassDto>> Handle(GetClassByIdQuery request, CancellationToken cancellationToken)
