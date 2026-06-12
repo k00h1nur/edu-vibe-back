@@ -9,7 +9,8 @@ public sealed record AssignmentDto(
     Guid ClassId,
     string Title,
     AssignmentStatus Status,
-    Guid CreatedByTeacherId);
+    Guid CreatedByTeacherId,
+    DateTime? DueDate);
 
 public sealed record AssignmentsPingCommand : IRequest<Result<string>>;
 
@@ -21,10 +22,11 @@ public sealed class AssignmentsPingCommandHandler : IRequestHandler<AssignmentsP
     }
 }
 
-public sealed record CreateAssignmentCommand(Guid ClassId, string Title, Guid TeacherUserId)
+public sealed record CreateAssignmentCommand(Guid ClassId, string Title, Guid TeacherUserId, DateTime? DueDate = null)
     : IRequest<Result<AssignmentDto>>;
 
-public sealed record UpdateAssignmentCommand(Guid AssignmentId, string Title) : IRequest<Result<AssignmentDto>>;
+public sealed record UpdateAssignmentCommand(Guid AssignmentId, string Title, DateTime? DueDate = null)
+    : IRequest<Result<AssignmentDto>>;
 
 public sealed record PublishAssignmentCommand(Guid AssignmentId) : IRequest<Result<AssignmentDto>>;
 

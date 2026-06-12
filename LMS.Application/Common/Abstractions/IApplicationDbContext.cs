@@ -21,6 +21,8 @@ public interface IApplicationDbContext
     DbSet<Attendance> Attendance { get; }
     DbSet<Assignment> Assignments { get; }
     DbSet<Submission> Submissions { get; }
+    DbSet<SubmissionFile> SubmissionFiles { get; }
+    DbSet<SubmissionAudit> SubmissionAudits { get; }
     DbSet<Payment> Payments { get; }
     DbSet<Conversation> Conversations { get; }
     DbSet<ConversationParticipant> ConversationParticipants { get; }

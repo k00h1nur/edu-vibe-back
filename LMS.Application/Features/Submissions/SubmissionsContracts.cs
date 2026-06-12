@@ -10,7 +10,29 @@ public sealed record SubmissionDto(
     Guid StudentProfileId,
     string Content,
     SubmissionStatus Status,
-    decimal? Score);
+    decimal? Score,
+    bool IsLocked,
+    int FileCount);
+
+public sealed record SubmissionFileDto(
+    Guid Id,
+    Guid SubmissionId,
+    string OriginalFileName,
+    string MimeType,
+    long FileSize,
+    bool IsDuplicateAcrossStudents,
+    DateTime CreatedAt);
+
+/// <summary>Lean shape for streaming a submission file back to the caller.</summary>
+public sealed record SubmissionFileDownloadDto(string StoredFileName, string OriginalFileName, string MimeType);
+
+public sealed record SubmissionAuditDto(
+    Guid Id,
+    Guid SubmissionId,
+    Guid? ActorUserId,
+    string Action,
+    string? Detail,
+    DateTime CreatedAt);
 
 public sealed record SubmissionsPingCommand : IRequest<Result<string>>;
 
@@ -32,3 +54,39 @@ public sealed record GetAssignmentSubmissionsQuery(Guid AssignmentId)
 
 public sealed record GetStudentSubmissionsQuery(Guid StudentProfileId)
     : IRequest<Result<IReadOnlyCollection<SubmissionDto>>>;
+
+// ---- File submissions + anti-cheat ----------------------------------------
+
+/// <summary>
+/// Attaches an already-stored file to the caller's submission for an
+/// assignment, creating the submission if it doesn't exist yet. The
+/// controller does the multipart read + disk write (which yields the
+/// sha/size); this command applies every access + anti-cheat rule and
+/// records the row. Returns the new file, or a failure the controller maps
+/// to an HTTP status (and uses to delete the orphaned blob).
+/// </summary>
+public sealed record AddSubmissionFileCommand(
+    Guid AssignmentId,
+    string StoredFileName,
+    string OriginalFileName,
+    string MimeType,
+    long FileSize,
+    string Sha256) : IRequest<Result<SubmissionFileDto>>;
+
+/// <summary>Removes a file from the caller's own submission. Returns the stored name so the controller deletes the blob.</summary>
+public sealed record RemoveSubmissionFileCommand(Guid SubmissionId, Guid FileId) : IRequest<Result<string>>;
+
+public sealed record GetSubmissionFilesQuery(Guid SubmissionId)
+    : IRequest<Result<IReadOnlyCollection<SubmissionFileDto>>>;
+
+public sealed record GetSubmissionFileForDownloadQuery(Guid FileId)
+    : IRequest<Result<SubmissionFileDownloadDto>>;
+
+/// <summary>Student finalises their own submission (locks it). Teacher uses <see cref="SetSubmissionLockCommand"/>.</summary>
+public sealed record FinalizeSubmissionCommand(Guid SubmissionId) : IRequest<Result<SubmissionDto>>;
+
+/// <summary>Teacher locks / unlocks a submission (staff-only).</summary>
+public sealed record SetSubmissionLockCommand(Guid SubmissionId, bool Locked) : IRequest<Result<SubmissionDto>>;
+
+public sealed record GetSubmissionAuditQuery(Guid SubmissionId)
+    : IRequest<Result<IReadOnlyCollection<SubmissionAuditDto>>>;

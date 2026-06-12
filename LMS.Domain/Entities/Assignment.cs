@@ -35,6 +35,13 @@ public sealed class Assignment : BaseEntity
     public string Title { get; private set; } = null!;
     public AssignmentStatus Status { get; private set; }
 
+    /// <summary>
+    /// Optional submission deadline (UTC). When set, students can't add or
+    /// remove submission files after it passes, and a submission made after
+    /// the deadline is flagged Late. Null = no deadline.
+    /// </summary>
+    public DateTime? DueDate { get; private set; }
+
     public Guid CreatedByTeacherId { get; private set; }
     public User? CreatedByTeacher { get; private set; }
 
@@ -46,6 +53,16 @@ public sealed class Assignment : BaseEntity
         Title = title.Trim();
         Touch();
     }
+
+    /// <summary>Sets or clears the submission deadline. Pass null to remove it.</summary>
+    public void SetDueDate(DateTime? dueDateUtc)
+    {
+        DueDate = dueDateUtc;
+        Touch();
+    }
+
+    /// <summary>True when a deadline is set and now is past it.</summary>
+    public bool IsPastDue(DateTime nowUtc) => DueDate is { } due && nowUtc > due;
 
     public void Publish()
     {

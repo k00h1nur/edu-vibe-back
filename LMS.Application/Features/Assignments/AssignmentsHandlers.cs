@@ -35,6 +35,8 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db) :
         var t = await db.Users.FirstOrDefaultAsync(x => x.Id == request.TeacherUserId, cancellationToken);
         if (t is null) return Result<AssignmentDto>.Fail("NOT_FOUND", "Teacher not found.");
         var a = new Assignment(request.ClassId, request.Title, t);
+        if (request.DueDate.HasValue)
+            a.SetDueDate(DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Utc));
         await db.Assignments.AddAsync(a, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return Result<AssignmentDto>.Ok(Map(a));
@@ -45,7 +47,7 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db) :
     {
         return Result<IReadOnlyCollection<AssignmentDto>>.Ok(await db.Assignments
             .Where(x => x.ClassId == request.ClassId)
-            .Select(a => new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId))
+            .Select(a => new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId, a.DueDate))
             .ToListAsync(cancellationToken));
     }
 
@@ -68,7 +70,7 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db) :
                 !db.AssignmentAssignees.Any(aa => aa.AssignmentId == a.Id) ||
                 db.AssignmentAssignees.Any(aa =>
                     aa.AssignmentId == a.Id && aa.StudentProfileId == request.StudentProfileId))
-            .Select(a => new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId))
+            .Select(a => new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId, a.DueDate))
             .ToListAsync(cancellationToken);
 
         return Result<IReadOnlyCollection<AssignmentDto>>.Ok(data);
@@ -90,6 +92,9 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db) :
         var a = await db.Assignments.FirstOrDefaultAsync(x => x.Id == request.AssignmentId, cancellationToken);
         if (a is null) return Result<AssignmentDto>.Fail("NOT_FOUND", "Assignment not found.");
         a.UpdateTitle(request.Title);
+        a.SetDueDate(request.DueDate.HasValue
+            ? DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Utc)
+            : null);
         await db.SaveChangesAsync(cancellationToken);
         return Result<AssignmentDto>.Ok(Map(a));
     }
@@ -107,7 +112,7 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db) :
 
         var data = await q
             .OrderByDescending(x => x.CreatedAt)
-            .Select(a => new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId))
+            .Select(a => new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId, a.DueDate))
             .ToListAsync(cancellationToken);
         return Result<IReadOnlyCollection<AssignmentDto>>.Ok(data);
     }
@@ -211,6 +216,6 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db) :
 
     private static AssignmentDto Map(Assignment a)
     {
-        return new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId);
+        return new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId, a.DueDate);
     }
 }

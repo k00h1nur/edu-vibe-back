@@ -37,6 +37,9 @@ namespace LMS.Infrastructure.Migrations
                     b.Property<Guid>("CreatedByTeacherId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("DueDate")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
@@ -55,6 +58,90 @@ namespace LMS.Infrastructure.Migrations
                     b.HasIndex("CreatedByTeacherId");
 
                     b.ToTable("assignments", (string)null);
+                });
+
+            modelBuilder.Entity("LMS.Domain.Entities.SubmissionFile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("FileSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsDuplicateAcrossStudents")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("MimeType")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("StoredFileName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid>("SubmissionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Sha256");
+
+                    b.HasIndex("SubmissionId");
+
+                    b.ToTable("submission_files", (string)null);
+                });
+
+            modelBuilder.Entity("LMS.Domain.Entities.SubmissionAudit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Detail")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<Guid>("SubmissionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SubmissionId");
+
+                    b.ToTable("submission_audits", (string)null);
                 });
 
             modelBuilder.Entity("LMS.Domain.Entities.AssignmentAssignee", b =>
@@ -1447,6 +1534,9 @@ namespace LMS.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("IsLocked")
+                        .HasColumnType("boolean");
+
                     b.Property<decimal?>("Score")
                         .HasPrecision(10, 2)
                         .HasColumnType("numeric(10,2)");
@@ -2028,6 +2118,17 @@ namespace LMS.Infrastructure.Migrations
                     b.Navigation("Assignment");
 
                     b.Navigation("StudentProfile");
+                });
+
+            modelBuilder.Entity("LMS.Domain.Entities.SubmissionFile", b =>
+                {
+                    b.HasOne("LMS.Domain.Entities.Submission", "Submission")
+                        .WithMany("Files")
+                        .HasForeignKey("SubmissionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Submission");
                 });
 
             modelBuilder.Entity("LMS.Domain.Entities.TaskSubmission", b =>

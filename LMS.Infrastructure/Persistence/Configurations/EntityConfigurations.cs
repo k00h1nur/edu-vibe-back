@@ -207,6 +207,36 @@ public sealed class SubmissionConfiguration : IEntityTypeConfiguration<Submissio
         b.HasKey(x => x.Id);
         b.Property(x => x.Score).HasPrecision(10, 2);
         b.HasIndex(x => new { x.AssignmentId, x.StudentProfileId }).IsUnique();
+        b.HasMany(x => x.Files).WithOne(f => f.Submission)
+            .HasForeignKey(f => f.SubmissionId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public sealed class SubmissionFileConfiguration : IEntityTypeConfiguration<SubmissionFile>
+{
+    public void Configure(EntityTypeBuilder<SubmissionFile> b)
+    {
+        b.ToTable("submission_files");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.StoredFileName).IsRequired().HasMaxLength(256);
+        b.Property(x => x.OriginalFileName).IsRequired().HasMaxLength(512);
+        b.Property(x => x.MimeType).IsRequired().HasMaxLength(256);
+        b.Property(x => x.Sha256).IsRequired().HasMaxLength(64);
+        b.HasIndex(x => x.SubmissionId);
+        // Cross-student duplicate detection scans by hash.
+        b.HasIndex(x => x.Sha256);
+    }
+}
+
+public sealed class SubmissionAuditConfiguration : IEntityTypeConfiguration<SubmissionAudit>
+{
+    public void Configure(EntityTypeBuilder<SubmissionAudit> b)
+    {
+        b.ToTable("submission_audits");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Action).IsRequired().HasMaxLength(32);
+        b.Property(x => x.Detail).HasMaxLength(1024);
+        b.HasIndex(x => x.SubmissionId);
     }
 }
 

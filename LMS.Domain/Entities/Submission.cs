@@ -6,16 +6,16 @@ namespace LMS.Domain.Entities;
 
 public sealed class Submission : BaseEntity
 {
-    private Submission(Guid assignmentId, Guid studentProfileId, string content)
+    private Submission(Guid assignmentId, Guid studentProfileId, string? content)
     {
         if (assignmentId == Guid.Empty || studentProfileId == Guid.Empty)
             throw new DomainException("Assignment and student profile ids are required.");
 
-        if (string.IsNullOrWhiteSpace(content)) throw new DomainException("Submission content is required.");
-
         AssignmentId = assignmentId;
         StudentProfileId = studentProfileId;
-        Content = content.Trim();
+        // Content is optional now — a submission can be files-only. We keep the
+        // column NOT NULL (empty string) to avoid a nullable migration.
+        Content = content?.Trim() ?? string.Empty;
         Status = SubmissionStatus.Submitted;
     }
 
@@ -29,7 +29,16 @@ public sealed class Submission : BaseEntity
     public SubmissionStatus Status { get; private set; }
     public decimal? Score { get; private set; }
 
-    public static Submission Create(Guid assignmentId, Guid studentProfileId, string content,
+    /// <summary>
+    /// When true the student can no longer add or remove files — either the
+    /// student finalised it, or a teacher locked it. Grading still works.
+    /// </summary>
+    public bool IsLocked { get; private set; }
+
+    /// <summary>Uploaded files attached to this submission (anti-cheat: each carries a sha256).</summary>
+    public ICollection<SubmissionFile> Files { get; } = new List<SubmissionFile>();
+
+    public static Submission Create(Guid assignmentId, Guid studentProfileId, string? content,
         IEnumerable<Submission> existingSubmissions)
     {
         if (existingSubmissions.Any(x => x.AssignmentId == assignmentId && x.StudentProfileId == studentProfileId))
@@ -38,11 +47,11 @@ public sealed class Submission : BaseEntity
         return new Submission(assignmentId, studentProfileId, content);
     }
 
-    public void Submit(string content, bool isLate = false)
+    /// <summary>Updates the text content. Empty is allowed for files-only submissions.</summary>
+    public void Submit(string? content, bool isLate = false)
     {
-        if (string.IsNullOrWhiteSpace(content)) throw new DomainException("Submission content is required.");
-
-        Content = content.Trim();
+        if (IsLocked) throw new DomainException("Submission is locked and can no longer be changed.");
+        Content = content?.Trim() ?? string.Empty;
         Status = isLate ? SubmissionStatus.Late : SubmissionStatus.Submitted;
         Touch();
     }
@@ -53,6 +62,27 @@ public sealed class Submission : BaseEntity
 
         Score = score;
         Status = SubmissionStatus.Graded;
+        Touch();
+    }
+
+    /// <summary>Marks the submission late (kept distinct from a re-submit).</summary>
+    public void MarkLate()
+    {
+        if (Status != SubmissionStatus.Graded) Status = SubmissionStatus.Late;
+        Touch();
+    }
+
+    /// <summary>Locks the submission — student can no longer add/remove files.</summary>
+    public void Lock()
+    {
+        IsLocked = true;
+        Touch();
+    }
+
+    /// <summary>Unlocks the submission (teacher-only path, e.g. to allow a resubmit).</summary>
+    public void Unlock()
+    {
+        IsLocked = false;
         Touch();
     }
 }
