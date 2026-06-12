@@ -191,7 +191,17 @@ public sealed class DemoUsersSeederHostedService(
             case ProfileKind.Staff:
             {
                 var profile = await db.StaffProfiles.FirstOrDefaultAsync(p => p.UserId == userId, ct);
-                if (profile is null) return 0;
+                if (profile is null)
+                {
+                    // Old seeded staff users (e.g. the admin) created before the
+                    // seeder attached a profile have none — provision it now so
+                    // /api/Staff/me works and they can edit their own settings.
+                    profile = new StaffProfile(userId, EmploymentType.FullTime);
+                    profile.UpdateProfile(s.FirstName, s.LastName, s.PhoneNumber, s.Description);
+                    await db.StaffProfiles.AddAsync(profile, ct);
+                    await db.SaveChangesAsync(ct);
+                    return 1;
+                }
                 if (profile.FirstName != null && profile.LastName != null && profile.PhoneNumber != null) return 0;
                 profile.UpdateProfile(s.FirstName, s.LastName, s.PhoneNumber, s.Description);
                 await db.SaveChangesAsync(ct);
@@ -199,8 +209,17 @@ public sealed class DemoUsersSeederHostedService(
             }
             case ProfileKind.Student:
             {
+                var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
                 var profile = await db.StudentProfiles.FirstOrDefaultAsync(p => p.UserId == userId, ct);
-                if (profile is null) return 0;
+                if (profile is null)
+                {
+                    if (user is null) return 0;
+                    profile = new StudentProfile(userId, user);
+                    profile.UpdateProfile(s.FirstName, s.LastName, s.PhoneNumber, s.Description);
+                    await db.StudentProfiles.AddAsync(profile, ct);
+                    await db.SaveChangesAsync(ct);
+                    return 1;
+                }
                 if (profile.FirstName != null && profile.LastName != null && profile.PhoneNumber != null) return 0;
                 profile.UpdateProfile(s.FirstName, s.LastName, s.PhoneNumber, s.Description);
                 await db.SaveChangesAsync(ct);
