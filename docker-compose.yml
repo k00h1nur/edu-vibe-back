@@ -91,12 +91,13 @@ services:
 
   # TLS edge: terminates HTTPS (automatic Let's Encrypt) for edu-vibe.uz,
   # www.edu-vibe.uz and api.edu-vibe.uz, and reverse-proxies to web / api.
+  # No depends_on: Caddy re-resolves web/api via Docker DNS at dial time, so it
+  # must NOT list them as dependencies — otherwise a backend `up -d ... caddy`
+  # would pull web in and recreate it from .env's (possibly stale) WEB_IMAGE,
+  # clobbering whatever the frontend pipeline deployed.
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
-    depends_on:
-      - web
-      - api
     ports:
       - "80:80"
       - "443:443"

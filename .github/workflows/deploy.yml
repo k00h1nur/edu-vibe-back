@@ -80,7 +80,10 @@ jobs:
             cd /opt/eduvibe
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             # Pin the api image to this commit's sha for an immutable deploy.
+            # Persist the deployed tag so any later `up -d` (incl. a teammate's
+            # backend deploy) reuses it instead of a stale pin.
             export IMAGE="$IMAGE_REF"
+            grep -q '^IMAGE=' .env && sed -i "s|^IMAGE=.*|IMAGE=$IMAGE_REF|" .env || echo "IMAGE=$IMAGE_REF" >> .env
             docker compose pull api
             # Touch only the backend + edge services; never clobber the web
             # container, which the frontend repo's pipeline owns.
