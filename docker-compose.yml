@@ -64,6 +64,7 @@ services:
       # Production refuses to boot with an empty CORS origin list.
       Cors__AllowedOrigins__0: ${CORS_ORIGIN_0}
       DemoUsers__Enabled: ${DEMO_USERS_ENABLED:-false}
+      DemoUsers__Password: ${DEMO_USERS_PASSWORD:-Demo!2026}
     volumes:
       - uploads:/app/uploads
     healthcheck:
