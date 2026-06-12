@@ -5,13 +5,21 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LMS.Application.Features.Attendance;
 
-public sealed class AttendanceHandlers(IApplicationDbContext db) :
+public sealed class AttendanceHandlers(IApplicationDbContext db, ICurrentUserService currentUser) :
     IRequestHandler<MarkAttendanceCommand, Result<AttendanceDto>>,
     IRequestHandler<UpdateAttendanceCommand, Result<AttendanceDto>>,
     IRequestHandler<GetSessionAttendanceQuery, Result<IReadOnlyCollection<AttendanceDto>>>,
     IRequestHandler<GetStudentAttendanceQuery, Result<IReadOnlyCollection<AttendanceDto>>>,
     IRequestHandler<GetAttendanceQuery, Result<IReadOnlyCollection<AttendanceDto>>>
 {
+    // Roles allowed to read ANY student's attendance. Students hold
+    // Attendance.Read too (for their own history), so the permission gate
+    // alone can't tell "my attendance" from "someone else's".
+    private static readonly string[] StaffRoles =
+        { "admin", "superadmin", "teacher", "support_teacher", "office_admin", "academy_director" };
+
+    private bool CallerIsStaff() => StaffRoles.Any(currentUser.IsInRole);
+
     public async Task<Result<IReadOnlyCollection<AttendanceDto>>> Handle(GetSessionAttendanceQuery request,
         CancellationToken cancellationToken)
     {
@@ -24,6 +32,24 @@ public sealed class AttendanceHandlers(IApplicationDbContext db) :
     public async Task<Result<IReadOnlyCollection<AttendanceDto>>> Handle(GetStudentAttendanceQuery request,
         CancellationToken cancellationToken)
     {
+        // Self-scope: a non-staff caller (i.e. a student) may only read their
+        // OWN attendance. Resolve their profile from the JWT claim, falling
+        // back to a UserId → StudentProfiles lookup if the claim is absent.
+        if (!CallerIsStaff())
+        {
+            var ownProfileId = currentUser.StudentProfileId;
+            if (ownProfileId is null && currentUser.UserId is { } uid)
+            {
+                ownProfileId = await db.StudentProfiles
+                    .Where(sp => sp.UserId == uid)
+                    .Select(sp => (Guid?)sp.Id)
+                    .FirstOrDefaultAsync(cancellationToken);
+            }
+            if (ownProfileId is null || ownProfileId.Value != request.StudentProfileId)
+                return Result<IReadOnlyCollection<AttendanceDto>>.Fail(
+                    "FORBIDDEN", "You can only view your own attendance.");
+        }
+
         return Result<IReadOnlyCollection<AttendanceDto>>.Ok(await db.Attendance
             .Where(x => x.StudentProfileId == request.StudentProfileId)
             .Select(a => new AttendanceDto(a.Id, a.ClassId, a.SessionId, a.StudentProfileId, a.Status))

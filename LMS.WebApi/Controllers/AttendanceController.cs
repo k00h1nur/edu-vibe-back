@@ -37,12 +37,19 @@ public sealed class AttendanceController(ISender sender) : ControllerBase
         return Ok(ApiResponse<IReadOnlyCollection<AttendanceDto>>.Ok(r.Data, r.Message));
     }
 
+    /// <summary>
+    /// A student's attendance history. Non-staff callers are self-scoped in
+    /// the handler — a student can only read their own record, not another's.
+    /// </summary>
     [HttpGet("student/{studentProfileId:guid}")]
     [PermissionAuthorize(Permissions.Attendance.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<AttendanceDto>>>> Student(Guid studentProfileId,
         CancellationToken ct)
     {
         var r = await sender.Send(new GetStudentAttendanceQuery(studentProfileId), ct);
+        if (!r.Success)
+            return StatusCode(StatusCodes.Status403Forbidden,
+                ApiResponse<IReadOnlyCollection<AttendanceDto>>.Fail(r.Message ?? "Forbidden"));
         return Ok(ApiResponse<IReadOnlyCollection<AttendanceDto>>.Ok(r.Data, r.Message));
     }
 
