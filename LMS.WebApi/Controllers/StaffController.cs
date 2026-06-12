@@ -174,6 +174,47 @@ public sealed class StaffController(ISender sender) : ControllerBase
         }
         return Ok(ApiResponse<StaffDto>.Ok(r.Data, r.Message));
     }
+
+    /// <summary>
+    /// Self-service avatar upload — a teacher changes their own photo from
+    /// Settings. The profile is resolved from the JWT (no id in the route),
+    /// so plain [Authorize] is enough; the admin-gated {id}/avatar endpoint
+    /// above stays for admins changing someone else's photo.
+    /// </summary>
+    [HttpPost("me/avatar")]
+    [RequestSizeLimit(2 * 1024 * 1024)]
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<ApiResponse<StaffDto>>> UploadMyAvatar(
+        IFormFile file,
+        [FromServices] LMS.Application.Common.Abstractions.IAvatarFileStore store,
+        CancellationToken ct)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(ApiResponse<StaffDto>.Fail("File is required."));
+
+        var mine = await sender.Send(new GetMyStaffProfileQuery(), ct);
+        if (!mine.Success || mine.Data is null)
+            return NotFound(ApiResponse<StaffDto>.Fail(mine.Message ?? "No staff profile for this user."));
+
+        string storedName;
+        try
+        {
+            await using var stream = file.OpenReadStream();
+            storedName = await store.SaveAsync(stream, file.FileName, file.ContentType, ct);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ApiResponse<StaffDto>.Fail(ex.Message));
+        }
+
+        var r = await sender.Send(new SetStaffAvatarCommand(mine.Data.Id, $"/uploads/avatars/{storedName}"), ct);
+        if (!r.Success)
+        {
+            await store.DeleteAsync(storedName, ct);
+            return BadRequest(ApiResponse<StaffDto>.Fail(r.Message ?? "Failed"));
+        }
+        return Ok(ApiResponse<StaffDto>.Ok(r.Data, r.Message));
+    }
 }
 
 /// <summary>

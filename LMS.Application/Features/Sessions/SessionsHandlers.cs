@@ -12,8 +12,8 @@ public sealed class SessionsHandlers(IApplicationDbContext db) :
     IRequestHandler<CancelClassSessionCommand, Result>,
     IRequestHandler<GetClassSessionsQuery, Result<IReadOnlyCollection<SessionDto>>>,
     IRequestHandler<GetSessionByIdQuery, Result<SessionDto>>,
-    IRequestHandler<GetMyScheduleQuery, Result<IReadOnlyCollection<SessionDto>>>,
-    IRequestHandler<GetUpcomingSessionsQuery, Result<IReadOnlyCollection<SessionDto>>>,
+    IRequestHandler<GetMyScheduleQuery, Result<IReadOnlyCollection<ScheduleEntryDto>>>,
+    IRequestHandler<GetUpcomingSessionsQuery, Result<IReadOnlyCollection<ScheduleEntryDto>>>,
     IRequestHandler<GetSessionsForDateQuery, Result<IReadOnlyCollection<SessionDto>>>,
     IRequestHandler<GetScheduleQuery, Result<IReadOnlyCollection<ScheduleEntryDto>>>
 {
@@ -56,18 +56,20 @@ public sealed class SessionsHandlers(IApplicationDbContext db) :
             : Result<SessionDto>.Ok(dto);
     }
 
-    public async Task<Result<IReadOnlyCollection<SessionDto>>> Handle(GetMyScheduleQuery request,
+    public async Task<Result<IReadOnlyCollection<ScheduleEntryDto>>> Handle(GetMyScheduleQuery request,
         CancellationToken cancellationToken)
     {
         var classIds = await ResolveUserClassIds(request.UserId, cancellationToken);
-        return Result<IReadOnlyCollection<SessionDto>>.Ok(await db.ClassSessions
+        return Result<IReadOnlyCollection<ScheduleEntryDto>>.Ok(await db.ClassSessions
             .Where(x => classIds.Contains(x.ClassId))
             .OrderBy(x => x.SessionDate).ThenBy(x => x.StartsAt)
-            .Select(x => new SessionDto(x.Id, x.ClassId, x.SessionDate, x.StartsAt, x.EndsAt, x.RoomId))
+            .Join(db.Classes, s => s.ClassId, c => c.Id, (s, c) => new ScheduleEntryDto(
+                s.Id, s.ClassId, c.Title, c.TeacherUserId,
+                s.SessionDate, s.StartsAt, s.EndsAt, s.RoomId))
             .ToListAsync(cancellationToken));
     }
 
-    public async Task<Result<IReadOnlyCollection<SessionDto>>> Handle(GetUpcomingSessionsQuery request,
+    public async Task<Result<IReadOnlyCollection<ScheduleEntryDto>>> Handle(GetUpcomingSessionsQuery request,
         CancellationToken cancellationToken)
     {
         var classIds = await ResolveUserClassIds(request.UserId, cancellationToken);
@@ -78,9 +80,11 @@ public sealed class SessionsHandlers(IApplicationDbContext db) :
             .Where(x => classIds.Contains(x.ClassId) && x.SessionDate >= today)
             .OrderBy(x => x.SessionDate).ThenBy(x => x.StartsAt)
             .Take(take)
-            .Select(x => new SessionDto(x.Id, x.ClassId, x.SessionDate, x.StartsAt, x.EndsAt, x.RoomId))
+            .Join(db.Classes, s => s.ClassId, c => c.Id, (s, c) => new ScheduleEntryDto(
+                s.Id, s.ClassId, c.Title, c.TeacherUserId,
+                s.SessionDate, s.StartsAt, s.EndsAt, s.RoomId))
             .ToListAsync(cancellationToken);
-        return Result<IReadOnlyCollection<SessionDto>>.Ok(data);
+        return Result<IReadOnlyCollection<ScheduleEntryDto>>.Ok(data);
     }
 
     /// <summary>

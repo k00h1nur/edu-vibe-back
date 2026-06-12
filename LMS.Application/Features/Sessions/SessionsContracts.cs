@@ -45,14 +45,20 @@ public sealed record GetClassSessionsQuery(Guid ClassId) : IRequest<Result<IRead
 /// </summary>
 public sealed record GetSessionByIdQuery(Guid SessionId) : IRequest<Result<SessionDto>>;
 
-public sealed record GetMyScheduleQuery(Guid UserId) : IRequest<Result<IReadOnlyCollection<SessionDto>>>;
+/// <summary>
+/// Returns <see cref="ScheduleEntryDto"/> (not the lean SessionDto) so the
+/// caller gets the class title in the same round-trip — students can't read
+/// /api/Classes, so the join is the only way their timetable shows names.
+/// </summary>
+public sealed record GetMyScheduleQuery(Guid UserId) : IRequest<Result<IReadOnlyCollection<ScheduleEntryDto>>>;
 
 /// <summary>
 /// Upcoming sessions for the given user. Resolves both teaching schedule (for staff/teachers)
-/// and enrolled classes (for students), starting from today.
+/// and enrolled classes (for students), starting from today. Same joined shape
+/// as <see cref="GetMyScheduleQuery"/>.
 /// </summary>
 public sealed record GetUpcomingSessionsQuery(Guid UserId, int Take = 20)
-    : IRequest<Result<IReadOnlyCollection<SessionDto>>>;
+    : IRequest<Result<IReadOnlyCollection<ScheduleEntryDto>>>;
 
 /// <summary>
 /// Admin-scope query — every session on a given date across all classes.
