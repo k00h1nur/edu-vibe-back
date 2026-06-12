@@ -17,6 +17,7 @@ public interface IApplicationDbContext
     DbSet<Class> Classes { get; }
     DbSet<Enrollment> Enrollments { get; }
     DbSet<ClassSession> ClassSessions { get; }
+    DbSet<ClassSchedulePattern> ClassSchedulePatterns { get; }
     DbSet<Attendance> Attendance { get; }
     DbSet<Assignment> Assignments { get; }
     DbSet<Submission> Submissions { get; }

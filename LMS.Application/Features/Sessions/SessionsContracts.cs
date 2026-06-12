@@ -1,4 +1,5 @@
 using LMS.Application.Common.Models;
+using LMS.Domain.Enums;
 using MediatR;
 
 namespace LMS.Application.Features.Sessions;
@@ -90,3 +91,42 @@ public sealed record ScheduleEntryDto(
 /// </summary>
 public sealed record GetScheduleQuery(DateOnly From, DateOnly To)
     : IRequest<Result<IReadOnlyCollection<ScheduleEntryDto>>>;
+
+// ---- Recurring schedule patterns -----------------------------------------
+
+public sealed record SchedulePatternDto(
+    Guid ClassId,
+    SchedulePatternType Type,
+    int DaysOfWeekMask,
+    DateOnly StartDate,
+    DateOnly EndDate,
+    TimeOnly StartsAt,
+    TimeOnly EndsAt,
+    Guid? RoomId,
+    DateTime UpdatedAt);
+
+/// <summary>The class's recurring pattern, or NOT_FOUND when none was set yet.</summary>
+public sealed record GetClassSchedulePatternQuery(Guid ClassId) : IRequest<Result<SchedulePatternDto>>;
+
+/// <summary>
+/// Upserts the class's recurring pattern and regenerates its sessions:
+/// past sessions and any session that already has attendance marks stay
+/// untouched; every other future session is replaced by the dates the new
+/// pattern produces. Replaces lesson-by-lesson manual creation.
+/// </summary>
+public sealed record ApplyClassScheduleCommand(
+    Guid ClassId,
+    SchedulePatternType Type,
+    int DaysOfWeekMask,
+    DateOnly StartDate,
+    DateOnly EndDate,
+    TimeOnly StartsAt,
+    TimeOnly EndsAt,
+    Guid? RoomId) : IRequest<Result<ApplyScheduleResultDto>>;
+
+/// <summary>What the apply did — surfaced as the admin-facing toast.</summary>
+public sealed record ApplyScheduleResultDto(
+    SchedulePatternDto Pattern,
+    int GeneratedCount,
+    int RemovedCount,
+    int PreservedCount);

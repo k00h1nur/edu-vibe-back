@@ -315,6 +315,50 @@ namespace LMS.Infrastructure.Migrations
                     b.ToTable("classes", (string)null);
                 });
 
+            modelBuilder.Entity("LMS.Domain.Entities.ClassSchedulePattern", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClassId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("DaysOfWeekMask")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<TimeOnly>("EndsAt")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<Guid?>("RoomId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<TimeOnly>("StartsAt")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClassId")
+                        .IsUnique();
+
+                    b.ToTable("class_schedule_patterns", (string)null);
+                });
+
             modelBuilder.Entity("LMS.Domain.Entities.ClassSession", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1757,6 +1801,17 @@ namespace LMS.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Teacher");
+                });
+
+            modelBuilder.Entity("LMS.Domain.Entities.ClassSchedulePattern", b =>
+                {
+                    b.HasOne("LMS.Domain.Entities.Class", "Class")
+                        .WithMany()
+                        .HasForeignKey("ClassId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Class");
                 });
 
             modelBuilder.Entity("LMS.Domain.Entities.ClassSession", b =>

@@ -163,6 +163,18 @@ public sealed class ClassSessionConfiguration : IEntityTypeConfiguration<ClassSe
     }
 }
 
+public sealed class ClassSchedulePatternConfiguration : IEntityTypeConfiguration<ClassSchedulePattern>
+{
+    public void Configure(EntityTypeBuilder<ClassSchedulePattern> b)
+    {
+        b.ToTable("class_schedule_patterns");
+        b.HasKey(x => x.Id);
+        // One pattern per class — re-applying updates the row in place.
+        b.HasIndex(x => x.ClassId).IsUnique();
+        b.HasOne(x => x.Class).WithMany().HasForeignKey(x => x.ClassId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
 public sealed class AttendanceConfiguration : IEntityTypeConfiguration<Attendance>
 {
     public void Configure(EntityTypeBuilder<Attendance> b)
