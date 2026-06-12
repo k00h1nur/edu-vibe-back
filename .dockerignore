@@ -1,0 +1,27 @@
+# Build output (rebuilt inside the image)
+**/bin/
+**/obj/
+
+# IDE / VCS
+.git/
+.github/
+.idea/
+.vs/
+*.user
+*.suo
+**/*.DotSettings.user
+
+# Logs & local artifacts
+*.log
+restore.log
+
+# Deploy artifacts not needed in the build context
+docker-compose.yml
+Caddyfile
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
