@@ -1,5 +1,6 @@
 using LMS.Application.Common.Models;
 using LMS.Application.Common.Security;
+using LMS.Application.Features.Analytics;
 using LMS.Application.Features.Classes;
 using LMS.Application.Features.Sessions;
 using LMS.WebApi.Common;
@@ -65,6 +66,22 @@ public sealed class ClassesController(ISender sender) : ControllerBase
     {
         var r = await sender.Send(new GetClassStudentsQuery(id), ct);
         return Ok(ApiResponse<IReadOnlyCollection<Guid>>.Ok(r.Data, r.Message));
+    }
+
+    /// <summary>
+    /// Class engagement + outcomes: attendance rate, average grade, assignment +
+    /// lesson completion rates, and at-risk students. Self-scoped in the handler
+    /// to the class's own teacher or staff — no cross-class access.
+    /// </summary>
+    [HttpGet("{id:guid}/analytics")]
+    public async Task<ActionResult<ApiResponse<ClassAnalyticsDto>>> Analytics(Guid id, CancellationToken ct)
+    {
+        var r = await sender.Send(new GetClassAnalyticsQuery(id), ct);
+        return r.Success
+            ? Ok(ApiResponse<ClassAnalyticsDto>.Ok(r.Data, r.Message))
+            : r.ErrorCode == "FORBIDDEN"
+                ? StatusCode(StatusCodes.Status403Forbidden, ApiResponse<ClassAnalyticsDto>.Fail(r.Message ?? "Forbidden"))
+                : NotFound(ApiResponse<ClassAnalyticsDto>.Fail(r.Message ?? "Not found"));
     }
 
     /// <summary>The class's recurring schedule pattern; 404 until one is set.</summary>
