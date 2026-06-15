@@ -140,6 +140,20 @@ public sealed class ClassConfiguration : IEntityTypeConfiguration<Class>
     }
 }
 
+public sealed class ClassResourceConfiguration : IEntityTypeConfiguration<ClassResource>
+{
+    public void Configure(EntityTypeBuilder<ClassResource> b)
+    {
+        b.ToTable("class_resources");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Title).IsRequired().HasMaxLength(256);
+        // The hub reads every resource for one class ordered by Position — index the FK.
+        b.HasIndex(x => x.ClassId).HasDatabaseName("ix_class_resources_class_id");
+        b.HasOne(x => x.Class).WithMany(c => c.Resources)
+            .HasForeignKey(x => x.ClassId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
 public sealed class EnrollmentConfiguration : IEntityTypeConfiguration<Enrollment>
 {
     public void Configure(EntityTypeBuilder<Enrollment> b)

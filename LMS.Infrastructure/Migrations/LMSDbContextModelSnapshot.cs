@@ -498,6 +498,49 @@ namespace LMS.Infrastructure.Migrations
                     b.ToTable("class_sessions", (string)null);
                 });
 
+            modelBuilder.Entity("LMS.Domain.Entities.ClassResource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClassId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Url")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClassId")
+                        .HasDatabaseName("ix_class_resources_class_id");
+
+                    b.ToTable("class_resources", (string)null);
+                });
+
             modelBuilder.Entity("LMS.Domain.Entities.LessonMaterial", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1915,6 +1958,17 @@ namespace LMS.Infrastructure.Migrations
                     b.Navigation("CreatedByTeacher");
                 });
 
+            modelBuilder.Entity("LMS.Domain.Entities.ClassResource", b =>
+                {
+                    b.HasOne("LMS.Domain.Entities.Class", "Class")
+                        .WithMany("Resources")
+                        .HasForeignKey("ClassId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Class");
+                });
+
             modelBuilder.Entity("LMS.Domain.Entities.AssignmentAssignee", b =>
                 {
                     b.HasOne("LMS.Domain.Entities.Assignment", "Assignment")
@@ -2289,6 +2343,8 @@ namespace LMS.Infrastructure.Migrations
                     b.Navigation("Assignments");
 
                     b.Navigation("Enrollments");
+
+                    b.Navigation("Resources");
                 });
 
             modelBuilder.Entity("LMS.Domain.Entities.LearningTask", b =>

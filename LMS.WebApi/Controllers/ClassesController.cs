@@ -2,6 +2,7 @@ using LMS.Application.Common.Models;
 using LMS.Application.Common.Security;
 using LMS.Application.Features.Analytics;
 using LMS.Application.Features.Classes;
+using LMS.Application.Features.ClassResources;
 using LMS.Application.Features.Sessions;
 using LMS.WebApi.Common;
 using LMS.WebApi.Security;
@@ -83,6 +84,67 @@ public sealed class ClassesController(ISender sender) : ControllerBase
                 ? StatusCode(StatusCodes.Status403Forbidden, ApiResponse<ClassAnalyticsDto>.Fail(r.Message ?? "Forbidden"))
                 : NotFound(ApiResponse<ClassAnalyticsDto>.Fail(r.Message ?? "Not found"));
     }
+
+    // ===== Class-level content hub ========================================
+    // The shared "course setup" — roadmap, video lessons, links, default
+    // homework — that an admin (or the class teacher) attaches to a whole
+    // class. Self-scoped in the handlers: read = staff / class teacher /
+    // enrolled student; manage = staff / class teacher. Plain [Authorize]
+    // here (no Classes.* permission) so students can read their own class's
+    // content without the admin read permission.
+
+    /// <summary>Every content item attached to the class, ordered for the hub.</summary>
+    [HttpGet("{id:guid}/resources")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<ClassResourceDto>>>> GetResources(
+        Guid id, CancellationToken ct)
+    {
+        var r = await sender.Send(new GetClassResourcesQuery(id), ct);
+        return r.Success
+            ? Ok(ApiResponse<IReadOnlyCollection<ClassResourceDto>>.Ok(r.Data, r.Message))
+            : r.ErrorCode == "FORBIDDEN"
+                ? StatusCode(StatusCodes.Status403Forbidden,
+                    ApiResponse<IReadOnlyCollection<ClassResourceDto>>.Fail(r.Message ?? "Forbidden"))
+                : NotFound(ApiResponse<IReadOnlyCollection<ClassResourceDto>>.Fail(r.Message ?? "Not found"));
+    }
+
+    [HttpPost("{id:guid}/resources")]
+    public async Task<ActionResult<ApiResponse<ClassResourceDto>>> CreateResource(
+        Guid id, [FromBody] CreateClassResourceCommand cmd, CancellationToken ct)
+    {
+        var r = await sender.Send(cmd with { ClassId = id }, ct);
+        return MapWrite(r);
+    }
+
+    [HttpPut("{id:guid}/resources/{resourceId:guid}")]
+    public async Task<ActionResult<ApiResponse<ClassResourceDto>>> UpdateResource(
+        Guid id, Guid resourceId, [FromBody] UpdateClassResourceCommand cmd, CancellationToken ct)
+    {
+        var r = await sender.Send(cmd with { ClassId = id, ResourceId = resourceId }, ct);
+        return MapWrite(r);
+    }
+
+    [HttpDelete("{id:guid}/resources/{resourceId:guid}")]
+    public async Task<ActionResult<ApiResponse<object>>> DeleteResource(
+        Guid id, Guid resourceId, CancellationToken ct)
+    {
+        var r = await sender.Send(new DeleteClassResourceCommand(id, resourceId), ct);
+        return r.Success
+            ? Ok(ApiResponse<object>.Ok(new { }, r.Message))
+            : r.ErrorCode == "FORBIDDEN"
+                ? StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.Fail(r.Message ?? "Forbidden"))
+                : r.ErrorCode == "NOT_FOUND"
+                    ? NotFound(ApiResponse<object>.Fail(r.Message ?? "Not found"))
+                    : BadRequest(ApiResponse<object>.Fail(r.Message ?? "Failed"));
+    }
+
+    private ActionResult<ApiResponse<ClassResourceDto>> MapWrite(Result<ClassResourceDto> r) =>
+        r.Success
+            ? Ok(ApiResponse<ClassResourceDto>.Ok(r.Data, r.Message))
+            : r.ErrorCode == "FORBIDDEN"
+                ? StatusCode(StatusCodes.Status403Forbidden, ApiResponse<ClassResourceDto>.Fail(r.Message ?? "Forbidden"))
+                : r.ErrorCode == "NOT_FOUND"
+                    ? NotFound(ApiResponse<ClassResourceDto>.Fail(r.Message ?? "Not found"))
+                    : BadRequest(ApiResponse<ClassResourceDto>.Fail(r.Message ?? "Failed"));
 
     /// <summary>The class's recurring schedule pattern; 404 until one is set.</summary>
     [HttpGet("{id:guid}/schedule-pattern")]

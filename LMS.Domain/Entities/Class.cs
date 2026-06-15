@@ -38,6 +38,7 @@ public sealed class Class : BaseEntity
 
     public ICollection<Enrollment> Enrollments { get; } = new List<Enrollment>();
     public ICollection<Assignment> Assignments { get; } = new List<Assignment>();
+    public ICollection<ClassResource> Resources { get; } = new List<ClassResource>();
 
     public void EnrollStudent(Guid studentProfileId)
     {
