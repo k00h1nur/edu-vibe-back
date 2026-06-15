@@ -24,6 +24,14 @@ public sealed class ClassSession : BaseEntity
     public Guid? RoomId { get; private set; }
     public Room? Room { get; private set; }
 
+    // ---- Online-lesson details ------------------------------------------
+    // What turns a calendar slot into a lesson: an optional topic/title, a
+    // Zoom/Google Meet link students join from, and free-form notes. All
+    // nullable — a plain in-person slot leaves them blank.
+    public string? Topic { get; private set; }
+    public string? MeetingUrl { get; private set; }
+    public string? Notes { get; private set; }
+
     public void Reschedule(DateOnly sessionDate, TimeOnly startsAt, TimeOnly endsAt, Guid? roomId)
     {
         if (startsAt >= endsAt) throw new DomainException("StartsAt must be before EndsAt.");
@@ -31,6 +39,18 @@ public sealed class ClassSession : BaseEntity
         StartsAt = startsAt;
         EndsAt = endsAt;
         RoomId = roomId;
+        Touch();
+    }
+
+    /// <summary>
+    /// Sets the lesson's topic, online meeting link, and notes. Blank/whitespace
+    /// values normalise to null so an empty field clears rather than stores "".
+    /// </summary>
+    public void SetDetails(string? topic, string? meetingUrl, string? notes)
+    {
+        Topic = string.IsNullOrWhiteSpace(topic) ? null : topic.Trim();
+        MeetingUrl = string.IsNullOrWhiteSpace(meetingUrl) ? null : meetingUrl.Trim();
+        Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
         Touch();
     }
 }

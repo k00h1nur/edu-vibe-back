@@ -6,9 +6,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LMS.Application.Features.Sessions;
 
-public sealed class SessionsHandlers(IApplicationDbContext db) :
+public sealed class SessionsHandlers(IApplicationDbContext db, ICurrentUserService currentUser) :
     IRequestHandler<CreateClassSessionCommand, Result<SessionDto>>,
     IRequestHandler<UpdateClassSessionCommand, Result<SessionDto>>,
+    IRequestHandler<SetSessionDetailsCommand, Result<SessionDto>>,
     IRequestHandler<CancelClassSessionCommand, Result>,
     IRequestHandler<GetClassSessionsQuery, Result<IReadOnlyCollection<SessionDto>>>,
     IRequestHandler<GetSessionByIdQuery, Result<SessionDto>>,
@@ -32,6 +33,7 @@ public sealed class SessionsHandlers(IApplicationDbContext db) :
     {
         var s = new ClassSession(request.ClassId, request.SessionDate, request.StartsAt, request.EndsAt,
             request.RoomId);
+        s.SetDetails(request.Topic, request.MeetingUrl, request.Notes);
         await db.ClassSessions.AddAsync(s, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return Result<SessionDto>.Ok(Map(s));
@@ -42,7 +44,7 @@ public sealed class SessionsHandlers(IApplicationDbContext db) :
     {
         return Result<IReadOnlyCollection<SessionDto>>.Ok(await db.ClassSessions
             .Where(x => x.ClassId == request.ClassId)
-            .Select(x => new SessionDto(x.Id, x.ClassId, x.SessionDate, x.StartsAt, x.EndsAt, x.RoomId))
+            .Select(x => new SessionDto(x.Id, x.ClassId, x.SessionDate, x.StartsAt, x.EndsAt, x.RoomId, x.Topic, x.MeetingUrl, x.Notes))
             .ToListAsync(cancellationToken));
     }
 
@@ -51,7 +53,7 @@ public sealed class SessionsHandlers(IApplicationDbContext db) :
     {
         var dto = await db.ClassSessions.AsNoTracking()
             .Where(x => x.Id == request.SessionId)
-            .Select(x => new SessionDto(x.Id, x.ClassId, x.SessionDate, x.StartsAt, x.EndsAt, x.RoomId))
+            .Select(x => new SessionDto(x.Id, x.ClassId, x.SessionDate, x.StartsAt, x.EndsAt, x.RoomId, x.Topic, x.MeetingUrl, x.Notes))
             .FirstOrDefaultAsync(cancellationToken);
         return dto is null
             ? Result<SessionDto>.Fail("NOT_FOUND", "Session not found.")
@@ -67,7 +69,7 @@ public sealed class SessionsHandlers(IApplicationDbContext db) :
             .OrderBy(x => x.SessionDate).ThenBy(x => x.StartsAt)
             .Join(db.Classes, s => s.ClassId, c => c.Id, (s, c) => new ScheduleEntryDto(
                 s.Id, s.ClassId, c.Title, c.TeacherUserId,
-                s.SessionDate, s.StartsAt, s.EndsAt, s.RoomId))
+                s.SessionDate, s.StartsAt, s.EndsAt, s.RoomId, s.Topic, s.MeetingUrl))
             .ToListAsync(cancellationToken));
     }
 
@@ -84,7 +86,7 @@ public sealed class SessionsHandlers(IApplicationDbContext db) :
             .Take(take)
             .Join(db.Classes, s => s.ClassId, c => c.Id, (s, c) => new ScheduleEntryDto(
                 s.Id, s.ClassId, c.Title, c.TeacherUserId,
-                s.SessionDate, s.StartsAt, s.EndsAt, s.RoomId))
+                s.SessionDate, s.StartsAt, s.EndsAt, s.RoomId, s.Topic, s.MeetingUrl))
             .ToListAsync(cancellationToken);
         return Result<IReadOnlyCollection<ScheduleEntryDto>>.Ok(data);
     }
@@ -114,13 +116,37 @@ public sealed class SessionsHandlers(IApplicationDbContext db) :
         var s = await db.ClassSessions.FirstOrDefaultAsync(x => x.Id == request.SessionId, cancellationToken);
         if (s is null) return Result<SessionDto>.Fail("NOT_FOUND", "Session not found.");
         s.Reschedule(request.SessionDate, request.StartsAt, request.EndsAt, request.RoomId);
+        s.SetDetails(request.Topic, request.MeetingUrl, request.Notes);
         await db.SaveChangesAsync(cancellationToken);
         return Result<SessionDto>.Ok(Map(s));
     }
 
+    /// <summary>
+    /// Teacher lesson editor — self-scoped: only the class's own teacher may set
+    /// the topic / meeting link / notes. Admins use Create/Update (permission
+    /// gated) instead, so this endpoint can stay permission-free.
+    /// </summary>
+    public async Task<Result<SessionDto>> Handle(SetSessionDetailsCommand request, CancellationToken cancellationToken)
+    {
+        var s = await db.ClassSessions.FirstOrDefaultAsync(x => x.Id == request.SessionId, cancellationToken);
+        if (s is null) return Result<SessionDto>.Fail("NOT_FOUND", "Session not found.");
+
+        var teacherUserId = await db.Classes.AsNoTracking()
+            .Where(c => c.Id == s.ClassId)
+            .Select(c => c.TeacherUserId)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (currentUser.UserId is null || teacherUserId != currentUser.UserId)
+            return Result<SessionDto>.Fail("FORBIDDEN", "Only the class teacher can edit this lesson.");
+
+        s.SetDetails(request.Topic, request.MeetingUrl, request.Notes);
+        await db.SaveChangesAsync(cancellationToken);
+        return Result<SessionDto>.Ok(Map(s), "Lesson updated.");
+    }
+
     private static SessionDto Map(ClassSession s)
     {
-        return new SessionDto(s.Id, s.ClassId, s.SessionDate, s.StartsAt, s.EndsAt, s.RoomId);
+        return new SessionDto(s.Id, s.ClassId, s.SessionDate, s.StartsAt, s.EndsAt, s.RoomId,
+            s.Topic, s.MeetingUrl, s.Notes);
     }
 
     public async Task<Result<IReadOnlyCollection<SessionDto>>> Handle(GetSessionsForDateQuery request,
@@ -131,7 +157,7 @@ public sealed class SessionsHandlers(IApplicationDbContext db) :
 
         var data = await q
             .OrderBy(x => x.StartsAt)
-            .Select(x => new SessionDto(x.Id, x.ClassId, x.SessionDate, x.StartsAt, x.EndsAt, x.RoomId))
+            .Select(x => new SessionDto(x.Id, x.ClassId, x.SessionDate, x.StartsAt, x.EndsAt, x.RoomId, x.Topic, x.MeetingUrl, x.Notes))
             .ToListAsync(ct);
         return Result<IReadOnlyCollection<SessionDto>>.Ok(data);
     }
@@ -149,7 +175,7 @@ public sealed class SessionsHandlers(IApplicationDbContext db) :
             orderby s.SessionDate, s.StartsAt
             select new ScheduleEntryDto(
                 s.Id, s.ClassId, c.Title, c.TeacherUserId,
-                s.SessionDate, s.StartsAt, s.EndsAt, s.RoomId))
+                s.SessionDate, s.StartsAt, s.EndsAt, s.RoomId, s.Topic, s.MeetingUrl))
             .ToListAsync(ct);
         return Result<IReadOnlyCollection<ScheduleEntryDto>>.Ok(data);
     }

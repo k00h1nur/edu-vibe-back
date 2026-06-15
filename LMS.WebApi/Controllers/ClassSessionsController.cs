@@ -124,6 +124,27 @@ public sealed class ClassSessionsController(ISender sender, ICurrentUserService 
             : BadRequest(ApiResponse<SessionDto>.Fail(r.Message ?? "Failed"));
     }
 
+    /// <summary>
+    /// Teacher lesson editor — set the topic, online meeting link (Zoom /
+    /// Google Meet) and notes on one of the caller's own sessions. Self-scoped
+    /// in the handler to the class's teacher, so it needs no Sessions.Update
+    /// (admins use PUT instead). FORBIDDEN → 403, NOT_FOUND → 404.
+    /// </summary>
+    [HttpPost("{id:guid}/details")]
+    public async Task<ActionResult<ApiResponse<SessionDto>>> SetDetails(
+        Guid id, [FromBody] SetSessionDetailsCommand cmd, CancellationToken ct)
+    {
+        var r = await sender.Send(cmd with { SessionId = id }, ct);
+        if (r.Success) return Ok(ApiResponse<SessionDto>.Ok(r.Data, r.Message));
+        return r.ErrorCode switch
+        {
+            "NOT_FOUND" => NotFound(ApiResponse<SessionDto>.Fail(r.Message ?? "Not found")),
+            "FORBIDDEN" => StatusCode(StatusCodes.Status403Forbidden,
+                ApiResponse<SessionDto>.Fail(r.Message ?? "Forbidden")),
+            _ => BadRequest(ApiResponse<SessionDto>.Fail(r.Message ?? "Failed")),
+        };
+    }
+
     [HttpDelete("{id:guid}")]
     [PermissionAuthorize(Permissions.Sessions.Delete)]
     public async Task<ActionResult<ApiResponse<object>>> Delete(Guid id, CancellationToken ct)

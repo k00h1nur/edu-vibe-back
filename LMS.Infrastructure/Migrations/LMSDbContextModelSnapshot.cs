@@ -461,6 +461,12 @@ namespace LMS.Infrastructure.Migrations
                     b.Property<TimeOnly>("EndsAt")
                         .HasColumnType("time without time zone");
 
+                    b.Property<string>("MeetingUrl")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
                     b.Property<Guid?>("RoomId")
                         .HasColumnType("uuid");
 
@@ -469,6 +475,9 @@ namespace LMS.Infrastructure.Migrations
 
                     b.Property<TimeOnly>("StartsAt")
                         .HasColumnType("time without time zone");
+
+                    b.Property<string>("Topic")
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");

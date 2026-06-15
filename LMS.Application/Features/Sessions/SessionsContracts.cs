@@ -10,7 +10,10 @@ public sealed record SessionDto(
     DateOnly SessionDate,
     TimeOnly StartsAt,
     TimeOnly EndsAt,
-    Guid? RoomId);
+    Guid? RoomId,
+    string? Topic = null,
+    string? MeetingUrl = null,
+    string? Notes = null);
 
 public sealed record SessionsPingCommand : IRequest<Result<string>>;
 
@@ -27,14 +30,32 @@ public sealed record CreateClassSessionCommand(
     DateOnly SessionDate,
     TimeOnly StartsAt,
     TimeOnly EndsAt,
-    Guid? RoomId) : IRequest<Result<SessionDto>>;
+    Guid? RoomId,
+    string? Topic = null,
+    string? MeetingUrl = null,
+    string? Notes = null) : IRequest<Result<SessionDto>>;
 
 public sealed record UpdateClassSessionCommand(
     Guid SessionId,
     DateOnly SessionDate,
     TimeOnly StartsAt,
     TimeOnly EndsAt,
-    Guid? RoomId) : IRequest<Result<SessionDto>>;
+    Guid? RoomId,
+    string? Topic = null,
+    string? MeetingUrl = null,
+    string? Notes = null) : IRequest<Result<SessionDto>>;
+
+/// <summary>
+/// Teacher-facing lesson editor: set the topic, online meeting link (Zoom /
+/// Google Meet) and notes on a session WITHOUT touching its date/time. The
+/// handler self-scopes to the class's own teacher, so it needs no
+/// Sessions.Update permission (which is admin-only).
+/// </summary>
+public sealed record SetSessionDetailsCommand(
+    Guid SessionId,
+    string? Topic,
+    string? MeetingUrl,
+    string? Notes) : IRequest<Result<SessionDto>>;
 
 public sealed record CancelClassSessionCommand(Guid SessionId) : IRequest<Result>;
 
@@ -82,7 +103,9 @@ public sealed record ScheduleEntryDto(
     DateOnly SessionDate,
     TimeOnly StartsAt,
     TimeOnly EndsAt,
-    Guid? RoomId);
+    Guid? RoomId,
+    string? Topic = null,
+    string? MeetingUrl = null);
 
 /// <summary>
 /// Returns every session inside [<paramref name="From"/>, <paramref name="To"/>]
