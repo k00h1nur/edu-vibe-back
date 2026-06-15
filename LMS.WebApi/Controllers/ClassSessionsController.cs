@@ -1,6 +1,7 @@
 using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Models;
 using LMS.Application.Common.Security;
+using LMS.Application.Features.Analytics;
 using LMS.Application.Features.Lessons;
 using LMS.Application.Features.Sessions;
 using LMS.WebApi.Common;
@@ -172,6 +173,23 @@ public sealed class ClassSessionsController(
     {
         var r = await sender.Send(new GetLessonFullQuery(id), ct);
         return r.Success ? Ok(ApiResponse<LessonFullDto>.Ok(r.Data, r.Message)) : MapFail(r);
+    }
+
+    /// <summary>Session attendance roster + each student's status + counts (teacher of the class / staff).</summary>
+    [HttpGet("{id:guid}/attendance")]
+    public async Task<ActionResult<ApiResponse<SessionAttendanceDto>>> SessionAttendance(Guid id, CancellationToken ct)
+    {
+        var r = await sender.Send(new GetSessionAttendanceSummaryQuery(id), ct);
+        return r.Success ? Ok(ApiResponse<SessionAttendanceDto>.Ok(r.Data, r.Message)) : MapFail(r);
+    }
+
+    /// <summary>Bulk-mark attendance for a session — Present/Absent/Late/Excused per student.</summary>
+    [HttpPost("{id:guid}/attendance")]
+    public async Task<ActionResult<ApiResponse<SessionAttendanceDto>>> BulkAttendance(
+        Guid id, [FromBody] BulkMarkAttendanceCommand cmd, CancellationToken ct)
+    {
+        var r = await sender.Send(cmd with { SessionId = id }, ct);
+        return r.Success ? Ok(ApiResponse<SessionAttendanceDto>.Ok(r.Data, r.Message)) : MapFail(r);
     }
 
     /// <summary>Teacher uploads a material file to the lesson (multipart). Orphan blob deleted on rejection.</summary>

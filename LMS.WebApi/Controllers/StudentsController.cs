@@ -1,5 +1,6 @@
 using LMS.Application.Common.Models;
 using LMS.Application.Common.Security;
+using LMS.Application.Features.Analytics;
 using LMS.Application.Features.Students;
 using LMS.Domain.Enums;
 using LMS.WebApi.Common;
@@ -36,6 +37,23 @@ public sealed class StudentsController(ISender sender) : ControllerBase
         return r.Success
             ? Ok(ApiResponse<StudentDto>.Ok(r.Data, r.Message))
             : NotFound(ApiResponse<StudentDto>.Fail(r.Message ?? "Not found"));
+    }
+
+    /// <summary>
+    /// A student's measurable performance summary (attendance %, assignment +
+    /// lesson completion, average score, missing/late counts). Self-scoped in
+    /// the handler — the student themselves, a teacher of their class, or staff.
+    /// No permission gate (students lack Analytics.Read but need their own).
+    /// </summary>
+    [HttpGet("{id:guid}/performance")]
+    public async Task<ActionResult<ApiResponse<StudentPerformanceDto>>> Performance(Guid id, CancellationToken ct)
+    {
+        var r = await sender.Send(new GetStudentPerformanceQuery(id), ct);
+        return r.Success
+            ? Ok(ApiResponse<StudentPerformanceDto>.Ok(r.Data, r.Message))
+            : r.ErrorCode == "FORBIDDEN"
+                ? StatusCode(StatusCodes.Status403Forbidden, ApiResponse<StudentPerformanceDto>.Fail(r.Message ?? "Forbidden"))
+                : NotFound(ApiResponse<StudentPerformanceDto>.Fail(r.Message ?? "Not found"));
     }
 
     /// <summary>
