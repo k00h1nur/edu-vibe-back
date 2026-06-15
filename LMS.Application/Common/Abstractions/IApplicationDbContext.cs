@@ -23,6 +23,8 @@ public interface IApplicationDbContext
     DbSet<Submission> Submissions { get; }
     DbSet<SubmissionFile> SubmissionFiles { get; }
     DbSet<SubmissionAudit> SubmissionAudits { get; }
+    DbSet<LessonMaterial> LessonMaterials { get; }
+    DbSet<LessonProgress> LessonProgress { get; }
     DbSet<Payment> Payments { get; }
     DbSet<Conversation> Conversations { get; }
     DbSet<ConversationParticipant> ConversationParticipants { get; }

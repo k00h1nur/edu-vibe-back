@@ -45,7 +45,21 @@ public sealed class Assignment : BaseEntity
     public Guid CreatedByTeacherId { get; private set; }
     public User? CreatedByTeacher { get; private set; }
 
+    /// <summary>
+    /// Optional link to a specific lesson (ClassSession) within the class. When
+    /// set, the assignment shows on that lesson's hub. Null = a general
+    /// class-level assignment not tied to one lesson.
+    /// </summary>
+    public Guid? ClassSessionId { get; private set; }
+
     public ICollection<Submission> Submissions { get; } = new List<Submission>();
+
+    /// <summary>Links/unlinks this assignment to a lesson. Pass null to unlink.</summary>
+    public void SetSession(Guid? classSessionId)
+    {
+        ClassSessionId = classSessionId;
+        Touch();
+    }
 
     public void UpdateTitle(string title)
     {

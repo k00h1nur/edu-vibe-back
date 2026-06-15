@@ -1,5 +1,7 @@
 using LMS.Application.Common.Abstractions;
+using LMS.Application.Common.Models;
 using LMS.Application.Common.Security;
+using LMS.Application.Features.Lessons;
 using LMS.Application.Features.Sessions;
 using LMS.WebApi.Common;
 using LMS.WebApi.Security;
@@ -12,8 +14,15 @@ namespace LMS.WebApi.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
-public sealed class ClassSessionsController(ISender sender, ICurrentUserService currentUser) : ControllerBase
+public sealed class ClassSessionsController(
+    ISender sender,
+    ICurrentUserService currentUser,
+    ILessonMaterialFileStore lessonFiles) : ControllerBase
 {
+    private const long LessonUploadSizeLimit = 50 * 1024 * 1024; // 50 MB per lesson file
+
+    public sealed record SetVideoRequest(string? VideoUrl);
+    public sealed record CompleteRequest(bool Completed);
     [HttpGet("class/{classId:guid}")]
     [PermissionAuthorize(Permissions.Sessions.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<SessionDto>>>> ByClass(Guid classId,
@@ -142,6 +151,144 @@ public sealed class ClassSessionsController(ISender sender, ICurrentUserService 
             "FORBIDDEN" => StatusCode(StatusCodes.Status403Forbidden,
                 ApiResponse<SessionDto>.Fail(r.Message ?? "Forbidden")),
             _ => BadRequest(ApiResponse<SessionDto>.Fail(r.Message ?? "Failed")),
+        };
+    }
+
+    // ===== Lesson hub =====================================================
+    // Self-scoped in the handlers (class teacher / enrolled student / staff),
+    // so these carry no PermissionAuthorize — students lack Sessions.Read but
+    // still need to read their own lessons.
+
+    private ActionResult<ApiResponse<T>> MapFail<T>(Result<T> r) => r.ErrorCode switch
+    {
+        "NOT_FOUND" => NotFound(ApiResponse<T>.Fail(r.Message ?? "Not found")),
+        "FORBIDDEN" => StatusCode(StatusCodes.Status403Forbidden, ApiResponse<T>.Fail(r.Message ?? "Forbidden")),
+        _ => BadRequest(ApiResponse<T>.Fail(r.Message ?? "Failed")),
+    };
+
+    /// <summary>The full lesson hub — session + video + materials + assignments + progress.</summary>
+    [HttpGet("{id:guid}/full")]
+    public async Task<ActionResult<ApiResponse<LessonFullDto>>> Full(Guid id, CancellationToken ct)
+    {
+        var r = await sender.Send(new GetLessonFullQuery(id), ct);
+        return r.Success ? Ok(ApiResponse<LessonFullDto>.Ok(r.Data, r.Message)) : MapFail(r);
+    }
+
+    /// <summary>Teacher uploads a material file to the lesson (multipart). Orphan blob deleted on rejection.</summary>
+    [HttpPost("{id:guid}/materials")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(LessonUploadSizeLimit)]
+    public async Task<ActionResult<ApiResponse<LessonMaterialDto>>> AddMaterial(
+        Guid id, IFormFile file, CancellationToken ct)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(ApiResponse<LessonMaterialDto>.Fail("File is required."));
+        if (file.Length > LessonUploadSizeLimit)
+            return BadRequest(ApiResponse<LessonMaterialDto>.Fail("File exceeds the 50 MB limit."));
+
+        SavedLessonMaterial saved;
+        try
+        {
+            await using var stream = file.OpenReadStream();
+            saved = await lessonFiles.SaveAsync(stream, file.FileName, ct);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ApiResponse<LessonMaterialDto>.Fail(ex.Message));
+        }
+
+        var r = await sender.Send(new AddLessonMaterialCommand(
+            id, saved.StoredFileName, file.FileName, file.ContentType ?? "application/octet-stream", saved.Size), ct);
+        if (!r.Success)
+        {
+            await lessonFiles.DeleteAsync(saved.StoredFileName, ct);
+            return MapFail(r);
+        }
+        return Ok(ApiResponse<LessonMaterialDto>.Ok(r.Data, r.Message));
+    }
+
+    /// <summary>Teacher removes a lesson material (and its blob).</summary>
+    [HttpDelete("{id:guid}/materials/{materialId:guid}")]
+    public async Task<ActionResult<ApiResponse<object>>> RemoveMaterial(Guid id, Guid materialId, CancellationToken ct)
+    {
+        var r = await sender.Send(new RemoveLessonMaterialCommand(id, materialId), ct);
+        if (!r.Success)
+            return r.ErrorCode switch
+            {
+                "NOT_FOUND" => NotFound(ApiResponse<object>.Fail(r.Message ?? "Not found")),
+                "FORBIDDEN" => StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.Fail(r.Message ?? "Forbidden")),
+                _ => BadRequest(ApiResponse<object>.Fail(r.Message ?? "Failed")),
+            };
+        if (!string.IsNullOrEmpty(r.Data)) await lessonFiles.DeleteAsync(r.Data, ct);
+        return Ok(ApiResponse<object>.Ok(new { }, r.Message));
+    }
+
+    /// <summary>Streams a lesson material. Private bucket — access check runs per call.</summary>
+    [HttpGet("materials/{materialId:guid}/download")]
+    public async Task<IActionResult> DownloadMaterial(Guid materialId, CancellationToken ct)
+    {
+        var r = await sender.Send(new GetLessonMaterialForDownloadQuery(materialId), ct);
+        if (!r.Success || r.Data is null) return Forbid();
+        var stream = await lessonFiles.OpenAsync(r.Data.StoredFileName, ct);
+        if (stream is null) return NotFound();
+        return File(stream, r.Data.MimeType, r.Data.OriginalFileName);
+    }
+
+    /// <summary>Teacher sets/clears the lesson video URL.</summary>
+    [HttpPost("{id:guid}/video")]
+    public async Task<ActionResult<ApiResponse<object>>> SetVideo(
+        Guid id, [FromBody] SetVideoRequest body, CancellationToken ct)
+    {
+        var r = await sender.Send(new SetLessonVideoCommand(id, body.VideoUrl), ct);
+        if (r.Success) return Ok(ApiResponse<object>.Ok(new { }, r.Message));
+        return r.ErrorCode switch
+        {
+            "NOT_FOUND" => NotFound(ApiResponse<object>.Fail(r.Message ?? "Not found")),
+            "FORBIDDEN" => StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.Fail(r.Message ?? "Forbidden")),
+            _ => BadRequest(ApiResponse<object>.Fail(r.Message ?? "Failed")),
+        };
+    }
+
+    /// <summary>Student marks the lesson complete/incomplete (self-scoped).</summary>
+    [HttpPost("{id:guid}/complete")]
+    public async Task<ActionResult<ApiResponse<object>>> Complete(
+        Guid id, [FromBody] CompleteRequest body, CancellationToken ct)
+    {
+        var r = await sender.Send(new SetLessonProgressCommand(id, body.Completed), ct);
+        if (r.Success) return Ok(ApiResponse<object>.Ok(new { }, r.Message));
+        return r.ErrorCode switch
+        {
+            "NOT_FOUND" => NotFound(ApiResponse<object>.Fail(r.Message ?? "Not found")),
+            "FORBIDDEN" => StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.Fail(r.Message ?? "Forbidden")),
+            _ => BadRequest(ApiResponse<object>.Fail(r.Message ?? "Failed")),
+        };
+    }
+
+    /// <summary>Teacher links one of the class's assignments to this lesson.</summary>
+    [HttpPost("{id:guid}/assignments/{assignmentId:guid}")]
+    public async Task<ActionResult<ApiResponse<object>>> LinkAssignment(Guid id, Guid assignmentId, CancellationToken ct)
+    {
+        var r = await sender.Send(new LinkLessonAssignmentCommand(id, assignmentId, true), ct);
+        if (r.Success) return Ok(ApiResponse<object>.Ok(new { }, r.Message));
+        return r.ErrorCode switch
+        {
+            "NOT_FOUND" => NotFound(ApiResponse<object>.Fail(r.Message ?? "Not found")),
+            "FORBIDDEN" => StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.Fail(r.Message ?? "Forbidden")),
+            _ => BadRequest(ApiResponse<object>.Fail(r.Message ?? "Failed")),
+        };
+    }
+
+    /// <summary>Teacher unlinks an assignment from this lesson.</summary>
+    [HttpDelete("{id:guid}/assignments/{assignmentId:guid}")]
+    public async Task<ActionResult<ApiResponse<object>>> UnlinkAssignment(Guid id, Guid assignmentId, CancellationToken ct)
+    {
+        var r = await sender.Send(new LinkLessonAssignmentCommand(id, assignmentId, false), ct);
+        if (r.Success) return Ok(ApiResponse<object>.Ok(new { }, r.Message));
+        return r.ErrorCode switch
+        {
+            "NOT_FOUND" => NotFound(ApiResponse<object>.Fail(r.Message ?? "Not found")),
+            "FORBIDDEN" => StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.Fail(r.Message ?? "Forbidden")),
+            _ => BadRequest(ApiResponse<object>.Fail(r.Message ?? "Failed")),
         };
     }
 

@@ -71,6 +71,7 @@ public static class DependencyInjection
         services.AddSingleton<IAvatarFileStore, LocalAvatarFileStore>();
         services.AddSingleton<IMaterialFileStore, LocalMaterialFileStore>();
         services.AddSingleton<ISubmissionFileStore, LocalSubmissionFileStore>();
+        services.AddSingleton<ILessonMaterialFileStore, LocalLessonMaterialFileStore>();
         return services;
     }
 

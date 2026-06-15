@@ -175,6 +175,33 @@ public sealed class ClassSchedulePatternConfiguration : IEntityTypeConfiguration
     }
 }
 
+public sealed class LessonMaterialConfiguration : IEntityTypeConfiguration<LessonMaterial>
+{
+    public void Configure(EntityTypeBuilder<LessonMaterial> b)
+    {
+        b.ToTable("lesson_materials");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.StoredFileName).IsRequired().HasMaxLength(256);
+        b.Property(x => x.OriginalFileName).IsRequired().HasMaxLength(512);
+        b.Property(x => x.MimeType).IsRequired().HasMaxLength(256);
+        b.HasIndex(x => x.ClassSessionId);
+        b.HasOne(x => x.ClassSession).WithMany(s => s.Materials)
+            .HasForeignKey(x => x.ClassSessionId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public sealed class LessonProgressConfiguration : IEntityTypeConfiguration<LessonProgress>
+{
+    public void Configure(EntityTypeBuilder<LessonProgress> b)
+    {
+        b.ToTable("lesson_progress");
+        b.HasKey(x => x.Id);
+        // One completion mark per (student, session).
+        b.HasIndex(x => new { x.StudentProfileId, x.ClassSessionId }).IsUnique();
+        b.HasIndex(x => x.ClassSessionId);
+    }
+}
+
 public sealed class AttendanceConfiguration : IEntityTypeConfiguration<Attendance>
 {
     public void Configure(EntityTypeBuilder<Attendance> b)

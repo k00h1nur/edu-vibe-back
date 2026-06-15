@@ -28,6 +28,8 @@ public sealed class LMSDbContext : DbContext, IApplicationDbContext
     public DbSet<Submission> Submissions => Set<Submission>();
     public DbSet<SubmissionFile> SubmissionFiles => Set<SubmissionFile>();
     public DbSet<SubmissionAudit> SubmissionAudits => Set<SubmissionAudit>();
+    public DbSet<LessonMaterial> LessonMaterials => Set<LessonMaterial>();
+    public DbSet<LessonProgress> LessonProgress => Set<LessonProgress>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<ConversationParticipant> ConversationParticipants => Set<ConversationParticipant>();

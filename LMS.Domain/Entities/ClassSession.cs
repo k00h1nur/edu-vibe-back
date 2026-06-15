@@ -32,6 +32,15 @@ public sealed class ClassSession : BaseEntity
     public string? MeetingUrl { get; private set; }
     public string? Notes { get; private set; }
 
+    /// <summary>
+    /// Optional video lesson — a YouTube/Vimeo/MP4 URL students watch from the
+    /// lesson hub. Embedded on the session (1:1) rather than a separate entity.
+    /// </summary>
+    public string? VideoUrl { get; private set; }
+
+    /// <summary>One-to-many lesson files attached to this session.</summary>
+    public ICollection<LessonMaterial> Materials { get; } = new List<LessonMaterial>();
+
     public void Reschedule(DateOnly sessionDate, TimeOnly startsAt, TimeOnly endsAt, Guid? roomId)
     {
         if (startsAt >= endsAt) throw new DomainException("StartsAt must be before EndsAt.");
@@ -51,6 +60,13 @@ public sealed class ClassSession : BaseEntity
         Topic = string.IsNullOrWhiteSpace(topic) ? null : topic.Trim();
         MeetingUrl = string.IsNullOrWhiteSpace(meetingUrl) ? null : meetingUrl.Trim();
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        Touch();
+    }
+
+    /// <summary>Sets or clears the video-lesson URL. Blank normalises to null.</summary>
+    public void SetVideo(string? videoUrl)
+    {
+        VideoUrl = string.IsNullOrWhiteSpace(videoUrl) ? null : videoUrl.Trim();
         Touch();
     }
 }
