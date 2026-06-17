@@ -37,6 +37,17 @@ public sealed class TelegramAuthCommandHandler(
         if (tg is null)
             return Result<AuthTokensResponse>.Fail("TELEGRAM_INITDATA_INVALID", error ?? "Invalid Telegram initData.");
 
+        // Deep-link session handoff: the panel minted a one-time token bound to
+        // a signed-in user. Exchange it to sign in as THAT user (their real
+        // role) and link this Telegram identity to them.
+        if (!string.IsNullOrWhiteSpace(request.StartToken))
+        {
+            var handoff = await HandleHandoffAsync(tg, request.StartToken!, cancellationToken);
+            if (handoff is not null) return handoff;
+            // null → token wasn't usable; fall through to normal sign-in so a
+            // stale link still logs the user in via their existing link (if any).
+        }
+
         // Existing link → sign that user in.
         var account = await dbContext.TelegramAccounts
             .Include(x => x.User)
@@ -88,6 +99,68 @@ public sealed class TelegramAuthCommandHandler(
 
         var tokens = await IssueTokensAsync(user, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
+        return Result<AuthTokensResponse>.Ok(tokens, "Authenticated via Telegram.");
+    }
+
+    /// <summary>
+    /// Exchanges a one-time deep-link token: consumes it, links the verified
+    /// Telegram identity to the token's user, and issues a session as that user.
+    /// Returns null when the token isn't usable (caller falls back to normal
+    /// sign-in); returns a failed Result on a genuine conflict.
+    /// </summary>
+    private async Task<Result<AuthTokensResponse>?> HandleHandoffAsync(
+        TelegramInitData tg, string startToken, CancellationToken ct)
+    {
+        var link = await dbContext.TelegramDeepLinkTokens
+            .FirstOrDefaultAsync(x => x.Token == startToken, ct);
+        if (link is null || !link.IsUsable(dateTimeProvider.UtcNow))
+            return null;
+
+        // One-time: burn it now, even if a guard below rejects the exchange.
+        link.Consume(dateTimeProvider.UtcNow);
+
+        var targetUser = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == link.UserId, ct);
+        if (targetUser is null)
+        {
+            await dbContext.SaveChangesAsync(ct);
+            return Result<AuthTokensResponse>.Fail("USER_NOT_FOUND", "The linked account no longer exists.");
+        }
+        if (targetUser.Status != UserStatus.Active)
+        {
+            await dbContext.SaveChangesAsync(ct);
+            return Result<AuthTokensResponse>.Fail("USER_INACTIVE", "User is not active.");
+        }
+
+        var byTg = await dbContext.TelegramAccounts
+            .FirstOrDefaultAsync(x => x.TelegramUserId == tg.UserId, ct);
+        if (byTg is not null && byTg.UserId != targetUser.Id)
+        {
+            await dbContext.SaveChangesAsync(ct);
+            return Result<AuthTokensResponse>.Fail("TELEGRAM_ALREADY_LINKED",
+                "This Telegram account is already linked to a different user.");
+        }
+
+        if (byTg is not null)
+        {
+            byTg.UpdateProfile(tg.Username, tg.FirstName, tg.LastName, tg.PhotoUrl);
+        }
+        else
+        {
+            var byUser = await dbContext.TelegramAccounts
+                .FirstOrDefaultAsync(x => x.UserId == targetUser.Id, ct);
+            if (byUser is not null)
+            {
+                await dbContext.SaveChangesAsync(ct);
+                return Result<AuthTokensResponse>.Fail("TELEGRAM_USER_ALREADY_LINKED",
+                    "Your account is already linked to a different Telegram. Disconnect it in Settings first.");
+            }
+            var acc = new TelegramAccount(
+                targetUser.Id, tg.UserId, tg.Username, tg.FirstName, tg.LastName, tg.PhotoUrl);
+            await dbContext.TelegramAccounts.AddAsync(acc, ct);
+        }
+
+        var tokens = await IssueTokensAsync(targetUser, ct);
+        await dbContext.SaveChangesAsync(ct);
         return Result<AuthTokensResponse>.Ok(tokens, "Authenticated via Telegram.");
     }
 
@@ -210,5 +283,77 @@ public sealed class UnlinkTelegramCommandHandler(
         dbContext.TelegramAccounts.Remove(account);
         await dbContext.SaveChangesAsync(cancellationToken);
         return Result.Ok("Telegram disconnected.");
+    }
+}
+
+/// <summary>
+/// Bot-settings singleton: Get returns the one row (or an empty default so the
+/// frontend never 404s), Update upserts it. Mirrors the OfficeInfo pattern.
+/// </summary>
+public sealed class TelegramSettingsHandlers(IApplicationDbContext dbContext) :
+    IRequestHandler<GetTelegramSettingsQuery, Result<TelegramSettingsDto>>,
+    IRequestHandler<UpdateTelegramSettingsCommand, Result<TelegramSettingsDto>>
+{
+    public async Task<Result<TelegramSettingsDto>> Handle(GetTelegramSettingsQuery request,
+        CancellationToken cancellationToken)
+    {
+        var row = await dbContext.TelegramSettings.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+        return Result<TelegramSettingsDto>.Ok(row is null
+            ? new TelegramSettingsDto(null, DateTime.UtcNow)
+            : new TelegramSettingsDto(row.BotUsername, row.UpdatedAt));
+    }
+
+    public async Task<Result<TelegramSettingsDto>> Handle(UpdateTelegramSettingsCommand request,
+        CancellationToken cancellationToken)
+    {
+        var row = await dbContext.TelegramSettings.FirstOrDefaultAsync(cancellationToken);
+        if (row is null)
+        {
+            row = new TelegramSettings(request.BotUsername);
+            await dbContext.TelegramSettings.AddAsync(row, cancellationToken);
+        }
+        else
+        {
+            row.SetBotUsername(request.BotUsername);
+        }
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return Result<TelegramSettingsDto>.Ok(new TelegramSettingsDto(row.BotUsername, row.UpdatedAt), "Saved");
+    }
+}
+
+/// <summary>
+/// Mints a one-time deep-link handoff token for the signed-in user and builds
+/// the Telegram Mini App deep link (t.me/&lt;bot&gt;?startapp=&lt;token&gt;) the panel opens.
+/// </summary>
+public sealed class CreateDeepLinkTokenCommandHandler(
+    IApplicationDbContext dbContext,
+    ICurrentUserService currentUser,
+    IDateTimeProvider dateTimeProvider)
+    : IRequestHandler<CreateDeepLinkTokenCommand, Result<DeepLinkTokenDto>>
+{
+    private static readonly TimeSpan Ttl = TimeSpan.FromMinutes(5);
+
+    public async Task<Result<DeepLinkTokenDto>> Handle(CreateDeepLinkTokenCommand request,
+        CancellationToken cancellationToken)
+    {
+        if (currentUser.UserId is null)
+            return Result<DeepLinkTokenDto>.Fail("UNAUTHENTICATED", "Caller must be authenticated.");
+
+        // URL-safe random token — also valid as a Telegram `startapp` parameter.
+        var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+            .Replace('+', '-').Replace('/', '_').TrimEnd('=');
+        var expiresAt = dateTimeProvider.UtcNow.Add(Ttl);
+
+        await dbContext.TelegramDeepLinkTokens.AddAsync(
+            new TelegramDeepLinkToken(currentUser.UserId.Value, token, expiresAt), cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var botUsername = (await dbContext.TelegramSettings.AsNoTracking()
+            .FirstOrDefaultAsync(cancellationToken))?.BotUsername;
+        var deepLink = string.IsNullOrWhiteSpace(botUsername)
+            ? string.Empty
+            : $"https://t.me/{botUsername}?startapp={token}";
+
+        return Result<DeepLinkTokenDto>.Ok(new DeepLinkTokenDto(token, deepLink, expiresAt));
     }
 }

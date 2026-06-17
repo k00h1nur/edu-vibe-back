@@ -698,3 +698,27 @@ public sealed class TelegramAccountConfiguration : IEntityTypeConfiguration<Tele
             .HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
     }
 }
+
+public sealed class TelegramSettingsConfiguration : IEntityTypeConfiguration<TelegramSettings>
+{
+    public void Configure(EntityTypeBuilder<TelegramSettings> b)
+    {
+        b.ToTable("telegram_settings");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.BotUsername).HasMaxLength(64);
+    }
+}
+
+public sealed class TelegramDeepLinkTokenConfiguration : IEntityTypeConfiguration<TelegramDeepLinkToken>
+{
+    public void Configure(EntityTypeBuilder<TelegramDeepLinkToken> b)
+    {
+        b.ToTable("telegram_deep_link_tokens");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Token).IsRequired().HasMaxLength(128);
+        b.HasIndex(x => x.Token).IsUnique();
+        b.HasIndex(x => x.ExpiresAt);
+        b.HasOne(x => x.User).WithMany()
+            .HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+    }
+}

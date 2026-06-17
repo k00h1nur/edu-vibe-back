@@ -51,9 +51,9 @@ internal sealed class TelegramSenderHostedService : BackgroundService
 
         try
         {
-            await foreach (var text in _notifier.Reader.ReadAllAsync(stoppingToken))
+            await foreach (var message in _notifier.Reader.ReadAllAsync(stoppingToken))
             {
-                await SendWithRetryAsync(text, stoppingToken);
+                await SendWithRetryAsync(message, stoppingToken);
             }
         }
         catch (OperationCanceledException)
@@ -62,12 +62,12 @@ internal sealed class TelegramSenderHostedService : BackgroundService
         }
     }
 
-    private async Task SendWithRetryAsync(string text, CancellationToken ct)
+    private async Task SendWithRetryAsync(TelegramOutbound message, CancellationToken ct)
     {
         var max = Math.Max(1, _options.MaxAttempts);
         for (var attempt = 1; attempt <= max; attempt++)
         {
-            var outcome = await TrySendOnceAsync(text, ct);
+            var outcome = await TrySendOnceAsync(message, ct);
             switch (outcome.Kind)
             {
                 case OutcomeKind.Success:
@@ -90,19 +90,16 @@ internal sealed class TelegramSenderHostedService : BackgroundService
         }
     }
 
-    private async Task<Outcome> TrySendOnceAsync(string text, CancellationToken ct)
+    private async Task<Outcome> TrySendOnceAsync(TelegramOutbound message, CancellationToken ct)
     {
         try
         {
             var http = _httpFactory.CreateClient(HttpClientName);
-            var url = $"{ApiBase}/bot{_options.BotToken}/sendMessage";
-            var payload = new
-            {
-                chat_id = _options.ChatId,
-                text,
-                parse_mode = "MarkdownV2",
-                disable_web_page_preview = true,
-            };
+            var url = $"{ApiBase}/bot{message.BotToken}/sendMessage";
+            // parse_mode is omitted for plain-text DMs (no MarkdownV2 escaping needed).
+            object payload = message.ParseMode is null
+                ? new { chat_id = message.ChatId, text = message.Text, disable_web_page_preview = true }
+                : new { chat_id = message.ChatId, text = message.Text, parse_mode = message.ParseMode, disable_web_page_preview = true };
 
             using var response = await http.PostAsJsonAsync(url, payload, ct);
             if (response.IsSuccessStatusCode) return Outcome.Success;

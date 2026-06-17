@@ -24,7 +24,8 @@ public sealed record TelegramProfileDto(
 /// JWT/refresh pair the email/password login issues, so every downstream
 /// consumer (middleware, panels) treats a Telegram session identically.
 /// </summary>
-public sealed record TelegramAuthCommand(string InitData) : IRequest<Result<AuthTokensResponse>>;
+public sealed record TelegramAuthCommand(string InitData, string? StartToken = null)
+    : IRequest<Result<AuthTokensResponse>>;
 
 /// <summary>
 /// Link the Telegram identity in <paramref name="InitData"/> to the
@@ -39,3 +40,28 @@ public sealed record GetTelegramProfileQuery : IRequest<Result<TelegramProfileDt
 
 /// <summary>Disconnect the current user's Telegram link (idempotent).</summary>
 public sealed record UnlinkTelegramCommand : IRequest<Result>;
+
+// ----- Platform bot settings (singleton) ----------------------------------
+
+/// <summary>Public, safe-to-expose bot settings. Secrets (token, chat id) live in server config.</summary>
+public sealed record TelegramSettingsDto(string? BotUsername, DateTime UpdatedAt);
+
+/// <summary>Reads the singleton bot settings (returns an empty default if unset).</summary>
+public sealed record GetTelegramSettingsQuery : IRequest<Result<TelegramSettingsDto>>;
+
+/// <summary>Admin upsert of the bot @username. Empty/blank clears it.</summary>
+public sealed record UpdateTelegramSettingsCommand(string? BotUsername)
+    : IRequest<Result<TelegramSettingsDto>>;
+
+// ----- Deep-link session handoff ------------------------------------------
+
+/// <summary>The minted handoff token + ready-to-open Telegram Mini App deep link.</summary>
+public sealed record DeepLinkTokenDto(string Token, string DeepLink, DateTime ExpiresAt);
+
+/// <summary>
+/// Mints a short-lived, one-time handoff token for the CURRENT signed-in user
+/// (taken from the JWT). The panel opens the returned <c>DeepLink</c>, and the
+/// Mini App exchanges the token (via <see cref="TelegramAuthCommand.StartToken"/>)
+/// to sign in as that same user.
+/// </summary>
+public sealed record CreateDeepLinkTokenCommand : IRequest<Result<DeepLinkTokenDto>>;

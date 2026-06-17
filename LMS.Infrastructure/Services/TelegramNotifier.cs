@@ -17,9 +17,12 @@ namespace LMS.Infrastructure.Services;
 ///   • Single reader ⇒ no Telegram rate-limit pile-on from concurrent sends.
 ///   • Graceful drain on shutdown via BackgroundService.StopAsync.
 /// </summary>
+/// <summary>One queued Telegram send: which bot, which chat, the text, and how to parse it.</summary>
+internal sealed record TelegramOutbound(string BotToken, string ChatId, string Text, string? ParseMode);
+
 public sealed class TelegramNotifier : ITelegramNotifier
 {
-    private readonly Channel<string> _channel;
+    private readonly Channel<TelegramOutbound> _channel;
     private readonly TelegramOptions _options;
     private readonly ILogger<TelegramNotifier> _logger;
 
@@ -29,7 +32,7 @@ public sealed class TelegramNotifier : ITelegramNotifier
         _logger = logger;
 
         var capacity = _options.QueueCapacity > 0 ? _options.QueueCapacity : 256;
-        _channel = Channel.CreateBounded<string>(new BoundedChannelOptions(capacity)
+        _channel = Channel.CreateBounded<TelegramOutbound>(new BoundedChannelOptions(capacity)
         {
             // Drop the oldest queued payload when full — staleness beats memory pressure
             // for non-critical chat notifications.
@@ -41,24 +44,41 @@ public sealed class TelegramNotifier : ITelegramNotifier
         if (!_options.IsEnabled)
         {
             _logger.LogInformation(
-                "Telegram notifier disabled — set Telegram:BotToken and Telegram:ChatId to enable.");
+                "Telegram notifier disabled — set Telegram:BotToken (DMs) and/or " +
+                "Telegram:ManagerBotToken + Telegram:ChatId (group) to enable.");
         }
     }
 
     /// <summary>Consumed by <see cref="TelegramSenderHostedService"/>; not part of the public API.</summary>
-    internal ChannelReader<string> Reader => _channel.Reader;
+    internal ChannelReader<TelegramOutbound> Reader => _channel.Reader;
 
     public Task<bool> SendAsync(string markdownText, CancellationToken cancellationToken = default)
     {
-        if (!_options.IsEnabled) return Task.FromResult(false);
+        // Group / marketing notice via the manager bot (MarkdownV2, as before).
+        if (!_options.GroupEnabled) return Task.FromResult(false);
         if (string.IsNullOrWhiteSpace(markdownText)) return Task.FromResult(false);
+        return Task.FromResult(Enqueue(
+            new TelegramOutbound(_options.GroupBotToken!, _options.ChatId!, markdownText, "MarkdownV2")));
+    }
 
-        if (_channel.Writer.TryWrite(markdownText)) return Task.FromResult(true);
+    public Task<bool> SendToUserAsync(long telegramUserId, string text, CancellationToken cancellationToken = default)
+    {
+        // Direct message to a student via the platform bot. Plain text (no
+        // parse_mode) so we don't have to MarkdownV2-escape user/lesson content.
+        if (!_options.DmEnabled) return Task.FromResult(false);
+        if (string.IsNullOrWhiteSpace(text) || telegramUserId <= 0) return Task.FromResult(false);
+        return Task.FromResult(Enqueue(
+            new TelegramOutbound(_options.BotToken!, telegramUserId.ToString(), text, ParseMode: null)));
+    }
+
+    private bool Enqueue(TelegramOutbound message)
+    {
+        if (_channel.Writer.TryWrite(message)) return true;
 
         // BoundedChannelFullMode.DropOldest guarantees TryWrite always succeeds while
         // the channel is open, so reaching here means the channel was completed
         // (i.e. the host is shutting down). Log quietly and drop.
         _logger.LogWarning("Telegram queue closed — message dropped.");
-        return Task.FromResult(false);
+        return false;
     }
 }
