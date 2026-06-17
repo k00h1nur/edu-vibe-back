@@ -237,6 +237,7 @@ public sealed class AssignmentConfiguration : IEntityTypeConfiguration<Assignmen
         b.ToTable("assignments");
         b.HasKey(x => x.Id);
         b.Property(x => x.Title).IsRequired().HasMaxLength(256);
+        b.Property(x => x.Description).HasMaxLength(4000);
     }
 }
 
@@ -664,5 +665,36 @@ public sealed class MarketingVideoConfiguration : IEntityTypeConfiguration<Marke
         b.Property(x => x.VideoUrl).IsRequired().HasMaxLength(1024);
         b.Property(x => x.ThumbnailUrl).HasMaxLength(1024);
         b.HasIndex(x => new { x.IsActive, x.SortOrder });
+    }
+}
+
+public sealed class MockTestSlotConfiguration : IEntityTypeConfiguration<MockTestSlot>
+{
+    public void Configure(EntityTypeBuilder<MockTestSlot> b)
+    {
+        b.ToTable("mock_test_slots");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Title).IsRequired().HasMaxLength(256);
+        b.Property(x => x.DurationText).HasMaxLength(64);
+        // Public list filters by IsActive + future StartsAt, ordered by StartsAt.
+        b.HasIndex(x => new { x.IsActive, x.StartsAt });
+    }
+}
+
+public sealed class TelegramAccountConfiguration : IEntityTypeConfiguration<TelegramAccount>
+{
+    public void Configure(EntityTypeBuilder<TelegramAccount> b)
+    {
+        b.ToTable("telegram_accounts");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Username).HasMaxLength(64);
+        b.Property(x => x.FirstName).HasMaxLength(128);
+        b.Property(x => x.LastName).HasMaxLength(128);
+        b.Property(x => x.PhotoUrl).HasMaxLength(1024);
+        // One Telegram identity ↔ one platform user.
+        b.HasIndex(x => x.TelegramUserId).IsUnique();
+        b.HasIndex(x => x.UserId).IsUnique();
+        b.HasOne(x => x.User).WithMany()
+            .HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
     }
 }

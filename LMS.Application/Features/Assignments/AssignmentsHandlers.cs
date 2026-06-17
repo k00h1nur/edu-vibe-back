@@ -37,6 +37,7 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db) :
         var a = new Assignment(request.ClassId, request.Title, t);
         if (request.DueDate.HasValue)
             a.SetDueDate(DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Utc));
+        a.SetDescription(request.Description);
         await db.Assignments.AddAsync(a, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return Result<AssignmentDto>.Ok(Map(a));
@@ -47,7 +48,7 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db) :
     {
         return Result<IReadOnlyCollection<AssignmentDto>>.Ok(await db.Assignments
             .Where(x => x.ClassId == request.ClassId)
-            .Select(a => new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId, a.DueDate))
+            .Select(a => new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId, a.DueDate, a.Description))
             .ToListAsync(cancellationToken));
     }
 
@@ -70,7 +71,7 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db) :
                 !db.AssignmentAssignees.Any(aa => aa.AssignmentId == a.Id) ||
                 db.AssignmentAssignees.Any(aa =>
                     aa.AssignmentId == a.Id && aa.StudentProfileId == request.StudentProfileId))
-            .Select(a => new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId, a.DueDate))
+            .Select(a => new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId, a.DueDate, a.Description))
             .ToListAsync(cancellationToken);
 
         return Result<IReadOnlyCollection<AssignmentDto>>.Ok(data);
@@ -95,6 +96,7 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db) :
         a.SetDueDate(request.DueDate.HasValue
             ? DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Utc)
             : null);
+        a.SetDescription(request.Description);
         await db.SaveChangesAsync(cancellationToken);
         return Result<AssignmentDto>.Ok(Map(a));
     }
@@ -112,7 +114,7 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db) :
 
         var data = await q
             .OrderByDescending(x => x.CreatedAt)
-            .Select(a => new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId, a.DueDate))
+            .Select(a => new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId, a.DueDate, a.Description))
             .ToListAsync(cancellationToken);
         return Result<IReadOnlyCollection<AssignmentDto>>.Ok(data);
     }
@@ -216,6 +218,6 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db) :
 
     private static AssignmentDto Map(Assignment a)
     {
-        return new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId, a.DueDate);
+        return new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId, a.DueDate, a.Description);
     }
 }

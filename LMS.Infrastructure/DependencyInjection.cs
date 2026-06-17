@@ -66,6 +66,7 @@ public static class DependencyInjection
         services.AddSingleton<TelegramNotifier>();
         services.AddSingleton<ITelegramNotifier>(sp => sp.GetRequiredService<TelegramNotifier>());
         services.AddHostedService<TelegramSenderHostedService>();
+        services.AddSingleton<ITelegramInitDataValidator, TelegramInitDataValidator>();
 
         services.AddSingleton<ITaskGrader, TaskGrader>();
         services.AddSingleton<IAvatarFileStore, LocalAvatarFileStore>();

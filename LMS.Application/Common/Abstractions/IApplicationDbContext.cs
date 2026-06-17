@@ -52,5 +52,7 @@ public interface IApplicationDbContext
     DbSet<Announcement> Announcements { get; }
     DbSet<MarketingCourse> MarketingCourses { get; }
     DbSet<MarketingVideo> MarketingVideos { get; }
+    DbSet<MockTestSlot> MockTestSlots { get; }
+    DbSet<TelegramAccount> TelegramAccounts { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }
