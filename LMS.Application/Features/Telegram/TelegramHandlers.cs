@@ -287,38 +287,17 @@ public sealed class UnlinkTelegramCommandHandler(
 }
 
 /// <summary>
-/// Bot-settings singleton: Get returns the one row (or an empty default so the
-/// frontend never 404s), Update upserts it. Mirrors the OfficeInfo pattern.
+/// Reads the public bot settings (bot @username + Mini App URL) straight from
+/// server config. The bot is fixed by the operator (appsettings / env) — admins
+/// cannot change it from the UI — so there is no DB row and no upsert.
 /// </summary>
-public sealed class TelegramSettingsHandlers(IApplicationDbContext dbContext) :
-    IRequestHandler<GetTelegramSettingsQuery, Result<TelegramSettingsDto>>,
-    IRequestHandler<UpdateTelegramSettingsCommand, Result<TelegramSettingsDto>>
+public sealed class TelegramSettingsHandlers(ITelegramConfig config, IDateTimeProvider clock) :
+    IRequestHandler<GetTelegramSettingsQuery, Result<TelegramSettingsDto>>
 {
-    public async Task<Result<TelegramSettingsDto>> Handle(GetTelegramSettingsQuery request,
-        CancellationToken cancellationToken)
-    {
-        var row = await dbContext.TelegramSettings.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
-        return Result<TelegramSettingsDto>.Ok(row is null
-            ? new TelegramSettingsDto(null, DateTime.UtcNow)
-            : new TelegramSettingsDto(row.BotUsername, row.UpdatedAt));
-    }
-
-    public async Task<Result<TelegramSettingsDto>> Handle(UpdateTelegramSettingsCommand request,
-        CancellationToken cancellationToken)
-    {
-        var row = await dbContext.TelegramSettings.FirstOrDefaultAsync(cancellationToken);
-        if (row is null)
-        {
-            row = new TelegramSettings(request.BotUsername);
-            await dbContext.TelegramSettings.AddAsync(row, cancellationToken);
-        }
-        else
-        {
-            row.SetBotUsername(request.BotUsername);
-        }
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return Result<TelegramSettingsDto>.Ok(new TelegramSettingsDto(row.BotUsername, row.UpdatedAt), "Saved");
-    }
+    public Task<Result<TelegramSettingsDto>> Handle(GetTelegramSettingsQuery request,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(Result<TelegramSettingsDto>.Ok(
+            new TelegramSettingsDto(config.BotUsername, config.MiniAppUrl, clock.UtcNow)));
 }
 
 /// <summary>
@@ -328,7 +307,8 @@ public sealed class TelegramSettingsHandlers(IApplicationDbContext dbContext) :
 public sealed class CreateDeepLinkTokenCommandHandler(
     IApplicationDbContext dbContext,
     ICurrentUserService currentUser,
-    IDateTimeProvider dateTimeProvider)
+    IDateTimeProvider dateTimeProvider,
+    ITelegramConfig config)
     : IRequestHandler<CreateDeepLinkTokenCommand, Result<DeepLinkTokenDto>>
 {
     private static readonly TimeSpan Ttl = TimeSpan.FromMinutes(5);
@@ -348,8 +328,7 @@ public sealed class CreateDeepLinkTokenCommandHandler(
             new TelegramDeepLinkToken(currentUser.UserId.Value, token, expiresAt), cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        var botUsername = (await dbContext.TelegramSettings.AsNoTracking()
-            .FirstOrDefaultAsync(cancellationToken))?.BotUsername;
+        var botUsername = config.BotUsername;
         var deepLink = string.IsNullOrWhiteSpace(botUsername)
             ? string.Empty
             : $"https://t.me/{botUsername}?startapp={token}";

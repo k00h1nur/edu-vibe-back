@@ -43,15 +43,15 @@ public sealed record UnlinkTelegramCommand : IRequest<Result>;
 
 // ----- Platform bot settings (singleton) ----------------------------------
 
-/// <summary>Public, safe-to-expose bot settings. Secrets (token, chat id) live in server config.</summary>
-public sealed record TelegramSettingsDto(string? BotUsername, DateTime UpdatedAt);
+/// <summary>
+/// Public, safe-to-expose bot settings sourced from server config (the bot is
+/// fixed by the operator — not editable from the admin UI). Secrets (token,
+/// chat id) stay server-side.
+/// </summary>
+public sealed record TelegramSettingsDto(string? BotUsername, string? MiniAppUrl, DateTime UpdatedAt);
 
-/// <summary>Reads the singleton bot settings (returns an empty default if unset).</summary>
+/// <summary>Reads the configured bot settings (bot @username + Mini App URL) from server config.</summary>
 public sealed record GetTelegramSettingsQuery : IRequest<Result<TelegramSettingsDto>>;
-
-/// <summary>Admin upsert of the bot @username. Empty/blank clears it.</summary>
-public sealed record UpdateTelegramSettingsCommand(string? BotUsername)
-    : IRequest<Result<TelegramSettingsDto>>;
 
 // ----- Deep-link session handoff ------------------------------------------
 

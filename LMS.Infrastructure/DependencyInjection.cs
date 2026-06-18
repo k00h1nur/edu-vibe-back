@@ -66,6 +66,12 @@ public static class DependencyInjection
         services.AddSingleton<TelegramNotifier>();
         services.AddSingleton<ITelegramNotifier>(sp => sp.GetRequiredService<TelegramNotifier>());
         services.AddHostedService<TelegramSenderHostedService>();
+        // Read-only bot config (username + Mini App URL) for the Application layer,
+        // sourced from TelegramOptions — the bot is fixed by the operator, not the DB.
+        services.AddSingleton<ITelegramConfig, TelegramConfig>();
+        // On boot, point the bot's default menu button at the production Mini App
+        // ({MiniAppUrl}/tg) via setChatMenuButton — no @BotFather step needed.
+        services.AddHostedService<TelegramMenuButtonHostedService>();
         services.AddSingleton<ITelegramInitDataValidator, TelegramInitDataValidator>();
         // Universal per-user notifier: resolves a user → their linked Telegram
         // and DMs via the platform bot. Scoped (depends on the scoped DbContext).
