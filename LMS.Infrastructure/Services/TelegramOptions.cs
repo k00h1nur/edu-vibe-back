@@ -27,6 +27,20 @@ public sealed class TelegramOptions
     public string? ChatId { get; init; }
 
     /// <summary>
+    /// Public bot @username (with or without the leading @), e.g. "platform_eduvibeBot".
+    /// Surfaced to the panels so "Open in Telegram" / deep links target the right bot.
+    /// Set in server config only — admins can no longer change the bot from the UI.
+    /// </summary>
+    public string? BotUsername { get; init; }
+
+    /// <summary>
+    /// Production Mini App base URL (e.g. https://admin.edu-vibe.uz). Used to register
+    /// the bot's default menu button (the Mini App launcher) on startup and as the
+    /// canonical origin for the deep-link handoff. Must be https for Telegram to accept it.
+    /// </summary>
+    public string? MiniAppUrl { get; init; }
+
+    /// <summary>
     /// Bounded in-memory queue depth. New writes drop the oldest message when
     /// full so a Telegram outage can never block the API thread or balloon
     /// memory. Default 256 ≈ a few minutes of normal traffic.

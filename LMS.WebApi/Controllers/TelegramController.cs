@@ -1,8 +1,6 @@
-using LMS.Application.Common.Security;
 using LMS.Application.Features.Auth;
 using LMS.Application.Features.Telegram;
 using LMS.WebApi.Common;
-using LMS.WebApi.Security;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -89,27 +87,15 @@ public sealed class TelegramController(ISender sender) : ControllerBase
     // ----- Platform bot settings ------------------------------------------
 
     /// <summary>
-    /// Public bot settings (just the @username) so any panel can build the
-    /// "Open in Telegram" deep link. Anonymous — the username isn't a secret.
+    /// Public bot settings (bot @username + Mini App URL) so any panel can build
+    /// the "Open in Telegram" deep link. Sourced from server config — the bot is
+    /// fixed by the operator and cannot be changed from the UI (no upsert). Anonymous.
     /// </summary>
     [HttpGet("settings")]
     [AllowAnonymous]
     public async Task<ActionResult<ApiResponse<TelegramSettingsDto>>> GetSettings(CancellationToken cancellationToken)
     {
         var result = await sender.Send(new GetTelegramSettingsQuery(), cancellationToken);
-        return Ok(ApiResponse<TelegramSettingsDto>.Ok(result.Data, result.Message));
-    }
-
-    /// <summary>Admin upsert of the bot @username. Reuses the OfficeInfo.Manage permission.</summary>
-    [HttpPut("settings")]
-    [Authorize]
-    [PermissionAuthorize(Permissions.OfficeInfo.Manage)]
-    public async Task<ActionResult<ApiResponse<TelegramSettingsDto>>> UpdateSettings(
-        [FromBody] UpdateTelegramSettingsCommand command, CancellationToken cancellationToken)
-    {
-        var result = await sender.Send(command, cancellationToken);
-        if (!result.Success)
-            return BadRequest(ApiResponse<TelegramSettingsDto>.Fail(result.Message ?? "Failed to save settings"));
         return Ok(ApiResponse<TelegramSettingsDto>.Ok(result.Data, result.Message));
     }
 }
