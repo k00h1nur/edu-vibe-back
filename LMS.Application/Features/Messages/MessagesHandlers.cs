@@ -8,7 +8,8 @@ namespace LMS.Application.Features.Messages;
 
 public sealed class MessagesHandlers(
     IApplicationDbContext db,
-    ICurrentUserService currentUser) :
+    ICurrentUserService currentUser,
+    INotificationService notifications) :
     IRequestHandler<SendMessageCommand, Result<MessageDto>>,
     IRequestHandler<GetConversationMessagesQuery, Result<IReadOnlyCollection<MessageDto>>>,
     IRequestHandler<MarkMessageAsReadCommand, Result<MessageDto>>,
@@ -101,6 +102,17 @@ public sealed class MessagesHandlers(
         var m = new Message(request.ConversationId, callerId.Value, request.Text);
         await db.Messages.AddAsync(m, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+
+        // Telegram DM the other participant(s) — works for any role (student,
+        // teacher, staff), since everyone signs in through the platform bot.
+        var recipientIds = await db.ConversationParticipants
+            .Where(p => p.ConversationId == request.ConversationId && p.UserId != callerId.Value)
+            .Select(p => p.UserId)
+            .ToListAsync(cancellationToken);
+        var preview = request.Text.Length > 140 ? request.Text[..140] + "…" : request.Text;
+        await notifications.NotifyUsersAsync(
+            recipientIds, $"💬 New message on EduVibe:\n{preview}", cancellationToken);
+
         return Result<MessageDto>.Ok(Map(m));
     }
 

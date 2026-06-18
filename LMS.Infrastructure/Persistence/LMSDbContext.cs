@@ -57,6 +57,10 @@ public sealed class LMSDbContext : DbContext, IApplicationDbContext
     public DbSet<Announcement> Announcements => Set<Announcement>();
     public DbSet<MarketingCourse> MarketingCourses => Set<MarketingCourse>();
     public DbSet<MarketingVideo> MarketingVideos => Set<MarketingVideo>();
+    public DbSet<MockTestSlot> MockTestSlots => Set<MockTestSlot>();
+    public DbSet<TelegramAccount> TelegramAccounts => Set<TelegramAccount>();
+    public DbSet<TelegramSettings> TelegramSettings => Set<TelegramSettings>();
+    public DbSet<TelegramDeepLinkToken> TelegramDeepLinkTokens => Set<TelegramDeepLinkToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

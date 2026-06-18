@@ -6,7 +6,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LMS.Application.Features.Assignments;
 
-public sealed class AssignmentsHandlers(IApplicationDbContext db) :
+public sealed class AssignmentsHandlers(
+    IApplicationDbContext db, ITelegramNotifier notifier, ICurrentUserService currentUser) :
     IRequestHandler<CreateAssignmentCommand, Result<AssignmentDto>>,
     IRequestHandler<UpdateAssignmentCommand, Result<AssignmentDto>>,
     IRequestHandler<PublishAssignmentCommand, Result<AssignmentDto>>,
@@ -37,6 +38,7 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db) :
         var a = new Assignment(request.ClassId, request.Title, t);
         if (request.DueDate.HasValue)
             a.SetDueDate(DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Utc));
+        a.SetDescription(request.Description);
         await db.Assignments.AddAsync(a, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return Result<AssignmentDto>.Ok(Map(a));
@@ -47,13 +49,22 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db) :
     {
         return Result<IReadOnlyCollection<AssignmentDto>>.Ok(await db.Assignments
             .Where(x => x.ClassId == request.ClassId)
-            .Select(a => new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId, a.DueDate))
+            .Select(a => new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId, a.DueDate, a.Description))
             .ToListAsync(cancellationToken));
     }
 
     public async Task<Result<IReadOnlyCollection<AssignmentDto>>> Handle(GetStudentAssignmentsQuery request,
         CancellationToken cancellationToken)
     {
+        // SECURITY: a student caller may only read their OWN assignments. Staff
+        // (StaffProfileId present) can read any student's for teaching workflows.
+        if (currentUser.StaffProfileId is null &&
+            (currentUser.StudentProfileId is null || currentUser.StudentProfileId != request.StudentProfileId))
+        {
+            return Result<IReadOnlyCollection<AssignmentDto>>.Fail(
+                "FORBIDDEN", "You can only view your own assignments.");
+        }
+
         var enrolledClassIds = await db.Enrollments
             .Where(x => x.StudentProfileId == request.StudentProfileId)
             .Select(x => x.ClassId)
@@ -70,7 +81,7 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db) :
                 !db.AssignmentAssignees.Any(aa => aa.AssignmentId == a.Id) ||
                 db.AssignmentAssignees.Any(aa =>
                     aa.AssignmentId == a.Id && aa.StudentProfileId == request.StudentProfileId))
-            .Select(a => new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId, a.DueDate))
+            .Select(a => new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId, a.DueDate, a.Description))
             .ToListAsync(cancellationToken);
 
         return Result<IReadOnlyCollection<AssignmentDto>>.Ok(data);
@@ -83,7 +94,43 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db) :
         if (a is null) return Result<AssignmentDto>.Fail("NOT_FOUND", "Assignment not found.");
         a.Publish();
         await db.SaveChangesAsync(cancellationToken);
+        await NotifyTargetedStudentsAsync(a, cancellationToken);
         return Result<AssignmentDto>.Ok(Map(a));
+    }
+
+    /// <summary>
+    /// Fire-and-forget Telegram DM to the students this assignment targets
+    /// (its explicit assignees, or the whole class when none are set) who have
+    /// linked their Telegram. Sent via the platform bot. Never throws — the
+    /// notifier swallows failures, so publishing always succeeds.
+    /// </summary>
+    private async Task NotifyTargetedStudentsAsync(Assignment a, CancellationToken ct)
+    {
+        var assigneeIds = await db.AssignmentAssignees
+            .Where(x => x.AssignmentId == a.Id).Select(x => x.StudentProfileId).ToListAsync(ct);
+        var profileIds = assigneeIds.Count > 0
+            ? assigneeIds
+            : await db.Enrollments.Where(e => e.ClassId == a.ClassId)
+                .Select(e => e.StudentProfileId).ToListAsync(ct);
+        if (profileIds.Count == 0) return;
+
+        var userIds = await db.StudentProfiles
+            .Where(s => profileIds.Contains(s.Id)).Select(s => s.UserId).ToListAsync(ct);
+        var telegramIds = await db.TelegramAccounts
+            .Where(t => userIds.Contains(t.UserId)).Select(t => t.TelegramUserId).ToListAsync(ct);
+        if (telegramIds.Count == 0) return;
+
+        var className = await db.Classes
+            .Where(c => c.Id == a.ClassId).Select(c => c.Title).FirstOrDefaultAsync(ct);
+        var due = a.DueDate is { } d ? $"\nDue: {d:yyyy-MM-dd HH:mm} UTC" : "";
+        var text =
+            $"📚 New assignment: {a.Title}" +
+            (string.IsNullOrWhiteSpace(className) ? "" : $"\nClass: {className}") +
+            due +
+            "\n\nOpen EduVibe to view it.";
+
+        foreach (var telegramId in telegramIds)
+            await notifier.SendToUserAsync(telegramId, text, ct);
     }
 
     public async Task<Result<AssignmentDto>> Handle(UpdateAssignmentCommand request,
@@ -95,6 +142,7 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db) :
         a.SetDueDate(request.DueDate.HasValue
             ? DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Utc)
             : null);
+        a.SetDescription(request.Description);
         await db.SaveChangesAsync(cancellationToken);
         return Result<AssignmentDto>.Ok(Map(a));
     }
@@ -112,7 +160,7 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db) :
 
         var data = await q
             .OrderByDescending(x => x.CreatedAt)
-            .Select(a => new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId, a.DueDate))
+            .Select(a => new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId, a.DueDate, a.Description))
             .ToListAsync(cancellationToken);
         return Result<IReadOnlyCollection<AssignmentDto>>.Ok(data);
     }
@@ -216,6 +264,6 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db) :
 
     private static AssignmentDto Map(Assignment a)
     {
-        return new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId, a.DueDate);
+        return new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId, a.DueDate, a.Description);
     }
 }

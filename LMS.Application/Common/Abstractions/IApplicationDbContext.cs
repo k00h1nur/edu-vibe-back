@@ -52,5 +52,9 @@ public interface IApplicationDbContext
     DbSet<Announcement> Announcements { get; }
     DbSet<MarketingCourse> MarketingCourses { get; }
     DbSet<MarketingVideo> MarketingVideos { get; }
+    DbSet<MockTestSlot> MockTestSlots { get; }
+    DbSet<TelegramAccount> TelegramAccounts { get; }
+    DbSet<TelegramSettings> TelegramSettings { get; }
+    DbSet<TelegramDeepLinkToken> TelegramDeepLinkTokens { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }

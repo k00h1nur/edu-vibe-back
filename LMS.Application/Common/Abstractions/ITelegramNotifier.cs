@@ -10,10 +10,18 @@ namespace LMS.Application.Common.Abstractions;
 public interface ITelegramNotifier
 {
     /// <summary>
-    /// Queue <paramref name="markdownText"/> for delivery. The bool reports
-    /// whether the message was accepted into the queue (<c>false</c> means
-    /// notifier disabled by config, text is blank, or the queue is full).
-    /// <b>Never throws.</b>
+    /// Queue <paramref name="markdownText"/> for delivery to the academy's staff /
+    /// marketing group (via the manager bot). The bool reports whether the message
+    /// was accepted into the queue (<c>false</c> means group notifier disabled by
+    /// config, text is blank, or the queue is full). <b>Never throws.</b>
     /// </summary>
     Task<bool> SendAsync(string markdownText, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Queue a plain-text direct message to a single Telegram user (by their
+    /// Telegram user id) via the platform bot — the only bot that may DM students,
+    /// since it's the one they signed in with. No-op (returns <c>false</c>) when
+    /// the platform bot token isn't configured. <b>Never throws.</b>
+    /// </summary>
+    Task<bool> SendToUserAsync(long telegramUserId, string text, CancellationToken cancellationToken = default);
 }

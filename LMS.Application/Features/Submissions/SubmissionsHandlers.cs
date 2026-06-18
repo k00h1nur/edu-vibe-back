@@ -6,7 +6,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LMS.Application.Features.Submissions;
 
-public sealed class SubmissionsHandlers(IApplicationDbContext db, ICurrentUserService currentUser) :
+public sealed class SubmissionsHandlers(
+    IApplicationDbContext db, ICurrentUserService currentUser, INotificationService notifications) :
     IRequestHandler<SubmitAssignmentCommand, Result<SubmissionDto>>,
     IRequestHandler<GradeSubmissionCommand, Result<SubmissionDto>>,
     IRequestHandler<GetAssignmentSubmissionsQuery, Result<IReadOnlyCollection<SubmissionDto>>>,
@@ -74,6 +75,18 @@ public sealed class SubmissionsHandlers(IApplicationDbContext db, ICurrentUserSe
         s.Grade(request.Score);
         db.SubmissionAudits.Add(new SubmissionAudit(s.Id, currentUser.UserId, "graded", $"score={request.Score}"));
         await db.SaveChangesAsync(cancellationToken);
+
+        // Telegram DM the student (via the platform bot) that their work is graded.
+        var studentUserId = await db.StudentProfiles
+            .Where(sp => sp.Id == s.StudentProfileId)
+            .Select(sp => sp.UserId)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (studentUserId != Guid.Empty)
+            await notifications.NotifyUserAsync(
+                studentUserId,
+                $"✅ Your submission was graded: {request.Score}.\nOpen EduVibe to see feedback.",
+                cancellationToken);
+
         return Result<SubmissionDto>.Ok(Map(s));
     }
 

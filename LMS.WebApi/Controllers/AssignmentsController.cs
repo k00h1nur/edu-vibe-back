@@ -42,6 +42,9 @@ public sealed class AssignmentsController(ISender sender) : ControllerBase
         CancellationToken ct)
     {
         var r = await sender.Send(new GetStudentAssignmentsQuery(studentProfileId), ct);
+        if (!r.Success)
+            return StatusCode(StatusCodes.Status403Forbidden,
+                ApiResponse<IReadOnlyCollection<AssignmentDto>>.Fail(r.Message ?? "Forbidden"));
         return Ok(ApiResponse<IReadOnlyCollection<AssignmentDto>>.Ok(r.Data, r.Message));
     }
 

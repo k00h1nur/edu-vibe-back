@@ -24,8 +24,13 @@ public sealed class RegisterUserCommandHandler(
         if (await dbContext.Users.AnyAsync(x => x.Email == email, cancellationToken))
             return Result<AuthTokensResponse>.Fail("EMAIL_EXISTS", "Email already exists.");
 
-        var role = await dbContext.Roles.FirstOrDefaultAsync(x => x.Code == request.RoleCode, cancellationToken);
-        if (role is null) return Result<AuthTokensResponse>.Fail("ROLE_NOT_FOUND", "Role does not exist.");
+        // SECURITY: public self-registration ALWAYS creates a Student, never an
+        // elevated role. The requested RoleCode is deliberately ignored — without
+        // this, an anonymous caller could POST roleCode="admin"/"superadmin" and
+        // mint themselves a privileged token. Staff/admin accounts are created
+        // only through the authenticated, anti-escalation AssignRole path.
+        var role = await dbContext.Roles.FirstOrDefaultAsync(x => x.Code == RoleCodes.Student, cancellationToken);
+        if (role is null) return Result<AuthTokensResponse>.Fail("ROLE_NOT_FOUND", "Student role is not configured.");
 
         var user = new User(email, passwordHasher.Hash(request.Password));
         await dbContext.Users.AddAsync(user, cancellationToken);

@@ -44,6 +44,9 @@ public sealed class TaskSubmissionsController(ISender sender) : ControllerBase
         Guid taskId, CancellationToken ct)
     {
         var r = await sender.Send(new GetTaskSubmissionsByTaskQuery(taskId), ct);
+        if (!r.Success)
+            return StatusCode(StatusCodes.Status403Forbidden,
+                ApiResponse<IReadOnlyCollection<TaskSubmissionDto>>.Fail(r.Message ?? "Forbidden"));
         return Ok(ApiResponse<IReadOnlyCollection<TaskSubmissionDto>>.Ok(r.Data, r.Message));
     }
 

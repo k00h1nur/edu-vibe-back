@@ -9,10 +9,21 @@ public sealed class TelegramOptions
 {
     public const string SectionName = "Telegram";
 
-    /// <summary>Bot token from @BotFather. Empty disables the notifier.</summary>
+    /// <summary>
+    /// Platform bot token (@platform_eduvibeBot) from @BotFather. Used for Mini App
+    /// initData verification AND for direct messages to students (the bot they
+    /// signed in with — the only bot allowed to DM them).
+    /// </summary>
     public string? BotToken { get; init; }
 
-    /// <summary>Target chat id (negative for groups/channels). Empty disables the notifier.</summary>
+    /// <summary>
+    /// Manager bot token (@eduvibe_manager_bot) — used for marketing + the staff/admin
+    /// group notifications (the <see cref="ChatId"/> group). Falls back to
+    /// <see cref="BotToken"/> when unset so existing group notifications keep working.
+    /// </summary>
+    public string? ManagerBotToken { get; init; }
+
+    /// <summary>Target chat id (negative for groups/channels) for staff/marketing notices.</summary>
     public string? ChatId { get; init; }
 
     /// <summary>
@@ -31,6 +42,17 @@ public sealed class TelegramOptions
     /// <summary>Base delay for exponential backoff between retries, milliseconds.</summary>
     public int BaseBackoffMilliseconds { get; init; } = 250;
 
-    public bool IsEnabled =>
-        !string.IsNullOrWhiteSpace(BotToken) && !string.IsNullOrWhiteSpace(ChatId);
+    /// <summary>Token used for the staff/marketing group: the manager bot, or the platform bot as fallback.</summary>
+    public string? GroupBotToken =>
+        !string.IsNullOrWhiteSpace(ManagerBotToken) ? ManagerBotToken : BotToken;
+
+    /// <summary>Group/marketing notifications can be sent (a group token + a chat id are set).</summary>
+    public bool GroupEnabled =>
+        !string.IsNullOrWhiteSpace(GroupBotToken) && !string.IsNullOrWhiteSpace(ChatId);
+
+    /// <summary>Direct messages to users can be sent (the platform bot token is set).</summary>
+    public bool DmEnabled => !string.IsNullOrWhiteSpace(BotToken);
+
+    /// <summary>True when the sender worker has anything it could deliver.</summary>
+    public bool IsEnabled => GroupEnabled || DmEnabled;
 }

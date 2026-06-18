@@ -33,6 +33,13 @@ public sealed class Assignment : BaseEntity
     // path will populate this — the public ctor always sets it before the
     // entity is observable.
     public string Title { get; private set; } = null!;
+
+    /// <summary>
+    /// Optional instructions/description shown to students alongside the title.
+    /// Null or empty = title-only assignment. Capped at 4000 chars.
+    /// </summary>
+    public string? Description { get; private set; }
+
     public AssignmentStatus Status { get; private set; }
 
     /// <summary>
@@ -65,6 +72,16 @@ public sealed class Assignment : BaseEntity
     {
         if (string.IsNullOrWhiteSpace(title)) throw new DomainException("Assignment title is required.");
         Title = title.Trim();
+        Touch();
+    }
+
+    /// <summary>Sets or clears the instructions. Trims; null/blank clears it.</summary>
+    public void SetDescription(string? description)
+    {
+        var trimmed = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+        if (trimmed is { Length: > 4000 })
+            throw new DomainException("Assignment description must be 4000 characters or fewer.");
+        Description = trimmed;
         Touch();
     }
 

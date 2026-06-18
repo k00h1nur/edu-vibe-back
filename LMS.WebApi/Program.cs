@@ -43,6 +43,10 @@ builder.Services.AddHostedService<DatabaseInitializerHostedService>();
 builder.Services.AddHostedService<PermissionDiscoveryHostedService>();
 builder.Services.AddHostedService<RolePermissionSeederHostedService>();
 builder.Services.AddHostedService<DemoUsersSeederHostedService>();
+// Marketing reference data — both idempotent (seed only when their table is
+// empty), so admin edits are never overwritten.
+builder.Services.AddHostedService<MarketingCoursesSeederHostedService>();
+builder.Services.AddHostedService<MockTestSlotsSeederHostedService>();
 
 // ---- CORS -----------------------------------------------------------------
 // Browser clients (marketing site at :5173, LMS admin at :3000) need the API
