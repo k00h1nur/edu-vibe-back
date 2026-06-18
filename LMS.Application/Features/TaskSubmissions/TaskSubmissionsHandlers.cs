@@ -73,6 +73,13 @@ public sealed class TaskSubmissionsHandlers(
     public async Task<Result<IReadOnlyCollection<TaskSubmissionDto>>> Handle(
         GetTaskSubmissionsByTaskQuery request, CancellationToken cancellationToken)
     {
+        // SECURITY: this returns EVERY student's submission for the task (the
+        // teacher grading view). Staff only — a student must use the self-scoped
+        // GetMyTaskSubmissionsByAssignmentQuery, or they could read peers' answers.
+        if (currentUser.StaffProfileId is null)
+            return Result<IReadOnlyCollection<TaskSubmissionDto>>.Fail(
+                "FORBIDDEN", "Only staff may read all submissions for a task.");
+
         var items = await db.TaskSubmissions
             .Where(s => s.TaskId == request.TaskId)
             .OrderByDescending(s => s.CreatedAt)

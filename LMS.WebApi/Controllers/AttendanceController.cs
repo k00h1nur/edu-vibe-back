@@ -34,6 +34,9 @@ public sealed class AttendanceController(ISender sender) : ControllerBase
         CancellationToken ct)
     {
         var r = await sender.Send(new GetSessionAttendanceQuery(sessionId), ct);
+        if (!r.Success)
+            return StatusCode(StatusCodes.Status403Forbidden,
+                ApiResponse<IReadOnlyCollection<AttendanceDto>>.Fail(r.Message ?? "Forbidden"));
         return Ok(ApiResponse<IReadOnlyCollection<AttendanceDto>>.Ok(r.Data, r.Message));
     }
 

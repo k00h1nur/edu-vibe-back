@@ -21,9 +21,25 @@ public sealed class AttendanceHandlers(IApplicationDbContext db, ICurrentUserSer
 
     private bool CallerIsStaff() => StaffRoles.Any(currentUser.IsInRole);
 
+    /// <summary>Resolves the caller's own student profile id from the JWT claim, falling back to a UserId lookup.</summary>
+    private async Task<Guid?> ResolveOwnProfileIdAsync(CancellationToken ct)
+    {
+        var id = currentUser.StudentProfileId;
+        if (id is null && currentUser.UserId is { } uid)
+            id = await db.StudentProfiles.Where(sp => sp.UserId == uid)
+                .Select(sp => (Guid?)sp.Id).FirstOrDefaultAsync(ct);
+        return id;
+    }
+
     public async Task<Result<IReadOnlyCollection<AttendanceDto>>> Handle(GetSessionAttendanceQuery request,
         CancellationToken cancellationToken)
     {
+        // The whole session roster is staff-only — students hold Attendance.Read
+        // for their OWN history, not to enumerate a session's attendees.
+        if (!CallerIsStaff())
+            return Result<IReadOnlyCollection<AttendanceDto>>.Fail(
+                "FORBIDDEN", "Only staff can read a session's attendance roster.");
+
         return Result<IReadOnlyCollection<AttendanceDto>>.Ok(await db.Attendance
             .Where(x => x.SessionId == request.SessionId)
             .Select(a => new AttendanceDto(a.Id, a.ClassId, a.SessionId, a.StudentProfileId, a.Status))
@@ -118,9 +134,23 @@ public sealed class AttendanceHandlers(IApplicationDbContext db, ICurrentUserSer
         CancellationToken cancellationToken)
     {
         var q = db.Attendance.AsQueryable();
+
+        // Self-scope: a non-staff caller (student) only ever sees their OWN
+        // attendance, regardless of the studentProfileId filter they pass.
+        if (!CallerIsStaff())
+        {
+            var ownProfileId = await ResolveOwnProfileIdAsync(cancellationToken);
+            if (ownProfileId is null)
+                return Result<IReadOnlyCollection<AttendanceDto>>.Ok(Array.Empty<AttendanceDto>());
+            q = q.Where(x => x.StudentProfileId == ownProfileId.Value);
+        }
+        else if (request.StudentProfileId is { } studentId)
+        {
+            q = q.Where(x => x.StudentProfileId == studentId);
+        }
+
         if (request.ClassId is { } classId) q = q.Where(x => x.ClassId == classId);
         if (request.SessionId is { } sessionId) q = q.Where(x => x.SessionId == sessionId);
-        if (request.StudentProfileId is { } studentId) q = q.Where(x => x.StudentProfileId == studentId);
         if (request.Status is { } status) q = q.Where(x => x.Status == status);
 
         var data = await q

@@ -67,6 +67,9 @@ public static class DependencyInjection
         services.AddSingleton<ITelegramNotifier>(sp => sp.GetRequiredService<TelegramNotifier>());
         services.AddHostedService<TelegramSenderHostedService>();
         services.AddSingleton<ITelegramInitDataValidator, TelegramInitDataValidator>();
+        // Universal per-user notifier: resolves a user → their linked Telegram
+        // and DMs via the platform bot. Scoped (depends on the scoped DbContext).
+        services.AddScoped<INotificationService, NotificationService>();
 
         services.AddSingleton<ITaskGrader, TaskGrader>();
         services.AddSingleton<IAvatarFileStore, LocalAvatarFileStore>();

@@ -6,7 +6,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LMS.Application.Features.Assignments;
 
-public sealed class AssignmentsHandlers(IApplicationDbContext db, ITelegramNotifier notifier) :
+public sealed class AssignmentsHandlers(
+    IApplicationDbContext db, ITelegramNotifier notifier, ICurrentUserService currentUser) :
     IRequestHandler<CreateAssignmentCommand, Result<AssignmentDto>>,
     IRequestHandler<UpdateAssignmentCommand, Result<AssignmentDto>>,
     IRequestHandler<PublishAssignmentCommand, Result<AssignmentDto>>,
@@ -55,6 +56,15 @@ public sealed class AssignmentsHandlers(IApplicationDbContext db, ITelegramNotif
     public async Task<Result<IReadOnlyCollection<AssignmentDto>>> Handle(GetStudentAssignmentsQuery request,
         CancellationToken cancellationToken)
     {
+        // SECURITY: a student caller may only read their OWN assignments. Staff
+        // (StaffProfileId present) can read any student's for teaching workflows.
+        if (currentUser.StaffProfileId is null &&
+            (currentUser.StudentProfileId is null || currentUser.StudentProfileId != request.StudentProfileId))
+        {
+            return Result<IReadOnlyCollection<AssignmentDto>>.Fail(
+                "FORBIDDEN", "You can only view your own assignments.");
+        }
+
         var enrolledClassIds = await db.Enrollments
             .Where(x => x.StudentProfileId == request.StudentProfileId)
             .Select(x => x.ClassId)
