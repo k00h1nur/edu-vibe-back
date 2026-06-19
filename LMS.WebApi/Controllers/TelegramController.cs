@@ -1,13 +1,10 @@
-using System.Text.Json;
 using LMS.Application.Features.Auth;
 using LMS.Application.Features.Telegram;
-using LMS.Infrastructure.Services;
 using LMS.WebApi.Common;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.Extensions.Options;
 
 namespace LMS.WebApi.Controllers;
 
@@ -100,53 +97,5 @@ public sealed class TelegramController(ISender sender) : ControllerBase
     {
         var result = await sender.Send(new GetTelegramSettingsQuery(), cancellationToken);
         return Ok(ApiResponse<TelegramSettingsDto>.Ok(result.Data, result.Message));
-    }
-
-    /// <summary>
-    /// TEMPORARY diagnostic — reveals WHICH bot token the running process actually
-    /// loaded, so a wrong/overriding prod config can be spotted. Leaks no secret:
-    /// it returns only the public bot id (the part before ':'), the token length,
-    /// and the result of calling Telegram getMe with the configured token. Remove
-    /// once the production token is confirmed correct.
-    /// </summary>
-    [HttpGet("diag")]
-    [AllowAnonymous]
-    public async Task<IActionResult> Diag(
-        [FromServices] IOptions<TelegramOptions> options,
-        [FromServices] IHttpClientFactory httpFactory,
-        CancellationToken cancellationToken)
-    {
-        var token = (options.Value.BotToken ?? string.Empty).Trim();
-        var botId = token.Contains(':') ? token[..token.IndexOf(':')] : "(no ':' in token)";
-
-        object getMe;
-        if (string.IsNullOrEmpty(token))
-        {
-            getMe = new { ok = false, note = "BotToken is empty" };
-        }
-        else
-        {
-            try
-            {
-                var http = httpFactory.CreateClient("Telegram");
-                using var resp = await http.GetAsync(
-                    $"https://api.telegram.org/bot{token}/getMe", cancellationToken);
-                var raw = await resp.Content.ReadAsStringAsync(cancellationToken);
-                getMe = JsonSerializer.Deserialize<JsonElement>(raw);
-            }
-            catch (Exception ex)
-            {
-                getMe = new { ok = false, error = ex.Message };
-            }
-        }
-
-        return Ok(new
-        {
-            configured = !string.IsNullOrEmpty(token),
-            tokenLength = token.Length,
-            botId,                                   // public bot id (before ':')
-            expectedBotId = "8908634284",            // @platform_eduvibeBot
-            getMe,                                   // Telegram's own reply (no token inside)
-        });
     }
 }
