@@ -53,6 +53,25 @@ public sealed class TelegramAccount : BaseEntity
         Touch();
     }
 
+    /// <summary>
+    /// Re-point this link to a <em>different</em> Telegram identity — the user
+    /// chose to sign in with another Telegram account. Updates the stable numeric
+    /// id + cached profile and resets <see cref="LinkedAt"/>. The 1:1 invariant is
+    /// preserved (one link row per user); the caller guarantees the new Telegram id
+    /// isn't already attached to someone else.
+    /// </summary>
+    public void Relink(long telegramUserId, string? username, string? firstName, string? lastName, string? photoUrl)
+    {
+        if (telegramUserId <= 0) throw new DomainException("Telegram user id is required.");
+        TelegramUserId = telegramUserId;
+        Username = Trim(username, 64);
+        FirstName = Trim(firstName, 128);
+        LastName = Trim(lastName, 128);
+        PhotoUrl = Trim(photoUrl, 1024);
+        LinkedAt = DateTime.UtcNow;
+        Touch();
+    }
+
     private static string? Trim(string? value, int max)
     {
         if (string.IsNullOrWhiteSpace(value)) return null;

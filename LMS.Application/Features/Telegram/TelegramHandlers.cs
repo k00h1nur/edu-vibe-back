@@ -27,9 +27,20 @@ public sealed class TelegramAuthCommandHandler(
     ITelegramInitDataValidator validator,
     IPasswordHasher passwordHasher,
     IJwtTokenGenerator jwtTokenGenerator,
-    IDateTimeProvider dateTimeProvider)
+    IDateTimeProvider dateTimeProvider,
+    ITelegramNotifier notifier)
     : IRequestHandler<TelegramAuthCommand, Result<AuthTokensResponse>>
 {
+    /// <summary>
+    /// DM sent to a Telegram account the moment it gets linked to (or switched onto)
+    /// an EduVibe user — a confirmation + a lightweight security notice. Plain text
+    /// (the notifier sends DMs without MarkdownV2 escaping).
+    /// </summary>
+    internal const string LinkNotice =
+        "✅ Your Telegram is now linked to EduVibe.\n\n" +
+        "You can open the app and sign in straight from Telegram anytime. " +
+        "If this wasn't you, please contact your administrator right away.";
+
     public async Task<Result<AuthTokensResponse>> Handle(TelegramAuthCommand request,
         CancellationToken cancellationToken)
     {
@@ -52,6 +63,9 @@ public sealed class TelegramAuthCommandHandler(
         var account = await dbContext.TelegramAccounts
             .Include(x => x.User)
             .FirstOrDefaultAsync(x => x.TelegramUserId == tg.UserId, cancellationToken);
+
+        // First contact for this Telegram id → we'll DM a link confirmation below.
+        var firstTimeLink = account is null;
 
         User user;
         if (account is not null)
@@ -99,6 +113,11 @@ public sealed class TelegramAuthCommandHandler(
 
         var tokens = await IssueTokensAsync(user, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        // Notify the freshly-linked Telegram (queued — never blocks the response).
+        if (firstTimeLink)
+            await notifier.SendToUserAsync(tg.UserId, LinkNotice, cancellationToken);
+
         return Result<AuthTokensResponse>.Ok(tokens, "Authenticated via Telegram.");
     }
 
@@ -140,27 +159,35 @@ public sealed class TelegramAuthCommandHandler(
                 "This Telegram account is already linked to a different user.");
         }
 
+        var linkChanged = false;
         if (byTg is not null)
         {
+            // Same Telegram, same user — just refresh the cached profile (no change).
             byTg.UpdateProfile(tg.Username, tg.FirstName, tg.LastName, tg.PhotoUrl);
         }
         else
         {
+            // This Telegram isn't attached to anyone. If the user already signs in
+            // with a DIFFERENT Telegram, switch them onto this one (connect from ANY
+            // Telegram — no "disconnect first" friction); otherwise create their first
+            // link. Either path is a change worth confirming by DM.
             var byUser = await dbContext.TelegramAccounts
                 .FirstOrDefaultAsync(x => x.UserId == targetUser.Id, ct);
             if (byUser is not null)
-            {
-                await dbContext.SaveChangesAsync(ct);
-                return Result<AuthTokensResponse>.Fail("TELEGRAM_USER_ALREADY_LINKED",
-                    "Your account is already linked to a different Telegram. Disconnect it in Settings first.");
-            }
-            var acc = new TelegramAccount(
-                targetUser.Id, tg.UserId, tg.Username, tg.FirstName, tg.LastName, tg.PhotoUrl);
-            await dbContext.TelegramAccounts.AddAsync(acc, ct);
+                byUser.Relink(tg.UserId, tg.Username, tg.FirstName, tg.LastName, tg.PhotoUrl);
+            else
+                await dbContext.TelegramAccounts.AddAsync(new TelegramAccount(
+                    targetUser.Id, tg.UserId, tg.Username, tg.FirstName, tg.LastName, tg.PhotoUrl), ct);
+            linkChanged = true;
         }
 
         var tokens = await IssueTokensAsync(targetUser, ct);
         await dbContext.SaveChangesAsync(ct);
+
+        // Confirm the new/switched link to that Telegram (queued — non-blocking).
+        if (linkChanged)
+            await notifier.SendToUserAsync(tg.UserId, LinkNotice, ct);
+
         return Result<AuthTokensResponse>.Ok(tokens, "Authenticated via Telegram.");
     }
 
@@ -201,7 +228,8 @@ public sealed class TelegramAuthCommandHandler(
 public sealed class TelegramLinkCommandHandler(
     IApplicationDbContext dbContext,
     ITelegramInitDataValidator validator,
-    ICurrentUserService currentUser)
+    ICurrentUserService currentUser,
+    ITelegramNotifier notifier)
     : IRequestHandler<TelegramLinkCommand, Result<TelegramProfileDto>>
 {
     public async Task<Result<TelegramProfileDto>> Handle(TelegramLinkCommand request,
@@ -229,18 +257,34 @@ public sealed class TelegramLinkCommandHandler(
             .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
 
         TelegramAccount account;
+        var linkChanged = false;
         if (byUser is not null)
         {
             account = byUser;
-            account.UpdateProfile(tg.Username, tg.FirstName, tg.LastName, tg.PhotoUrl);
+            if (account.TelegramUserId != tg.UserId)
+            {
+                // Switch this user onto a different Telegram (connect from any Telegram).
+                account.Relink(tg.UserId, tg.Username, tg.FirstName, tg.LastName, tg.PhotoUrl);
+                linkChanged = true;
+            }
+            else
+            {
+                account.UpdateProfile(tg.Username, tg.FirstName, tg.LastName, tg.PhotoUrl);
+            }
         }
         else
         {
             account = new TelegramAccount(userId, tg.UserId, tg.Username, tg.FirstName, tg.LastName, tg.PhotoUrl);
             await dbContext.TelegramAccounts.AddAsync(account, cancellationToken);
+            linkChanged = true;
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        // DM the newly-linked/switched Telegram a confirmation (queued — non-blocking).
+        if (linkChanged)
+            await notifier.SendToUserAsync(tg.UserId, TelegramAuthCommandHandler.LinkNotice, cancellationToken);
+
         return Result<TelegramProfileDto>.Ok(ToDto(account), "Telegram linked.");
     }
 
