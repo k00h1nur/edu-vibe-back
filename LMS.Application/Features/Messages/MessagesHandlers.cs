@@ -109,9 +109,16 @@ public sealed class MessagesHandlers(
             .Where(p => p.ConversationId == request.ConversationId && p.UserId != callerId.Value)
             .Select(p => p.UserId)
             .ToListAsync(cancellationToken);
+
+        // Resolve the SENDER's display name so the recipient's DM/notification
+        // says exactly WHO it's from (staff name → student name → email fallback).
+        var senderName = await ResolveDisplayNameAsync(callerId.Value, cancellationToken);
+
         var preview = request.Text.Length > 140 ? request.Text[..140] + "…" : request.Text;
         await notifications.NotifyUsersAsync(
-            recipientIds, $"💬 New message on EduVibe:\n{preview}", cancellationToken);
+            recipientIds,
+            $"💬 New message from {senderName} on EduVibe:\n{preview}",
+            cancellationToken);
 
         return Result<MessageDto>.Ok(Map(m));
     }
@@ -133,4 +140,33 @@ public sealed class MessagesHandlers(
 
     private static MessageDto Map(Message m) =>
         new(m.Id, m.ConversationId, m.SenderUserId, m.Text, m.CreatedAt, m.ReadAt);
+
+    /// <summary>
+    /// A user's human-readable name for notifications: staff full name → student
+    /// full name → email local-part → "Someone". Each profile name is COALESCEd
+    /// so a half-filled profile (only first or last) still produces a clean label.
+    /// </summary>
+    private async Task<string> ResolveDisplayNameAsync(Guid userId, CancellationToken ct)
+    {
+        var staff = await db.StaffProfiles.AsNoTracking()
+            .Where(s => s.UserId == userId)
+            .Select(s => ((s.FirstName ?? "") + " " + (s.LastName ?? "")).Trim())
+            .FirstOrDefaultAsync(ct);
+        if (!string.IsNullOrWhiteSpace(staff)) return staff;
+
+        var student = await db.StudentProfiles.AsNoTracking()
+            .Where(s => s.UserId == userId)
+            .Select(s => ((s.FirstName ?? "") + " " + (s.LastName ?? "")).Trim())
+            .FirstOrDefaultAsync(ct);
+        if (!string.IsNullOrWhiteSpace(student)) return student;
+
+        var email = await db.Users.AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => u.Email)
+            .FirstOrDefaultAsync(ct);
+        if (!string.IsNullOrWhiteSpace(email))
+            return email.Contains('@') ? email[..email.IndexOf('@')] : email;
+
+        return "Someone";
+    }
 }
