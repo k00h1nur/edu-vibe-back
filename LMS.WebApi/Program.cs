@@ -47,6 +47,7 @@ builder.Services.AddHostedService<DemoUsersSeederHostedService>();
 // empty), so admin edits are never overwritten.
 builder.Services.AddHostedService<MarketingCoursesSeederHostedService>();
 builder.Services.AddHostedService<MockTestSlotsSeederHostedService>();
+builder.Services.AddHostedService<CurriculumTemplateSeederHostedService>();
 
 // ---- CORS -----------------------------------------------------------------
 // Browser clients (marketing site at :5173, LMS admin at :3000) need the API

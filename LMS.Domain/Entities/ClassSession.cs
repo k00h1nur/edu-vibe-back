@@ -45,6 +45,25 @@ public sealed class ClassSession : BaseEntity
     /// <summary>One-to-many lesson files attached to this session.</summary>
     public ICollection<LessonMaterial> Materials { get; } = new List<LessonMaterial>();
 
+    /// <summary>
+    /// The curriculum lesson this scheduled session teaches (null = ad-hoc
+    /// session not bound to a curriculum). This is the schedule↔curriculum link:
+    /// it lets "today's topic" resolve the module / unit / objective for any date.
+    /// </summary>
+    public Guid? CurriculumLessonId { get; private set; }
+    public CurriculumLesson? CurriculumLesson { get; private set; }
+
+    /// <summary>
+    /// Binds this session to a curriculum lesson and (optionally) copies the
+    /// lesson topic onto the session's Topic. Pass null to unbind.
+    /// </summary>
+    public void LinkCurriculumLesson(Guid? curriculumLessonId, string? topic = null)
+    {
+        CurriculumLessonId = curriculumLessonId;
+        if (!string.IsNullOrWhiteSpace(topic)) Topic = topic.Trim();
+        Touch();
+    }
+
     // ---- Lesson content publishing --------------------------------------
     // Controls whether the lesson's CONTENT (notes, video, materials, the hub
     // itself) is visible to students. A slot can exist on the timetable while
