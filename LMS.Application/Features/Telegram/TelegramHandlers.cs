@@ -171,7 +171,21 @@ public sealed class TelegramAuthCommandHandler(
         // link(s) and bind fresh. 1 TG = 1 user is preserved: the link MOVES, never
         // duplicates. Delete-then-insert across two saves avoids a unique-index race
         // on TelegramUserId / UserId.
-        if (byTg is not null) dbContext.TelegramAccounts.Remove(byTg);
+        if (byTg is not null)
+        {
+            // Account switch: this Telegram was signed in as a DIFFERENT user
+            // (e.g. a Student session) and is now being re-pointed to targetUser
+            // (e.g. Admin). Revoke the displaced account's refresh token so its
+            // session can't be silently resurrected from a stale refresh cookie —
+            // no cross-account reuse, no session fixation. (Its 30-min access token
+            // is already cleared client-side before this call.)
+            if (byTg.UserId != targetUser.Id)
+            {
+                var displaced = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == byTg.UserId, ct);
+                displaced?.ClearRefreshToken();
+            }
+            dbContext.TelegramAccounts.Remove(byTg);
+        }
         var byUser = await dbContext.TelegramAccounts
             .FirstOrDefaultAsync(x => x.UserId == targetUser.Id, ct);
         if (byUser is not null) dbContext.TelegramAccounts.Remove(byUser);
