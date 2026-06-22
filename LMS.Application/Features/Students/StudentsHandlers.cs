@@ -1,12 +1,13 @@
 using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Models;
+using LMS.Application.Common.Security;
 using LMS.Domain.Entities;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace LMS.Application.Features.Students;
 
-public sealed class GetStudentsQueryHandler(IApplicationDbContext db)
+public sealed class GetStudentsQueryHandler(IApplicationDbContext db, ICurrentUserService currentUser)
     : IRequestHandler<GetStudentsQuery, Result<PagedResult<StudentDto>>>
 {
     public async Task<Result<PagedResult<StudentDto>>> Handle(GetStudentsQuery request,
@@ -21,6 +22,23 @@ public sealed class GetStudentsQueryHandler(IApplicationDbContext db)
             from s in db.StudentProfiles.AsNoTracking()
             join u in db.Users.AsNoTracking() on s.UserId equals u.Id
             select new { s, u };
+
+        // Teacher scoping: admins/office see every student; a teacher only sees
+        // students enrolled in a class they teach (Class.TeacherUserId == them).
+        // Mirrors the same scope enforced on the XP award so the list and the
+        // "Award XP" action stay consistent.
+        var isAdmin = currentUser.IsInRole(RoleCodes.Admin)
+            || currentUser.IsInRole(RoleCodes.SuperAdmin)
+            || currentUser.IsInRole(RoleCodes.OfficeAdmin);
+        if (!isAdmin)
+        {
+            var uid = currentUser.UserId;
+            query = uid is null
+                ? query.Where(_ => false)
+                : query.Where(x => db.Enrollments.Any(e =>
+                    e.StudentProfileId == x.s.Id &&
+                    db.Classes.Any(c => c.Id == e.ClassId && c.TeacherUserId == uid.Value)));
+        }
 
         if (page.NormalizedSearch is { } search)
         {
