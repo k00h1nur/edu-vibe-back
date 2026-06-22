@@ -83,7 +83,11 @@ public sealed class MaterialsController(
         var stream = await store.OpenAsync(r.Data.StoredFileName, ct);
         if (stream is null) return NotFound();
 
-        return File(stream, r.Data.MimeType, r.Data.OriginalFileName);
+        // Inline + range so the in-platform viewer can render PDFs/images and
+        // seek video/audio without forcing a download. The UI's download button
+        // uses the client-side download attribute when the user wants the file.
+        Response.Headers.ContentDisposition = $"inline; filename=\"{r.Data.OriginalFileName.Replace("\"", "")}\"";
+        return File(stream, r.Data.MimeType, enableRangeProcessing: true);
     }
 
     /// <summary>

@@ -44,7 +44,13 @@ public sealed record LessonFullDto(
     bool Completed,
     DateTime? CompletedAt,
     IReadOnlyCollection<LessonMaterialDto> Materials,
-    IReadOnlyCollection<LessonAssignmentDto> Assignments);
+    IReadOnlyCollection<LessonAssignmentDto> Assignments,
+    // Publishing / visibility — populated for everyone; only teachers/staff can
+    // change it, and students only ever receive a lesson that's currently visible.
+    bool IsPublished,
+    DateTime? PublishedAt,
+    DateTime? VisibleFrom,
+    DateTime? VisibleUntil);
 
 public sealed record LessonMaterialDownloadDto(string StoredFileName, string OriginalFileName, string MimeType);
 
@@ -72,6 +78,17 @@ public sealed record SetLessonProgressCommand(Guid SessionId, bool Completed) : 
 
 /// <summary>Teacher links/unlinks one of the class's assignments to this lesson.</summary>
 public sealed record LinkLessonAssignmentCommand(Guid SessionId, Guid AssignmentId, bool Linked) : IRequest<Result>;
+
+/// <summary>
+/// Teacher sets the lesson's publish state and visibility window in one call
+/// (single workspace). Self-scoped to the class teacher. Returns the refreshed
+/// lesson so the UI reflects PublishedAt etc. immediately.
+/// </summary>
+public sealed record SetLessonVisibilityCommand(
+    Guid SessionId,
+    bool IsPublished,
+    DateTime? VisibleFrom,
+    DateTime? VisibleUntil) : IRequest<Result<LessonFullDto>>;
 
 /// <summary>Resolves a material for download after the per-call access check.</summary>
 public sealed record GetLessonMaterialForDownloadQuery(Guid MaterialId) : IRequest<Result<LessonMaterialDownloadDto>>;

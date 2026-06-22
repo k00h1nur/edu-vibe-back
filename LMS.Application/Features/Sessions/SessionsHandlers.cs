@@ -64,8 +64,16 @@ public sealed class SessionsHandlers(IApplicationDbContext db, ICurrentUserServi
         CancellationToken cancellationToken)
     {
         var classIds = await ResolveUserClassIds(request.UserId, cancellationToken);
+        var teachingClassIds = await TeachingClassIds(request.UserId, cancellationToken);
+        var now = DateTime.UtcNow;
         return Result<IReadOnlyCollection<ScheduleEntryDto>>.Ok(await db.ClassSessions
-            .Where(x => classIds.Contains(x.ClassId))
+            // VISIBILITY: as a student you only see lessons whose content is
+            // currently visible; as the teacher of a class you see all of yours.
+            .Where(x => classIds.Contains(x.ClassId)
+                && (teachingClassIds.Contains(x.ClassId)
+                    || (x.IsPublished
+                        && (x.VisibleFrom == null || x.VisibleFrom <= now)
+                        && (x.VisibleUntil == null || now <= x.VisibleUntil))))
             .OrderBy(x => x.SessionDate).ThenBy(x => x.StartsAt)
             .Join(db.Classes, s => s.ClassId, c => c.Id, (s, c) => new ScheduleEntryDto(
                 s.Id, s.ClassId, c.Title, c.TeacherUserId,
@@ -77,11 +85,18 @@ public sealed class SessionsHandlers(IApplicationDbContext db, ICurrentUserServi
         CancellationToken cancellationToken)
     {
         var classIds = await ResolveUserClassIds(request.UserId, cancellationToken);
+        var teachingClassIds = await TeachingClassIds(request.UserId, cancellationToken);
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var now = DateTime.UtcNow;
         var take = Math.Clamp(request.Take, 1, 100);
 
         var data = await db.ClassSessions
-            .Where(x => classIds.Contains(x.ClassId) && x.SessionDate >= today)
+            // Same visibility gate as GetMySchedule (students see visible only).
+            .Where(x => classIds.Contains(x.ClassId) && x.SessionDate >= today
+                && (teachingClassIds.Contains(x.ClassId)
+                    || (x.IsPublished
+                        && (x.VisibleFrom == null || x.VisibleFrom <= now)
+                        && (x.VisibleUntil == null || now <= x.VisibleUntil))))
             .OrderBy(x => x.SessionDate).ThenBy(x => x.StartsAt)
             .Take(take)
             .Join(db.Classes, s => s.ClassId, c => c.Id, (s, c) => new ScheduleEntryDto(
@@ -110,6 +125,13 @@ public sealed class SessionsHandlers(IApplicationDbContext db, ICurrentUserServi
             .Union(teachingClassIds)
             .ToListAsync(cancellationToken);
     }
+
+    /// <summary>Class ids the user teaches — used to exempt a teacher's own lessons from the student visibility gate.</summary>
+    private async Task<List<Guid>> TeachingClassIds(Guid userId, CancellationToken cancellationToken) =>
+        await db.Classes.AsNoTracking()
+            .Where(c => c.TeacherUserId == userId)
+            .Select(c => c.Id)
+            .ToListAsync(cancellationToken);
 
     public async Task<Result<SessionDto>> Handle(UpdateClassSessionCommand request, CancellationToken cancellationToken)
     {

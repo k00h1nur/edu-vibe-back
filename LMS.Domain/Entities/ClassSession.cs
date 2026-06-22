@@ -14,6 +14,10 @@ public sealed class ClassSession : BaseEntity
         StartsAt = startsAt;
         EndsAt = endsAt;
         RoomId = roomId;
+        // New lessons are published by default so creating a slot keeps the
+        // existing "everything is visible" behaviour; teachers explicitly
+        // unpublish or schedule to hide content.
+        IsPublished = true;
     }
 
     public Guid ClassId { get; private set; }
@@ -40,6 +44,46 @@ public sealed class ClassSession : BaseEntity
 
     /// <summary>One-to-many lesson files attached to this session.</summary>
     public ICollection<LessonMaterial> Materials { get; } = new List<LessonMaterial>();
+
+    // ---- Lesson content publishing --------------------------------------
+    // Controls whether the lesson's CONTENT (notes, video, materials, the hub
+    // itself) is visible to students. A slot can exist on the timetable while
+    // its content is withheld (unpublished) or time-boxed (visibility window).
+    public bool IsPublished { get; private set; }
+    /// <summary>When the lesson was first published (audit/info). Null while unpublished.</summary>
+    public DateTime? PublishedAt { get; private set; }
+    /// <summary>Content hidden from students before this instant (null = no lower bound).</summary>
+    public DateTime? VisibleFrom { get; private set; }
+    /// <summary>Content hidden from students after this instant (null = no upper bound).</summary>
+    public DateTime? VisibleUntil { get; private set; }
+
+    /// <summary>Publish or unpublish the lesson content. Stamps PublishedAt on first publish.</summary>
+    public void SetPublished(bool published, DateTime now)
+    {
+        if (published && PublishedAt is null) PublishedAt = now;
+        IsPublished = published;
+        Touch();
+    }
+
+    /// <summary>Schedules the visibility window. Either bound may be null (open-ended).</summary>
+    public void SetVisibilityWindow(DateTime? visibleFrom, DateTime? visibleUntil)
+    {
+        if (visibleFrom is not null && visibleUntil is not null && visibleFrom > visibleUntil)
+            throw new DomainException("VisibleFrom must be on or before VisibleUntil.");
+        VisibleFrom = visibleFrom;
+        VisibleUntil = visibleUntil;
+        Touch();
+    }
+
+    /// <summary>
+    /// True when the content should be visible to a student at <paramref name="now"/>:
+    /// published AND inside the (optional) visibility window. Teachers/staff bypass this.
+    /// Mirror the predicate inline in LINQ-to-entities queries (it can't be translated).
+    /// </summary>
+    public bool IsVisibleToStudents(DateTime now) =>
+        IsPublished
+        && (VisibleFrom is null || VisibleFrom <= now)
+        && (VisibleUntil is null || now <= VisibleUntil);
 
     public void Reschedule(DateOnly sessionDate, TimeOnly startsAt, TimeOnly endsAt, Guid? roomId)
     {

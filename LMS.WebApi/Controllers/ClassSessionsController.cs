@@ -24,6 +24,7 @@ public sealed class ClassSessionsController(
 
     public sealed record SetVideoRequest(string? VideoUrl);
     public sealed record CompleteRequest(bool Completed);
+    public sealed record SetVisibilityRequest(bool IsPublished, DateTime? VisibleFrom, DateTime? VisibleUntil);
     [HttpGet("class/{classId:guid}")]
     [PermissionAuthorize(Permissions.Sessions.Read)]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<SessionDto>>>> ByClass(Guid classId,
@@ -241,7 +242,14 @@ public sealed class ClassSessionsController(
         return Ok(ApiResponse<object>.Ok(new { }, r.Message));
     }
 
-    /// <summary>Streams a lesson material. Private bucket — access check runs per call.</summary>
+    /// <summary>
+    /// Streams a lesson material for IN-PLATFORM viewing. Private bucket — access
+    /// + visibility checks run per call in the handler. Served with
+    /// Content-Disposition: inline (so PDFs/images/video render in the viewer
+    /// instead of forcing a download) and range processing enabled (so the
+    /// &lt;video&gt;/&lt;audio&gt; players can seek). A "Download" affordance in the UI
+    /// uses the client-side download attribute when the user wants the file.
+    /// </summary>
     [HttpGet("materials/{materialId:guid}/download")]
     public async Task<IActionResult> DownloadMaterial(Guid materialId, CancellationToken ct)
     {
@@ -249,7 +257,8 @@ public sealed class ClassSessionsController(
         if (!r.Success || r.Data is null) return Forbid();
         var stream = await lessonFiles.OpenAsync(r.Data.StoredFileName, ct);
         if (stream is null) return NotFound();
-        return File(stream, r.Data.MimeType, r.Data.OriginalFileName);
+        Response.Headers.ContentDisposition = $"inline; filename=\"{r.Data.OriginalFileName.Replace("\"", "")}\"";
+        return File(stream, r.Data.MimeType, enableRangeProcessing: true);
     }
 
     /// <summary>Teacher sets/clears the lesson video URL.</summary>
