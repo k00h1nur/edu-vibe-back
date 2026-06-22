@@ -122,10 +122,12 @@ public sealed class TelegramAuthCommandHandler(
     }
 
     /// <summary>
-    /// Exchanges a one-time deep-link token: consumes it, links the verified
-    /// Telegram identity to the token's user, and issues a session as that user.
-    /// Returns null when the token isn't usable (caller falls back to normal
-    /// sign-in); returns a failed Result on a genuine conflict.
+    /// Exchanges a one-time deep-link token: consumes it, (re-)points the verified
+    /// Telegram identity to the token's user, and issues a session as that user —
+    /// so "Open in Telegram" from a panel always signs into THAT account, moving
+    /// the Telegram link there if it was elsewhere. Returns null when the token
+    /// isn't usable (caller falls back to normal sign-in); a failed Result only if
+    /// the token's user is gone/inactive.
     /// </summary>
     private async Task<Result<AuthTokensResponse>?> HandleHandoffAsync(
         TelegramInitData tg, string startToken, CancellationToken ct)
@@ -152,41 +154,37 @@ public sealed class TelegramAuthCommandHandler(
 
         var byTg = await dbContext.TelegramAccounts
             .FirstOrDefaultAsync(x => x.TelegramUserId == tg.UserId, ct);
-        if (byTg is not null && byTg.UserId != targetUser.Id)
+
+        // Already this user's Telegram → just refresh the cached profile + sign in.
+        if (byTg is not null && byTg.UserId == targetUser.Id)
         {
+            byTg.UpdateProfile(tg.Username, tg.FirstName, tg.LastName, tg.PhotoUrl);
+            var same = await IssueTokensAsync(targetUser, ct);
             await dbContext.SaveChangesAsync(ct);
-            return Result<AuthTokensResponse>.Fail("TELEGRAM_ALREADY_LINKED",
-                "This Telegram account is already linked to a different user.");
+            return Result<AuthTokensResponse>.Ok(same, "Authenticated via Telegram.");
         }
 
-        var linkChanged = false;
-        if (byTg is not null)
-        {
-            // Same Telegram, same user — just refresh the cached profile (no change).
-            byTg.UpdateProfile(tg.Username, tg.FirstName, tg.LastName, tg.PhotoUrl);
-        }
-        else
-        {
-            // This Telegram isn't attached to anyone. If the user already signs in
-            // with a DIFFERENT Telegram, switch them onto this one (connect from ANY
-            // Telegram — no "disconnect first" friction); otherwise create their first
-            // link. Either path is a change worth confirming by DM.
-            var byUser = await dbContext.TelegramAccounts
-                .FirstOrDefaultAsync(x => x.UserId == targetUser.Id, ct);
-            if (byUser is not null)
-                byUser.Relink(tg.UserId, tg.Username, tg.FirstName, tg.LastName, tg.PhotoUrl);
-            else
-                await dbContext.TelegramAccounts.AddAsync(new TelegramAccount(
-                    targetUser.Id, tg.UserId, tg.Username, tg.FirstName, tg.LastName, tg.PhotoUrl), ct);
-            linkChanged = true;
-        }
+        // RE-POINT. The handoff is an authenticated claim by targetUser (they minted
+        // the token while signed into that panel), so "Open in Telegram" must sign
+        // into THAT account — even if this Telegram was linked to someone else, or
+        // the user previously linked a different Telegram. Clear the conflicting
+        // link(s) and bind fresh. 1 TG = 1 user is preserved: the link MOVES, never
+        // duplicates. Delete-then-insert across two saves avoids a unique-index race
+        // on TelegramUserId / UserId.
+        if (byTg is not null) dbContext.TelegramAccounts.Remove(byTg);
+        var byUser = await dbContext.TelegramAccounts
+            .FirstOrDefaultAsync(x => x.UserId == targetUser.Id, ct);
+        if (byUser is not null) dbContext.TelegramAccounts.Remove(byUser);
+        await dbContext.SaveChangesAsync(ct); // commit consume + deletes before insert
+
+        await dbContext.TelegramAccounts.AddAsync(new TelegramAccount(
+            targetUser.Id, tg.UserId, tg.Username, tg.FirstName, tg.LastName, tg.PhotoUrl), ct);
 
         var tokens = await IssueTokensAsync(targetUser, ct);
         await dbContext.SaveChangesAsync(ct);
 
         // Confirm the new/switched link to that Telegram (queued — non-blocking).
-        if (linkChanged)
-            await notifier.SendToUserAsync(tg.UserId, LinkNotice, ct);
+        await notifier.SendToUserAsync(tg.UserId, LinkNotice, ct);
 
         return Result<AuthTokensResponse>.Ok(tokens, "Authenticated via Telegram.");
     }
