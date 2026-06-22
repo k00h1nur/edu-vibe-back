@@ -47,6 +47,18 @@ public sealed class SubmissionsPingCommandHandler : IRequestHandler<SubmissionsP
 public sealed record SubmitAssignmentCommand(Guid AssignmentId, Guid StudentProfileId, string Content, bool IsLate)
     : IRequest<Result<SubmissionDto>>;
 
+/// <summary>
+/// Auto-saves the student's draft answer text WITHOUT finalising. Upserts the
+/// caller's submission (creating it on first save) and leaves it editable
+/// (unlocked) until the student finalises or a teacher locks it. Unlike
+/// <see cref="SubmitAssignmentCommand"/> it writes no per-save audit row (an
+/// autosave would otherwise flood the trail) — the create and the finalize are
+/// still audited. Student profile is always the caller's; never trusted from
+/// the wire.
+/// </summary>
+public sealed record SaveSubmissionDraftCommand(Guid AssignmentId, string Content)
+    : IRequest<Result<SubmissionDto>>;
+
 public sealed record GradeSubmissionCommand(Guid SubmissionId, decimal Score) : IRequest<Result<SubmissionDto>>;
 
 public sealed record GetAssignmentSubmissionsQuery(Guid AssignmentId)

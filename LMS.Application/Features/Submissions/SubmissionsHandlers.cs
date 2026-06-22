@@ -9,6 +9,7 @@ namespace LMS.Application.Features.Submissions;
 public sealed class SubmissionsHandlers(
     IApplicationDbContext db, ICurrentUserService currentUser, INotificationService notifications) :
     IRequestHandler<SubmitAssignmentCommand, Result<SubmissionDto>>,
+    IRequestHandler<SaveSubmissionDraftCommand, Result<SubmissionDto>>,
     IRequestHandler<GradeSubmissionCommand, Result<SubmissionDto>>,
     IRequestHandler<GetAssignmentSubmissionsQuery, Result<IReadOnlyCollection<SubmissionDto>>>,
     IRequestHandler<GetStudentSubmissionsQuery, Result<IReadOnlyCollection<SubmissionDto>>>,
@@ -125,6 +126,42 @@ public sealed class SubmissionsHandlers(
         s.Submit(request.Content, isLate);
         await db.Submissions.AddAsync(s, cancellationToken);
         db.SubmissionAudits.Add(new SubmissionAudit(s.Id, currentUser.UserId, "created", isLate ? "late" : null));
+        await db.SaveChangesAsync(cancellationToken);
+        return Result<SubmissionDto>.Ok(Map(s));
+    }
+
+    public async Task<Result<SubmissionDto>> Handle(SaveSubmissionDraftCommand request,
+        CancellationToken cancellationToken)
+    {
+        // SECURITY: always the caller's own profile — never trust a wire id.
+        var me = currentUser.StudentProfileId;
+        if (me is null) return Result<SubmissionDto>.Fail("FORBIDDEN", "Only students may save drafts.");
+
+        var assignment = await db.Assignments.AsNoTracking()
+            .FirstOrDefaultAsync(a => a.Id == request.AssignmentId, cancellationToken);
+        if (assignment is null) return Result<SubmissionDto>.Fail("NOT_FOUND", "Assignment not found.");
+
+        // Late is derived from the deadline server-side, same as a full submit.
+        var isLate = assignment.IsPastDue(DateTime.UtcNow);
+
+        var existing = await db.Submissions.Include(s => s.Files)
+            .FirstOrDefaultAsync(x => x.AssignmentId == request.AssignmentId
+                                      && x.StudentProfileId == me.Value, cancellationToken);
+        if (existing is not null)
+        {
+            // A locked submission is final — autosave must not silently mutate it.
+            if (existing.IsLocked)
+                return Result<SubmissionDto>.Fail("LOCKED", "Submission is locked and can no longer be changed.");
+            existing.Submit(request.Content, isLate); // upsert text; stays unlocked (editable)
+            await db.SaveChangesAsync(cancellationToken); // no per-save audit — autosave would flood it
+            return Result<SubmissionDto>.Ok(Map(existing));
+        }
+
+        var s = Submission.Create(request.AssignmentId, me.Value, request.Content, Array.Empty<Submission>());
+        s.Submit(request.Content, isLate);
+        await db.Submissions.AddAsync(s, cancellationToken);
+        // Audit the creation once (the autosaves that follow stay silent).
+        db.SubmissionAudits.Add(new SubmissionAudit(s.Id, currentUser.UserId, "created", "draft"));
         await db.SaveChangesAsync(cancellationToken);
         return Result<SubmissionDto>.Ok(Map(s));
     }

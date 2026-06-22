@@ -45,6 +45,22 @@ public sealed class SubmissionsController(ISender sender, ISubmissionFileStore f
             : BadRequest(ApiResponse<SubmissionDto>.Fail(r.Message ?? "Failed"));
     }
 
+    /// <summary>
+    /// Auto-saves the student's draft answer text for an assignment without
+    /// finalising. Upserts the caller's submission and leaves it editable. The
+    /// student profile is taken from the JWT, never the body. Body: {"content": "…"}.
+    /// </summary>
+    [HttpPost("assignment/{assignmentId:guid}/draft")]
+    [PermissionAuthorize(Permissions.Submissions.Create)]
+    public async Task<ActionResult<ApiResponse<SubmissionDto>>> SaveDraft(
+        Guid assignmentId, [FromBody] SaveDraftRequest body, CancellationToken ct)
+    {
+        var r = await sender.Send(new SaveSubmissionDraftCommand(assignmentId, body.Content ?? string.Empty), ct);
+        return r.Success
+            ? Ok(ApiResponse<SubmissionDto>.Ok(r.Data, r.Message))
+            : BadRequest(ApiResponse<SubmissionDto>.Fail(r.Message ?? "Failed"));
+    }
+
     [HttpPost("{id:guid}/grade/{score:decimal}")]
     [PermissionAuthorize(Permissions.Submissions.Grade)]
     public async Task<ActionResult<ApiResponse<SubmissionDto>>> Grade(Guid id, decimal score, CancellationToken ct)
@@ -170,3 +186,5 @@ public sealed class SubmissionsController(ISender sender, ISubmissionFileStore f
 }
 
 public sealed record SetLockRequest(bool Locked);
+
+public sealed record SaveDraftRequest(string? Content);
