@@ -104,6 +104,12 @@ services:
       NODE_ENV: production
       # Used by next.config rewrites() at runtime (e.g. /uploads -> API).
       NEXT_PUBLIC_API_BASE_URL: ${ADMIN_API_BASE_URL:-https://api.edu-vibe.uz}
+      # Server-side backend URL for the /api/proxy/* route. Internal Docker
+      # address so proxied (client-side) API calls don't hairpin out to the
+      # public api.edu-vibe.uz and back — that round-trip was timing out under
+      # the roster's parallel authed calls ("Failed to fetch"). Runtime-only var
+      # (not NEXT_PUBLIC_) so it's read at runtime, never baked into the image.
+      BACKEND_INTERNAL_URL: ${ADMIN_BACKEND_INTERNAL_URL:-http://api:8080}
 
   # TLS edge: terminates HTTPS (automatic Let's Encrypt) for edu-vibe.uz,
   # www.edu-vibe.uz and api.edu-vibe.uz, and reverse-proxies to web / api.
