@@ -33,6 +33,19 @@ public sealed class ConversationsController(ISender sender, ICurrentUserService 
         return Ok(ApiResponse<IReadOnlyCollection<ConversationDto>>.Ok(r.Data, r.Message));
     }
 
+    /// <summary>
+    /// People the caller may start a conversation with, scoped by role: a student
+    /// sees classmates + the teachers of their classes + admins; a teacher sees
+    /// students in classes they teach + admins; an admin sees everyone.
+    /// </summary>
+    [HttpGet("contacts")]
+    [PermissionAuthorize(Permissions.Conversations.Read)]
+    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<ContactDto>>>> Contacts(CancellationToken ct)
+    {
+        var r = await sender.Send(new GetMessageableContactsQuery(), ct);
+        return Ok(ApiResponse<IReadOnlyCollection<ContactDto>>.Ok(r.Data, r.Message));
+    }
+
     [HttpPost]
     [PermissionAuthorize(Permissions.Conversations.Create)]
     public async Task<ActionResult<ApiResponse<ConversationDto>>> Create([FromBody] CreateConversationCommand cmd,
