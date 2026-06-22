@@ -425,7 +425,7 @@ public static class Permissions
             Permissions.Assignments.Read,
             Permissions.Submissions.Read,
             Permissions.Attendance.Read, Permissions.Attendance.Mark,
-            Permissions.Conversations.Read,
+            Permissions.Conversations.Read, Permissions.Conversations.Create,
             Permissions.Messages.Read, Permissions.Messages.Send,
             Permissions.Courses.Read,
             Permissions.Books.Read,
@@ -443,7 +443,12 @@ public static class Permissions
             Permissions.Attendance.Read,
             Permissions.Badges.Read,
             Permissions.Xp.Read,
-            Permissions.Conversations.Read,
+            // Conversations.Create lets a student START a chat with someone in
+            // their allowed contact set (classmates / their teachers / admins).
+            // Without it the "New conversation" compose 403s on send even though
+            // the contact list (Conversations.Read) loads fine. The create
+            // handler still scopes WHO a non-admin may message.
+            Permissions.Conversations.Read, Permissions.Conversations.Create,
             Permissions.Messages.Read, Permissions.Messages.Send,
             Permissions.Results.Read,
             Permissions.Books.Read,
