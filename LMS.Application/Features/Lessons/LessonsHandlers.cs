@@ -23,6 +23,7 @@ public sealed class LessonsHandlers(IApplicationDbContext db, ICurrentUserServic
     IRequestHandler<SetLessonVideoCommand, Result>,
     IRequestHandler<SetLessonProgressCommand, Result>,
     IRequestHandler<LinkLessonAssignmentCommand, Result>,
+    IRequestHandler<SetLessonVisibilityCommand, Result<LessonFullDto>>,
     IRequestHandler<GetLessonMaterialForDownloadQuery, Result<LessonMaterialDownloadDto>>
 {
     private sealed record Access(Guid ClassId, string ClassTitle, Guid? TeacherUserId,
@@ -65,6 +66,13 @@ public sealed class LessonsHandlers(IApplicationDbContext db, ICurrentUserServic
 
         var s = await db.ClassSessions.AsNoTracking().FirstAsync(x => x.Id == request.SessionId, ct);
 
+        // VISIBILITY: a student may only open a lesson whose content is currently
+        // visible (published + inside any scheduled window). Teachers of the class
+        // and staff bypass this so they can prepare/preview unpublished content.
+        // 404 (not 403) so an unpublished lesson doesn't even leak its existence.
+        if (!access.IsTeacher && !access.IsStaff && !s.IsVisibleToStudents(DateTime.UtcNow))
+            return Result<LessonFullDto>.Fail("NOT_FOUND", "Lesson not found.");
+
         var rawMaterials = await db.LessonMaterials.AsNoTracking()
             .Where(m => m.ClassSessionId == request.SessionId)
             .OrderBy(m => m.CreatedAt)
@@ -102,8 +110,31 @@ public sealed class LessonsHandlers(IApplicationDbContext db, ICurrentUserServic
             s.SessionDate, s.StartsAt, s.EndsAt, s.RoomId,
             s.Topic, s.MeetingUrl, s.Notes, s.VideoUrl,
             access.IsTeacher, completedAt is not null, completedAt,
-            materials, assignments);
+            materials, assignments,
+            s.IsPublished, s.PublishedAt, s.VisibleFrom, s.VisibleUntil);
         return Result<LessonFullDto>.Ok(dto);
+    }
+
+    public async Task<Result<LessonFullDto>> Handle(SetLessonVisibilityCommand request, CancellationToken ct)
+    {
+        var access = await ResolveAsync(request.SessionId, ct);
+        if (access is null) return Result<LessonFullDto>.Fail("NOT_FOUND", "Lesson not found.");
+        if (!access.IsTeacher) return Result<LessonFullDto>.Fail("FORBIDDEN", "Only the class teacher can publish lessons.");
+
+        var s = await db.ClassSessions.FirstAsync(x => x.Id == request.SessionId, ct);
+        try
+        {
+            s.SetVisibilityWindow(request.VisibleFrom, request.VisibleUntil);
+        }
+        catch (LMS.Domain.Exceptions.DomainException ex)
+        {
+            return Result<LessonFullDto>.Fail("VALIDATION", ex.Message);
+        }
+        s.SetPublished(request.IsPublished, DateTime.UtcNow);
+        await db.SaveChangesAsync(ct);
+
+        // Return the refreshed hub so the workspace updates in place.
+        return await Handle(new GetLessonFullQuery(request.SessionId), ct);
     }
 
     public async Task<Result<LessonMaterialDto>> Handle(AddLessonMaterialCommand request, CancellationToken ct)
@@ -203,6 +234,22 @@ public sealed class LessonsHandlers(IApplicationDbContext db, ICurrentUserServic
         var access = await ResolveAsync(m.ClassSessionId, ct);
         if (access is null || !access.CanRead)
             return Result<LessonMaterialDownloadDto>.Fail("FORBIDDEN", "You don't have access to this material.");
+
+        // VISIBILITY: students can only fetch files from a currently-visible
+        // lesson — an unpublished/scheduled lesson's materials stay sealed even
+        // if the file id is guessed. Teachers/staff bypass.
+        if (!access.IsTeacher && !access.IsStaff)
+        {
+            var now = DateTime.UtcNow;
+            var visible = await db.ClassSessions.AsNoTracking()
+                .Where(x => x.Id == m.ClassSessionId)
+                .Select(x => x.IsPublished
+                    && (x.VisibleFrom == null || x.VisibleFrom <= now)
+                    && (x.VisibleUntil == null || now <= x.VisibleUntil))
+                .FirstOrDefaultAsync(ct);
+            if (!visible)
+                return Result<LessonMaterialDownloadDto>.Fail("FORBIDDEN", "You don't have access to this material.");
+        }
 
         return Result<LessonMaterialDownloadDto>.Ok(
             new LessonMaterialDownloadDto(m.StoredFileName, m.OriginalFileName, m.MimeType));
