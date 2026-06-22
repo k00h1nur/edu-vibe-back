@@ -36,6 +36,10 @@ public sealed class Class : BaseEntity
     public Guid? TeacherUserId { get; private set; }
     public User? Teacher { get; private set; }
 
+    /// <summary>The curriculum template this class follows (null = ad-hoc class, pre-curriculum behaviour).</summary>
+    public Guid? CurriculumTemplateId { get; private set; }
+    public CurriculumTemplate? CurriculumTemplate { get; private set; }
+
     public ICollection<Enrollment> Enrollments { get; } = new List<Enrollment>();
     public ICollection<Assignment> Assignments { get; } = new List<Assignment>();
     public ICollection<ClassResource> Resources { get; } = new List<ClassResource>();
@@ -80,6 +84,13 @@ public sealed class Class : BaseEntity
     {
         if (Status == ClassStatus.Cancelled) return;
         Status = ClassStatus.Cancelled;
+        Touch();
+    }
+
+    /// <summary>Sets (or clears) the curriculum template the class follows.</summary>
+    public void SetCurriculumTemplate(Guid? templateId)
+    {
+        CurriculumTemplateId = templateId;
         Touch();
     }
 }

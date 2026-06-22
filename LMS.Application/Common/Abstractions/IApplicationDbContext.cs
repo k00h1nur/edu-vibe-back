@@ -16,6 +16,10 @@ public interface IApplicationDbContext
     DbSet<Room> Rooms { get; }
     DbSet<Class> Classes { get; }
     DbSet<ClassResource> ClassResources { get; }
+    DbSet<CurriculumTemplate> CurriculumTemplates { get; }
+    DbSet<CurriculumModule> CurriculumModules { get; }
+    DbSet<CurriculumUnit> CurriculumUnits { get; }
+    DbSet<CurriculumLesson> CurriculumLessons { get; }
     DbSet<Enrollment> Enrollments { get; }
     DbSet<ClassSession> ClassSessions { get; }
     DbSet<ClassSchedulePattern> ClassSchedulePatterns { get; }

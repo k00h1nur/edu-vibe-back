@@ -722,3 +722,58 @@ public sealed class TelegramDeepLinkTokenConfiguration : IEntityTypeConfiguratio
             .HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
     }
 }
+
+// ---- Curriculum template tree (Template → Module → Unit → Lesson) ----------
+
+public sealed class CurriculumTemplateConfiguration : IEntityTypeConfiguration<CurriculumTemplate>
+{
+    public void Configure(EntityTypeBuilder<CurriculumTemplate> b)
+    {
+        b.ToTable("curriculum_templates");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Name).IsRequired().HasMaxLength(200);
+        b.Property(x => x.Level).HasMaxLength(40);
+        b.Property(x => x.Description).HasMaxLength(2000);
+        b.Property(x => x.Category).HasConversion<int>();
+        b.HasIndex(x => x.Category);
+        b.HasMany(x => x.Modules).WithOne().HasForeignKey(m => m.TemplateId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public sealed class CurriculumModuleConfiguration : IEntityTypeConfiguration<CurriculumModule>
+{
+    public void Configure(EntityTypeBuilder<CurriculumModule> b)
+    {
+        b.ToTable("curriculum_modules");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Title).IsRequired().HasMaxLength(200);
+        b.HasIndex(x => new { x.TemplateId, x.Order });
+        b.HasMany(x => x.Units).WithOne().HasForeignKey(u => u.ModuleId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public sealed class CurriculumUnitConfiguration : IEntityTypeConfiguration<CurriculumUnit>
+{
+    public void Configure(EntityTypeBuilder<CurriculumUnit> b)
+    {
+        b.ToTable("curriculum_units");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Title).IsRequired().HasMaxLength(200);
+        b.HasIndex(x => new { x.ModuleId, x.Order });
+        b.HasMany(x => x.Lessons).WithOne().HasForeignKey(l => l.UnitId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public sealed class CurriculumLessonConfiguration : IEntityTypeConfiguration<CurriculumLesson>
+{
+    public void Configure(EntityTypeBuilder<CurriculumLesson> b)
+    {
+        b.ToTable("curriculum_lessons");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Title).IsRequired().HasMaxLength(300);
+        b.Property(x => x.Objectives).HasMaxLength(2000);
+        b.Property(x => x.HomeworkPlaceholder).HasMaxLength(1000);
+        b.Property(x => x.MaterialsPlaceholder).HasMaxLength(1000);
+        b.HasIndex(x => new { x.UnitId, x.Order });
+    }
+}
