@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using LMS.Application.Common.Abstractions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace LMS.Infrastructure.Services;
@@ -15,7 +16,9 @@ namespace LMS.Infrastructure.Services;
 /// (replay/expiry protection). The bot token is the shared secret, so a valid
 /// hash proves the payload was issued by Telegram for THIS bot and untampered.
 /// </summary>
-public sealed class TelegramInitDataValidator(IOptions<TelegramOptions> options) : ITelegramInitDataValidator
+public sealed class TelegramInitDataValidator(
+    IOptions<TelegramOptions> options,
+    ILogger<TelegramInitDataValidator> logger) : ITelegramInitDataValidator
 {
     // initData is reused while the Mini App stays open; 24h is a safe upper
     // bound. The real session is the short-lived platform JWT we issue after.
@@ -43,19 +46,27 @@ public sealed class TelegramInitDataValidator(IOptions<TelegramOptions> options)
         if (!pairs.TryGetValue("hash", out var providedHash) || string.IsNullOrEmpty(providedHash))
             return (null, "Missing hash.");
 
-        var dataCheckString = string.Join('\n', pairs
-            .Where(kv => kv.Key is not "hash" and not "signature")
-            .OrderBy(kv => kv.Key, StringComparer.Ordinal)
-            .Select(kv => $"{kv.Key}={kv.Value}"));
-
-        var secretKey = HmacSha256(Encoding.UTF8.GetBytes("WebAppData"), Encoding.UTF8.GetBytes(botToken));
-        var computed = HmacSha256(secretKey, Encoding.UTF8.GetBytes(dataCheckString));
-
         byte[] providedBytes;
         try { providedBytes = Convert.FromHexString(providedHash); }
         catch { return (null, "Malformed hash."); }
-        if (!CryptographicOperations.FixedTimeEquals(computed, providedBytes))
+
+        var secretKey = HmacSha256(Encoding.UTF8.GetBytes("WebAppData"), Encoding.UTF8.GetBytes(botToken));
+
+        // Telegram clients disagree on whether the newer `signature` field belongs
+        // in the data_check_string (some include it in the HMAC, some don't). Accept
+        // EITHER convention — the HMAC is still fully verified with the bot token,
+        // so this only tolerates the client difference; it does not weaken the check.
+        // When no `signature` field is present, both variants are identical.
+        if (!HashMatches(pairs, secretKey, providedBytes, excludeSignature: true) &&
+            !HashMatches(pairs, secretKey, providedBytes, excludeSignature: false))
+        {
+            // Diagnostic (keys only — no PII): if this fires the token is right but
+            // the data_check_string differs (unexpected field / encoding).
+            logger.LogWarning(
+                "Telegram initData signature mismatch. Fields present: [{Keys}]",
+                string.Join(',', pairs.Keys.OrderBy(k => k, StringComparer.Ordinal)));
             return (null, "Invalid signature.");
+        }
 
         // Freshness — reject stale payloads (replay/expiry).
         if (!pairs.TryGetValue("auth_date", out var authDateRaw) ||
@@ -83,6 +94,22 @@ public sealed class TelegramInitDataValidator(IOptions<TelegramOptions> options)
             LastName = u.last_name,
             PhotoUrl = u.photo_url,
         }, null);
+    }
+
+    /// <summary>
+    /// Builds the data_check_string (all fields except <c>hash</c>, and optionally
+    /// except <c>signature</c>), computes the HMAC, and constant-time compares it
+    /// to the provided hash.
+    /// </summary>
+    private static bool HashMatches(
+        IReadOnlyDictionary<string, string> pairs, byte[] secretKey, byte[] providedBytes, bool excludeSignature)
+    {
+        var dataCheckString = string.Join('\n', pairs
+            .Where(kv => kv.Key != "hash" && (!excludeSignature || kv.Key != "signature"))
+            .OrderBy(kv => kv.Key, StringComparer.Ordinal)
+            .Select(kv => $"{kv.Key}={kv.Value}"));
+        var computed = HmacSha256(secretKey, Encoding.UTF8.GetBytes(dataCheckString));
+        return CryptographicOperations.FixedTimeEquals(computed, providedBytes);
     }
 
     private static byte[] HmacSha256(byte[] key, byte[] data)
