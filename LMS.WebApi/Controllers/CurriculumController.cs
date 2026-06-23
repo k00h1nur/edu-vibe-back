@@ -63,6 +63,18 @@ public sealed class CurriculumController(ISender sender) : ControllerBase
             : NotFound(ApiResponse<ClassCurriculumDto>.Fail(r.Message ?? "Not found"));
     }
 
+    /// <summary>The class's curriculum as a student learning journey (units → lessons, with progress + locks).</summary>
+    [HttpGet("class/{classId:guid}/roadmap")]
+    public async Task<ActionResult<ApiResponse<StudentRoadmapDto>>> Roadmap(Guid classId, CancellationToken ct)
+    {
+        var r = await sender.Send(new GetStudentRoadmapQuery(classId), ct);
+        return r.Success
+            ? Ok(ApiResponse<StudentRoadmapDto>.Ok(r.Data, r.Message))
+            : r.ErrorCode == "FORBIDDEN"
+                ? StatusCode(StatusCodes.Status403Forbidden, ApiResponse<StudentRoadmapDto>.Fail(r.Message ?? "Forbidden"))
+                : NotFound(ApiResponse<StudentRoadmapDto>.Fail(r.Message ?? "Not found"));
+    }
+
     // ===== Course Builder (teacher of the class / admin) ===================
     // All return the whole refreshed course so the roadmap re-renders from one
     // response. Permission-gated here; self-scoped to the class teacher in the
