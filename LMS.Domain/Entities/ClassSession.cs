@@ -1,4 +1,5 @@
 using LMS.Domain.Common;
+using LMS.Domain.Enums;
 using LMS.Domain.Exceptions;
 
 namespace LMS.Domain.Entities;
@@ -61,6 +62,36 @@ public sealed class ClassSession : BaseEntity
     {
         CurriculumLessonId = curriculumLessonId;
         if (!string.IsNullOrWhiteSpace(topic)) Topic = topic.Trim();
+        Touch();
+    }
+
+    // ---- Teaching lifecycle ---------------------------------------------
+    // The schedule as the source of truth for what was/will be taught. Set by
+    // the teacher; the student roadmap reads Completed to mark a lesson done.
+
+    /// <summary>Where this session sits in its teaching lifecycle. New slots are Planned.</summary>
+    public ClassSessionStatus Status { get; private set; } = ClassSessionStatus.Planned;
+    /// <summary>When the teacher marked the lesson Completed (null otherwise).</summary>
+    public DateTime? CompletedAt { get; private set; }
+
+    /// <summary>
+    /// Plans this session against a curriculum lesson — sets the lesson link,
+    /// topic and teacher notes in one go (the online meeting link is untouched).
+    /// Pass a null lessonId to unbind it from the curriculum.
+    /// </summary>
+    public void PlanCurriculum(Guid? curriculumLessonId, string? topic, string? notes)
+    {
+        CurriculumLessonId = curriculumLessonId;
+        Topic = string.IsNullOrWhiteSpace(topic) ? null : topic.Trim();
+        Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        Touch();
+    }
+
+    /// <summary>Moves the lesson through its lifecycle; stamps CompletedAt on Completed, clears it otherwise.</summary>
+    public void SetStatus(ClassSessionStatus status, DateTime now)
+    {
+        Status = status;
+        CompletedAt = status == ClassSessionStatus.Completed ? now : null;
         Touch();
     }
 

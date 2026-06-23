@@ -2,6 +2,7 @@ using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Models;
 using LMS.Application.Common.Security;
 using LMS.Domain.Entities;
+using LMS.Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -83,18 +84,27 @@ public sealed class StudentRoadmapHandler(IApplicationDbContext db, ICurrentUser
             })
             .ToListAsync(ct);
 
-        // Completion comes from the schedule: a lesson is done if a linked session is in the past.
+        // Completion comes from the schedule: a lesson is done when its linked
+        // session was explicitly marked Completed by the teacher, or it simply
+        // happened in the past (and wasn't cancelled).
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var sessions = await db.ClassSessions.AsNoTracking()
             .Where(s => s.ClassId == request.ClassId && s.CurriculumLessonId != null)
-            .Select(s => new { LessonId = s.CurriculumLessonId!.Value, s.SessionDate, s.Id })
+            .Select(s => new { LessonId = s.CurriculumLessonId!.Value, s.SessionDate, s.Id, s.Status, s.CompletedAt })
             .ToListAsync(ct);
-        var sessionByLesson = sessions.GroupBy(s => s.LessonId).ToDictionary(g => g.Key, g => new
+        var sessionByLesson = sessions.GroupBy(s => s.LessonId).ToDictionary(g => g.Key, g =>
         {
-            Scheduled = (DateOnly?)g.Min(x => x.SessionDate),
-            Completed = g.Any(x => x.SessionDate < today),
-            CompletedOn = g.Where(x => x.SessionDate < today).Select(x => (DateOnly?)x.SessionDate).Max(),
-            SessionId = (Guid?)g.OrderBy(x => x.SessionDate).First().Id,
+            var done = g.Where(x => x.Status == ClassSessionStatus.Completed
+                || (x.Status != ClassSessionStatus.Cancelled && x.SessionDate < today)).ToList();
+            return new
+            {
+                Scheduled = (DateOnly?)g.Min(x => x.SessionDate),
+                Completed = done.Count > 0,
+                CompletedOn = done
+                    .Select(x => (DateOnly?)(x.CompletedAt != null ? DateOnly.FromDateTime(x.CompletedAt.Value) : x.SessionDate))
+                    .Max(),
+                SessionId = (Guid?)g.OrderBy(x => x.SessionDate).First().Id,
+            };
         });
 
         // Pass 1 — per-unit lesson DTOs + aggregates.

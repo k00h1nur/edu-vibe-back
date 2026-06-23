@@ -156,6 +156,47 @@ public sealed class ClassSessionsController(
         };
     }
 
+    // ===== Schedule ↔ Curriculum ==========================================
+    // The schedule as the teaching plan: plan each session against a curriculum
+    // lesson, drive its status, read rich cards + a full lesson plan. Set/plan
+    // are self-scoped to the class teacher / admin in the handler.
+
+    /// <summary>Rich schedule cards for a class — sessions joined with curriculum unit/lesson + counts.</summary>
+    [HttpGet("class/{classId:guid}/schedule-cards")]
+    [PermissionAuthorize(Permissions.Sessions.Read)]
+    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<ScheduleCardDto>>>> ScheduleCards(
+        Guid classId, CancellationToken ct)
+    {
+        var r = await sender.Send(new GetClassScheduleCardsQuery(classId), ct);
+        return r.Success ? Ok(ApiResponse<IReadOnlyCollection<ScheduleCardDto>>.Ok(r.Data, r.Message)) : MapFail(r);
+    }
+
+    /// <summary>Plan a session against the curriculum (lesson + topic + notes).</summary>
+    [HttpPut("{id:guid}/curriculum")]
+    public async Task<ActionResult<ApiResponse<ScheduleCardDto>>> SetCurriculum(
+        Guid id, [FromBody] SetSessionCurriculumCommand cmd, CancellationToken ct)
+    {
+        var r = await sender.Send(cmd with { SessionId = id }, ct);
+        return r.Success ? Ok(ApiResponse<ScheduleCardDto>.Ok(r.Data, r.Message)) : MapFail(r);
+    }
+
+    /// <summary>Set a session's teaching status (Planned / InProgress / Completed / Cancelled).</summary>
+    [HttpPost("{id:guid}/status")]
+    public async Task<ActionResult<ApiResponse<ScheduleCardDto>>> SetStatus(
+        Guid id, [FromBody] SetSessionStatusCommand cmd, CancellationToken ct)
+    {
+        var r = await sender.Send(cmd with { SessionId = id }, ct);
+        return r.Success ? Ok(ApiResponse<ScheduleCardDto>.Ok(r.Data, r.Message)) : MapFail(r);
+    }
+
+    /// <summary>The full lesson plan for a session — curriculum + content + attendance stats.</summary>
+    [HttpGet("{id:guid}/lesson-plan")]
+    public async Task<ActionResult<ApiResponse<SessionLessonPlanDto>>> LessonPlan(Guid id, CancellationToken ct)
+    {
+        var r = await sender.Send(new GetSessionLessonPlanQuery(id), ct);
+        return r.Success ? Ok(ApiResponse<SessionLessonPlanDto>.Ok(r.Data, r.Message)) : MapFail(r);
+    }
+
     // ===== Lesson hub =====================================================
     // Self-scoped in the handlers (class teacher / enrolled student / staff),
     // so these carry no PermissionAuthorize — students lack Sessions.Read but
