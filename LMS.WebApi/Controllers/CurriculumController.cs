@@ -76,9 +76,12 @@ public sealed class CurriculumController(ISender sender) : ControllerBase
     }
 
     // ===== Course Builder (teacher of the class / admin) ===================
-    // All return the whole refreshed course so the roadmap re-renders from one
-    // response. Permission-gated here; self-scoped to the class teacher in the
-    // handler.
+    // Every endpoint returns the whole refreshed course so the roadmap re-renders
+    // from one response. NO permission attribute here on purpose: teachers don't
+    // hold Classes.Update (that's admin-only, for editing class settings), yet
+    // they must build their OWN class's course. Authorization is self-scoped in
+    // the handler (WithCourse → class teacher or admin), matching the lesson hub
+    // and schedule-curriculum endpoints. FORBIDDEN → 403 via MapBuilder.
 
     private ActionResult<ApiResponse<ClassCourseBuilderDto>> MapBuilder(Result<ClassCourseBuilderDto> r) =>
         r.Success
@@ -92,78 +95,65 @@ public sealed class CurriculumController(ISender sender) : ControllerBase
 
     /// <summary>Reads (and lazily provisions) the class's editable course structure.</summary>
     [HttpGet("class/{classId:guid}/builder")]
-    [PermissionAuthorize(Permissions.Classes.Update)]
     public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> Builder(Guid classId, CancellationToken ct)
         => MapBuilder(await sender.Send(new GetClassCourseBuilderQuery(classId), ct));
 
     [HttpPost("units")]
-    [PermissionAuthorize(Permissions.Classes.Update)]
     public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> CreateUnit(
         [FromBody] CreateCourseUnitCommand cmd, CancellationToken ct)
         => MapBuilder(await sender.Send(cmd, ct));
 
     [HttpPut("units/{id:guid}")]
-    [PermissionAuthorize(Permissions.Classes.Update)]
     public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> UpdateUnit(
         Guid id, [FromBody] UpdateCourseUnitCommand cmd, CancellationToken ct)
         => MapBuilder(await sender.Send(cmd with { UnitId = id }, ct));
 
     [HttpDelete("units/{id:guid}")]
-    [PermissionAuthorize(Permissions.Classes.Update)]
     public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> DeleteUnit(Guid id, CancellationToken ct)
         => MapBuilder(await sender.Send(new DeleteCourseUnitCommand(id), ct));
 
     [HttpPost("units/reorder")]
-    [PermissionAuthorize(Permissions.Classes.Update)]
     public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> ReorderUnits(
         [FromBody] ReorderCourseUnitsCommand cmd, CancellationToken ct)
         => MapBuilder(await sender.Send(cmd, ct));
 
     [HttpPost("lessons")]
-    [PermissionAuthorize(Permissions.Classes.Update)]
     public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> CreateLesson(
         [FromBody] CreateCourseLessonCommand cmd, CancellationToken ct)
         => MapBuilder(await sender.Send(cmd, ct));
 
     [HttpPut("lessons/{id:guid}")]
-    [PermissionAuthorize(Permissions.Classes.Update)]
     public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> UpdateLesson(
         Guid id, [FromBody] UpdateCourseLessonCommand cmd, CancellationToken ct)
         => MapBuilder(await sender.Send(cmd with { LessonId = id }, ct));
 
     [HttpDelete("lessons/{id:guid}")]
-    [PermissionAuthorize(Permissions.Classes.Update)]
     public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> DeleteLesson(Guid id, CancellationToken ct)
         => MapBuilder(await sender.Send(new DeleteCourseLessonCommand(id), ct));
 
     [HttpPost("lessons/reorder")]
-    [PermissionAuthorize(Permissions.Classes.Update)]
     public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> ReorderLessons(
         [FromBody] ReorderCourseLessonsCommand cmd, CancellationToken ct)
         => MapBuilder(await sender.Send(cmd, ct));
 
     /// <summary>Create a whole unit and all its lessons in one request (the one-click builder flow).</summary>
     [HttpPost("units/bulk")]
-    [PermissionAuthorize(Permissions.Classes.Update)]
     public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> BulkCreateUnit(
         [FromBody] BulkCreateUnitCommand cmd, CancellationToken ct)
         => MapBuilder(await sender.Send(cmd, ct));
 
     /// <summary>Duplicate a unit and all of its lessons (appended to the end of the course).</summary>
     [HttpPost("units/{id:guid}/duplicate")]
-    [PermissionAuthorize(Permissions.Classes.Update)]
     public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> DuplicateUnit(Guid id, CancellationToken ct)
         => MapBuilder(await sender.Send(new DuplicateCourseUnitCommand(id), ct));
 
     /// <summary>Duplicate a lesson within its unit.</summary>
     [HttpPost("lessons/{id:guid}/duplicate")]
-    [PermissionAuthorize(Permissions.Classes.Update)]
     public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> DuplicateLesson(Guid id, CancellationToken ct)
         => MapBuilder(await sender.Send(new DuplicateCourseLessonCommand(id), ct));
 
     /// <summary>Move a lesson to another unit in the same course. Body: {"targetUnitId":"...","targetOrder":3}.</summary>
     [HttpPost("lessons/{id:guid}/move")]
-    [PermissionAuthorize(Permissions.Classes.Update)]
     public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> MoveLesson(
         Guid id, [FromBody] MoveCourseLessonCommand cmd, CancellationToken ct)
         => MapBuilder(await sender.Send(cmd with { LessonId = id }, ct));
