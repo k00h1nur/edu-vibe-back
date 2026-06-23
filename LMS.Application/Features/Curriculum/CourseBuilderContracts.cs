@@ -31,6 +31,15 @@ public sealed record ClassCourseBuilderDto(
 /// <summary>Reads (and lazily provisions) the class's own editable course structure.</summary>
 public sealed record GetClassCourseBuilderQuery(Guid ClassId) : IRequest<Result<ClassCourseBuilderDto>>;
 
+/// <summary>
+/// Deep-copies a curriculum template (its modules → units → lessons, with all
+/// rich fields) into a fresh editable course owned by the class, and points the
+/// class at it. The one-click "start from a template" flow — no manual unit
+/// creation. Returns the whole built course so the roadmap renders immediately.
+/// </summary>
+public sealed record CloneTemplateToClassCommand(Guid ClassId, Guid TemplateId)
+    : IRequest<Result<ClassCourseBuilderDto>>;
+
 // New optional fields default so existing callers (title+description only) keep working.
 public sealed record CreateCourseUnitCommand(
     Guid ClassId, string Title, string? Description,

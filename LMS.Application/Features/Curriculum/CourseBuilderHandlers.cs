@@ -26,12 +26,67 @@ public sealed class CourseBuilderHandlers(IApplicationDbContext db, ICurrentUser
     IRequestHandler<BulkCreateUnitCommand, Result<ClassCourseBuilderDto>>,
     IRequestHandler<DuplicateCourseUnitCommand, Result<ClassCourseBuilderDto>>,
     IRequestHandler<DuplicateCourseLessonCommand, Result<ClassCourseBuilderDto>>,
-    IRequestHandler<MoveCourseLessonCommand, Result<ClassCourseBuilderDto>>
+    IRequestHandler<MoveCourseLessonCommand, Result<ClassCourseBuilderDto>>,
+    IRequestHandler<CloneTemplateToClassCommand, Result<ClassCourseBuilderDto>>
 {
     // ---- public handlers --------------------------------------------------
 
     public async Task<Result<ClassCourseBuilderDto>> Handle(GetClassCourseBuilderQuery request, CancellationToken ct)
         => await WithCourse(request.ClassId, ct, (_, _) => Task.CompletedTask);
+
+    public async Task<Result<ClassCourseBuilderDto>> Handle(CloneTemplateToClassCommand request, CancellationToken ct)
+    {
+        var cls = await db.Classes.FirstOrDefaultAsync(c => c.Id == request.ClassId, ct);
+        if (cls is null) return Fail("NOT_FOUND", "Class not found.");
+        if (!IsAdmin && (cls.TeacherUserId is null || cls.TeacherUserId != currentUser.UserId))
+            return Fail("FORBIDDEN", "Only the class teacher or an admin can set up this course.");
+
+        var source = await db.CurriculumTemplates.AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Id == request.TemplateId, ct);
+        if (source is null) return Fail("NOT_FOUND", "Template not found.");
+
+        // Fresh editable course owned by the class — a deep copy of the source.
+        var clone = new CurriculumTemplate(
+            $"{cls.Title} — {source.Name}", source.Category, source.Level, source.Description, isSystem: false);
+        await db.CurriculumTemplates.AddAsync(clone, ct);
+        await db.SaveChangesAsync(ct);
+
+        var modules = await db.CurriculumModules.AsNoTracking()
+            .Where(m => m.TemplateId == source.Id).OrderBy(m => m.Order).ToListAsync(ct);
+        var moduleIds = modules.Select(m => m.Id).ToList();
+        var units = await db.CurriculumUnits.AsNoTracking()
+            .Where(u => moduleIds.Contains(u.ModuleId)).OrderBy(u => u.Order).ToListAsync(ct);
+        var unitIds = units.Select(u => u.Id).ToList();
+        var lessons = await db.CurriculumLessons.AsNoTracking()
+            .Where(l => unitIds.Contains(l.UnitId)).OrderBy(l => l.Order).ToListAsync(ct);
+
+        foreach (var m in modules)
+        {
+            var mc = new CurriculumModule(clone.Id, m.Order, m.Title);
+            await db.CurriculumModules.AddAsync(mc, ct);
+            await db.SaveChangesAsync(ct);
+            foreach (var u in units.Where(x => x.ModuleId == m.Id))
+            {
+                var uc = new CurriculumUnit(mc.Id, u.Order, u.Title);
+                uc.Update(u.Title, u.Description);
+                uc.SetMeta(u.Icon, u.EstimatedMinutes, u.XpReward);
+                await db.CurriculumUnits.AddAsync(uc, ct);
+                await db.SaveChangesAsync(ct);
+                foreach (var l in lessons.Where(x => x.UnitId == u.Id))
+                {
+                    var lc = new CurriculumLesson(uc.Id, l.Order, l.Title,
+                        l.Objectives, l.HomeworkPlaceholder, l.MaterialsPlaceholder, l.IsAssessment);
+                    lc.SetMeta(l.LessonType, l.DurationMinutes, l.XpReward);
+                    await db.CurriculumLessons.AddAsync(lc, ct);
+                }
+                await db.SaveChangesAsync(ct);
+            }
+        }
+
+        cls.SetCurriculumTemplate(clone.Id);
+        await db.SaveChangesAsync(ct);
+        return await BuildDtoAsync(request.ClassId, clone.Id, ct);
+    }
 
     public async Task<Result<ClassCourseBuilderDto>> Handle(CreateCourseUnitCommand request, CancellationToken ct)
         => await WithCourse(request.ClassId, ct, async (templateId, moduleId) =>
