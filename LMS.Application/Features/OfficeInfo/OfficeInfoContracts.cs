@@ -23,6 +23,7 @@ public sealed record OfficeInfoDto(
     string? YoutubeUrl,
     string? WebsiteUrl,
     string? AboutHtml,
+    string? MapEmbedUrl,
     DateTime UpdatedAt);
 
 public sealed record GetOfficeInfoQuery : IRequest<Result<OfficeInfoDto>>;
@@ -40,4 +41,5 @@ public sealed record UpsertOfficeInfoCommand(
     string? FacebookUrl,
     string? YoutubeUrl,
     string? WebsiteUrl,
-    string? AboutHtml) : IRequest<Result<OfficeInfoDto>>;
+    string? AboutHtml,
+    string? MapEmbedUrl) : IRequest<Result<OfficeInfoDto>>;

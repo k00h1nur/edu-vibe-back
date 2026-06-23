@@ -29,6 +29,7 @@ public sealed class OfficeInfoHandlers(IApplicationDbContext db) :
                 Email: null, Address: null, WorkingHours: null,
                 TelegramUrl: null, InstagramUrl: null, FacebookUrl: null,
                 YoutubeUrl: null, WebsiteUrl: null, AboutHtml: null,
+                MapEmbedUrl: null,
                 UpdatedAt: DateTime.UtcNow);
             return Result<OfficeInfoDto>.Ok(empty);
         }
@@ -45,7 +46,7 @@ public sealed class OfficeInfoHandlers(IApplicationDbContext db) :
                 request.PhoneNumber, request.SecondaryPhone,
                 request.Email, request.Address, request.WorkingHours,
                 request.TelegramUrl, request.InstagramUrl, request.FacebookUrl,
-                request.YoutubeUrl, request.WebsiteUrl, request.AboutHtml);
+                request.YoutubeUrl, request.WebsiteUrl, request.AboutHtml, request.MapEmbedUrl);
             await db.OfficeInfo.AddAsync(row, ct);
         }
         else
@@ -55,7 +56,7 @@ public sealed class OfficeInfoHandlers(IApplicationDbContext db) :
                 request.PhoneNumber, request.SecondaryPhone,
                 request.Email, request.Address, request.WorkingHours,
                 request.TelegramUrl, request.InstagramUrl, request.FacebookUrl,
-                request.YoutubeUrl, request.WebsiteUrl, request.AboutHtml);
+                request.YoutubeUrl, request.WebsiteUrl, request.AboutHtml, request.MapEmbedUrl);
         }
         await db.SaveChangesAsync(ct);
         return Result<OfficeInfoDto>.Ok(Map(row), "Saved");
@@ -64,5 +65,5 @@ public sealed class OfficeInfoHandlers(IApplicationDbContext db) :
     private static OfficeInfoDto Map(OfficeInfoEntity r) => new(
         r.AcademyName, r.Tagline, r.PhoneNumber, r.SecondaryPhone, r.Email,
         r.Address, r.WorkingHours, r.TelegramUrl, r.InstagramUrl, r.FacebookUrl,
-        r.YoutubeUrl, r.WebsiteUrl, r.AboutHtml, r.UpdatedAt);
+        r.YoutubeUrl, r.WebsiteUrl, r.AboutHtml, r.MapEmbedUrl, r.UpdatedAt);
 }
