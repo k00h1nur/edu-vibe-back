@@ -33,12 +33,13 @@ public sealed class OfficeInfo : BaseEntity
         string? facebookUrl,
         string? youtubeUrl,
         string? websiteUrl,
-        string? aboutHtml)
+        string? aboutHtml,
+        string? mapEmbedUrl)
     {
         Id = SingletonId;
         SetAll(academyName, tagline, phoneNumber, secondaryPhone, email, address,
             workingHours, telegramUrl, instagramUrl, facebookUrl, youtubeUrl,
-            websiteUrl, aboutHtml);
+            websiteUrl, aboutHtml, mapEmbedUrl);
     }
 
     public string AcademyName { get; private set; } = null!;
@@ -55,6 +56,8 @@ public sealed class OfficeInfo : BaseEntity
     public string? WebsiteUrl { get; private set; }
     /// <summary>Sanitized rich-text "about" copy — rendered on the marketing site.</summary>
     public string? AboutHtml { get; private set; }
+    /// <summary>Google Maps embed URL (the iframe src) — renders the location map on the marketing site.</summary>
+    public string? MapEmbedUrl { get; private set; }
 
     public void Update(
         string academyName,
@@ -69,11 +72,12 @@ public sealed class OfficeInfo : BaseEntity
         string? facebookUrl,
         string? youtubeUrl,
         string? websiteUrl,
-        string? aboutHtml)
+        string? aboutHtml,
+        string? mapEmbedUrl)
     {
         SetAll(academyName, tagline, phoneNumber, secondaryPhone, email, address,
             workingHours, telegramUrl, instagramUrl, facebookUrl, youtubeUrl,
-            websiteUrl, aboutHtml);
+            websiteUrl, aboutHtml, mapEmbedUrl);
         Touch();
     }
 
@@ -81,7 +85,7 @@ public sealed class OfficeInfo : BaseEntity
         string academyName, string? tagline, string? phoneNumber, string? secondaryPhone,
         string? email, string? address, string? workingHours,
         string? telegramUrl, string? instagramUrl, string? facebookUrl,
-        string? youtubeUrl, string? websiteUrl, string? aboutHtml)
+        string? youtubeUrl, string? websiteUrl, string? aboutHtml, string? mapEmbedUrl)
     {
         if (string.IsNullOrWhiteSpace(academyName))
             throw new DomainException("Academy name is required.");
@@ -98,6 +102,7 @@ public sealed class OfficeInfo : BaseEntity
         YoutubeUrl = Trim(youtubeUrl, 512);
         WebsiteUrl = Trim(websiteUrl, 512);
         AboutHtml = Trim(aboutHtml, 8000);
+        MapEmbedUrl = Trim(mapEmbedUrl, 2000);
     }
 
     private static string? Trim(string? value, int max)

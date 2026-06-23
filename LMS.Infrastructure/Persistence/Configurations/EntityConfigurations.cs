@@ -615,6 +615,7 @@ public sealed class OfficeInfoConfiguration : IEntityTypeConfiguration<OfficeInf
         b.Property(x => x.YoutubeUrl).HasMaxLength(512);
         b.Property(x => x.WebsiteUrl).HasMaxLength(512);
         b.Property(x => x.AboutHtml).HasMaxLength(8000);
+        b.Property(x => x.MapEmbedUrl).HasMaxLength(2000);
     }
 }
 
