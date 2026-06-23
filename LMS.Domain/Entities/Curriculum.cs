@@ -97,8 +97,24 @@ public sealed class CurriculumUnit : BaseEntity
     public Guid ModuleId { get; private set; }
     public int Order { get; private set; }
     public string Title { get; private set; } = null!;
+    /// <summary>Short description shown on the unit card. Optional.</summary>
+    public string? Description { get; private set; }
 
     public ICollection<CurriculumLesson> Lessons { get; } = new List<CurriculumLesson>();
+
+    public void Update(string title, string? description)
+    {
+        if (string.IsNullOrWhiteSpace(title)) throw new DomainException("Unit title is required.");
+        Title = title.Trim();
+        Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+        Touch();
+    }
+
+    public void SetOrder(int order)
+    {
+        Order = order;
+        Touch();
+    }
 }
 
 /// <summary>
@@ -136,4 +152,22 @@ public sealed class CurriculumLesson : BaseEntity
     public string? MaterialsPlaceholder { get; private set; }
     /// <summary>Marks an assessment lesson (quiz / mock exam / test) for milestone reporting.</summary>
     public bool IsAssessment { get; private set; }
+
+    public void Update(string title, string? objectives, string? homeworkPlaceholder,
+        string? materialsPlaceholder, bool isAssessment)
+    {
+        if (string.IsNullOrWhiteSpace(title)) throw new DomainException("Lesson title is required.");
+        Title = title.Trim();
+        Objectives = string.IsNullOrWhiteSpace(objectives) ? null : objectives.Trim();
+        HomeworkPlaceholder = string.IsNullOrWhiteSpace(homeworkPlaceholder) ? null : homeworkPlaceholder.Trim();
+        MaterialsPlaceholder = string.IsNullOrWhiteSpace(materialsPlaceholder) ? null : materialsPlaceholder.Trim();
+        IsAssessment = isAssessment;
+        Touch();
+    }
+
+    public void SetOrder(int order)
+    {
+        Order = order;
+        Touch();
+    }
 }

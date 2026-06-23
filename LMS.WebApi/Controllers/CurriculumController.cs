@@ -62,4 +62,71 @@ public sealed class CurriculumController(ISender sender) : ControllerBase
             ? Ok(ApiResponse<ClassCurriculumDto>.Ok(r.Data, r.Message))
             : NotFound(ApiResponse<ClassCurriculumDto>.Fail(r.Message ?? "Not found"));
     }
+
+    // ===== Course Builder (teacher of the class / admin) ===================
+    // All return the whole refreshed course so the roadmap re-renders from one
+    // response. Permission-gated here; self-scoped to the class teacher in the
+    // handler.
+
+    private ActionResult<ApiResponse<ClassCourseBuilderDto>> MapBuilder(Result<ClassCourseBuilderDto> r) =>
+        r.Success
+            ? Ok(ApiResponse<ClassCourseBuilderDto>.Ok(r.Data, r.Message))
+            : r.ErrorCode switch
+            {
+                "NOT_FOUND" => NotFound(ApiResponse<ClassCourseBuilderDto>.Fail(r.Message ?? "Not found")),
+                "FORBIDDEN" => StatusCode(StatusCodes.Status403Forbidden, ApiResponse<ClassCourseBuilderDto>.Fail(r.Message ?? "Forbidden")),
+                _ => BadRequest(ApiResponse<ClassCourseBuilderDto>.Fail(r.Message ?? "Failed")),
+            };
+
+    /// <summary>Reads (and lazily provisions) the class's editable course structure.</summary>
+    [HttpGet("class/{classId:guid}/builder")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> Builder(Guid classId, CancellationToken ct)
+        => MapBuilder(await sender.Send(new GetClassCourseBuilderQuery(classId), ct));
+
+    [HttpPost("units")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> CreateUnit(
+        [FromBody] CreateCourseUnitCommand cmd, CancellationToken ct)
+        => MapBuilder(await sender.Send(cmd, ct));
+
+    [HttpPut("units/{id:guid}")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> UpdateUnit(
+        Guid id, [FromBody] UpdateCourseUnitCommand cmd, CancellationToken ct)
+        => MapBuilder(await sender.Send(cmd with { UnitId = id }, ct));
+
+    [HttpDelete("units/{id:guid}")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> DeleteUnit(Guid id, CancellationToken ct)
+        => MapBuilder(await sender.Send(new DeleteCourseUnitCommand(id), ct));
+
+    [HttpPost("units/reorder")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> ReorderUnits(
+        [FromBody] ReorderCourseUnitsCommand cmd, CancellationToken ct)
+        => MapBuilder(await sender.Send(cmd, ct));
+
+    [HttpPost("lessons")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> CreateLesson(
+        [FromBody] CreateCourseLessonCommand cmd, CancellationToken ct)
+        => MapBuilder(await sender.Send(cmd, ct));
+
+    [HttpPut("lessons/{id:guid}")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> UpdateLesson(
+        Guid id, [FromBody] UpdateCourseLessonCommand cmd, CancellationToken ct)
+        => MapBuilder(await sender.Send(cmd with { LessonId = id }, ct));
+
+    [HttpDelete("lessons/{id:guid}")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> DeleteLesson(Guid id, CancellationToken ct)
+        => MapBuilder(await sender.Send(new DeleteCourseLessonCommand(id), ct));
+
+    [HttpPost("lessons/reorder")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> ReorderLessons(
+        [FromBody] ReorderCourseLessonsCommand cmd, CancellationToken ct)
+        => MapBuilder(await sender.Send(cmd, ct));
 }
