@@ -760,6 +760,7 @@ public sealed class CurriculumUnitConfiguration : IEntityTypeConfiguration<Curri
         b.HasKey(x => x.Id);
         b.Property(x => x.Title).IsRequired().HasMaxLength(200);
         b.Property(x => x.Description).HasMaxLength(500);
+        b.Property(x => x.Icon).HasMaxLength(16);
         b.HasIndex(x => new { x.ModuleId, x.Order });
         b.HasMany(x => x.Lessons).WithOne().HasForeignKey(l => l.UnitId).OnDelete(DeleteBehavior.Cascade);
     }

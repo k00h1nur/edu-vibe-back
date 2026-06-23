@@ -13,6 +13,20 @@ public enum CurriculumCategory
     Custom = 5,
 }
 
+/// <summary>Pedagogical kind of a lesson — drives the badge/icon and lets the planner balance skills.</summary>
+public enum CurriculumLessonType
+{
+    General = 0,
+    Speaking = 1,
+    Grammar = 2,
+    Vocabulary = 3,
+    Listening = 4,
+    Reading = 5,
+    Writing = 6,
+    Practice = 7,
+    Exam = 8,
+}
+
 /// <summary>
 /// A reusable learning path a class can follow:
 /// Template → Module → Unit → Lesson. A class points at a template
@@ -99,6 +113,12 @@ public sealed class CurriculumUnit : BaseEntity
     public string Title { get; private set; } = null!;
     /// <summary>Short description shown on the unit card. Optional.</summary>
     public string? Description { get; private set; }
+    /// <summary>Optional emoji/icon shown on the unit card (e.g. "📘").</summary>
+    public string? Icon { get; private set; }
+    /// <summary>Estimated time to finish the unit, in minutes. Optional.</summary>
+    public int? EstimatedMinutes { get; private set; }
+    /// <summary>XP awarded for completing the whole unit.</summary>
+    public int XpReward { get; private set; }
 
     public ICollection<CurriculumLesson> Lessons { get; } = new List<CurriculumLesson>();
 
@@ -113,6 +133,15 @@ public sealed class CurriculumUnit : BaseEntity
     public void SetOrder(int order)
     {
         Order = order;
+        Touch();
+    }
+
+    /// <summary>Sets the card metadata (icon / estimated duration / XP reward).</summary>
+    public void SetMeta(string? icon, int? estimatedMinutes, int xpReward)
+    {
+        Icon = string.IsNullOrWhiteSpace(icon) ? null : icon.Trim();
+        EstimatedMinutes = estimatedMinutes is > 0 ? estimatedMinutes : null;
+        XpReward = xpReward < 0 ? 0 : xpReward;
         Touch();
     }
 }
@@ -152,6 +181,12 @@ public sealed class CurriculumLesson : BaseEntity
     public string? MaterialsPlaceholder { get; private set; }
     /// <summary>Marks an assessment lesson (quiz / mock exam / test) for milestone reporting.</summary>
     public bool IsAssessment { get; private set; }
+    /// <summary>Pedagogical kind — drives the lesson badge/icon and skill balancing.</summary>
+    public CurriculumLessonType LessonType { get; private set; }
+    /// <summary>Planned lesson length in minutes. Optional.</summary>
+    public int? DurationMinutes { get; private set; }
+    /// <summary>XP awarded for completing the lesson.</summary>
+    public int XpReward { get; private set; }
 
     public void Update(string title, string? objectives, string? homeworkPlaceholder,
         string? materialsPlaceholder, bool isAssessment)
@@ -167,6 +202,24 @@ public sealed class CurriculumLesson : BaseEntity
 
     public void SetOrder(int order)
     {
+        Order = order;
+        Touch();
+    }
+
+    /// <summary>Sets the lesson metadata (type / duration / XP reward).</summary>
+    public void SetMeta(CurriculumLessonType lessonType, int? durationMinutes, int xpReward)
+    {
+        LessonType = lessonType;
+        DurationMinutes = durationMinutes is > 0 ? durationMinutes : null;
+        XpReward = xpReward < 0 ? 0 : xpReward;
+        Touch();
+    }
+
+    /// <summary>Reassigns the lesson to another unit at the given order (drag-between-units).</summary>
+    public void MoveToUnit(Guid unitId, int order)
+    {
+        if (unitId == Guid.Empty) throw new DomainException("Unit id is required.");
+        UnitId = unitId;
         Order = order;
         Touch();
     }

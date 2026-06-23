@@ -129,4 +129,30 @@ public sealed class CurriculumController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> ReorderLessons(
         [FromBody] ReorderCourseLessonsCommand cmd, CancellationToken ct)
         => MapBuilder(await sender.Send(cmd, ct));
+
+    /// <summary>Create a whole unit and all its lessons in one request (the one-click builder flow).</summary>
+    [HttpPost("units/bulk")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> BulkCreateUnit(
+        [FromBody] BulkCreateUnitCommand cmd, CancellationToken ct)
+        => MapBuilder(await sender.Send(cmd, ct));
+
+    /// <summary>Duplicate a unit and all of its lessons (appended to the end of the course).</summary>
+    [HttpPost("units/{id:guid}/duplicate")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> DuplicateUnit(Guid id, CancellationToken ct)
+        => MapBuilder(await sender.Send(new DuplicateCourseUnitCommand(id), ct));
+
+    /// <summary>Duplicate a lesson within its unit.</summary>
+    [HttpPost("lessons/{id:guid}/duplicate")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> DuplicateLesson(Guid id, CancellationToken ct)
+        => MapBuilder(await sender.Send(new DuplicateCourseLessonCommand(id), ct));
+
+    /// <summary>Move a lesson to another unit in the same course. Body: {"targetUnitId":"...","targetOrder":3}.</summary>
+    [HttpPost("lessons/{id:guid}/move")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> MoveLesson(
+        Guid id, [FromBody] MoveCourseLessonCommand cmd, CancellationToken ct)
+        => MapBuilder(await sender.Send(cmd with { LessonId = id }, ct));
 }
