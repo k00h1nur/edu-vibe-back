@@ -98,6 +98,12 @@ public sealed class CurriculumController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> Builder(Guid classId, CancellationToken ct)
         => MapBuilder(await sender.Send(new GetClassCourseBuilderQuery(classId), ct));
 
+    /// <summary>One-click: deep-copy a curriculum template into this class as its editable course.</summary>
+    [HttpPost("class/{classId:guid}/use-template/{templateId:guid}")]
+    public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> UseTemplate(
+        Guid classId, Guid templateId, CancellationToken ct)
+        => MapBuilder(await sender.Send(new CloneTemplateToClassCommand(classId, templateId), ct));
+
     [HttpPost("units")]
     public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> CreateUnit(
         [FromBody] CreateCourseUnitCommand cmd, CancellationToken ct)
