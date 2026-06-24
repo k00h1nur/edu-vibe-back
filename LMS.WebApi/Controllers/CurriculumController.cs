@@ -104,6 +104,25 @@ public sealed class CurriculumController(ISender sender) : ControllerBase
         Guid classId, Guid templateId, CancellationToken ct)
         => MapBuilder(await sender.Send(new CloneTemplateToClassCommand(classId, templateId), ct));
 
+    /// <summary>
+    /// F3 one-click course setup — clone the template, generate the 2–3 lessons/day
+    /// session calendar, and map sessions to lessons, atomically. Body carries the
+    /// schedule window + daily slots: {"templateId","type","daysOfWeekMask",
+    /// "startDate","endDate","slots":[{"startsAt","endsAt"}],"roomId"}.
+    /// </summary>
+    [HttpPost("class/{classId:guid}/generate-course")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<GenerateCourseResultDto>>> GenerateCourse(
+        Guid classId, [FromBody] GenerateCourseCommand cmd, CancellationToken ct)
+    {
+        var r = await sender.Send(cmd with { ClassId = classId }, ct);
+        return r.Success
+            ? Ok(ApiResponse<GenerateCourseResultDto>.Ok(r.Data, r.Message))
+            : r.ErrorCode == "NOT_FOUND"
+                ? NotFound(ApiResponse<GenerateCourseResultDto>.Fail(r.Message ?? "Not found"))
+                : BadRequest(ApiResponse<GenerateCourseResultDto>.Fail(r.Message ?? "Failed"));
+    }
+
     [HttpPost("units")]
     public async Task<ActionResult<ApiResponse<ClassCourseBuilderDto>>> CreateUnit(
         [FromBody] CreateCourseUnitCommand cmd, CancellationToken ct)

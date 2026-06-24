@@ -1,5 +1,6 @@
 using LMS.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace LMS.Application.Common.Abstractions;
 
@@ -20,6 +21,7 @@ public interface IApplicationDbContext
     DbSet<CurriculumModule> CurriculumModules { get; }
     DbSet<CurriculumUnit> CurriculumUnits { get; }
     DbSet<CurriculumLesson> CurriculumLessons { get; }
+    DbSet<LessonDefaultTask> LessonDefaultTasks { get; }
     DbSet<Enrollment> Enrollments { get; }
     DbSet<ClassSession> ClassSessions { get; }
     DbSet<ClassSchedulePattern> ClassSchedulePatterns { get; }
@@ -63,4 +65,10 @@ public interface IApplicationDbContext
     DbSet<TelegramSettings> TelegramSettings { get; }
     DbSet<TelegramDeepLinkToken> TelegramDeepLinkTokens { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Opens a DB transaction on the shared scoped context so a multi-step command
+    /// (e.g. F3 GenerateCourse) can commit all of its SaveChanges atomically.
+    /// </summary>
+    Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken);
 }

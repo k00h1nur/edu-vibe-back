@@ -167,6 +167,9 @@ public sealed record GetClassSchedulePatternQuery(Guid ClassId) : IRequest<Resul
 /// untouched; every other future session is replaced by the dates the new
 /// pattern produces. Replaces lesson-by-lesson manual creation.
 /// </summary>
+/// <summary>One lesson time-slot within a day (F3 multi-lesson-per-day support).</summary>
+public sealed record ScheduleSlot(TimeOnly StartsAt, TimeOnly EndsAt);
+
 public sealed record ApplyClassScheduleCommand(
     Guid ClassId,
     SchedulePatternType Type,
@@ -175,7 +178,14 @@ public sealed record ApplyClassScheduleCommand(
     DateOnly EndDate,
     TimeOnly StartsAt,
     TimeOnly EndsAt,
-    Guid? RoomId) : IRequest<Result<ApplyScheduleResultDto>>;
+    Guid? RoomId,
+    /// <summary>
+    /// Optional 2–3 lessons/day slots (F3). When set, one session per slot is
+    /// generated on each matched day; when null/empty, the single StartsAt/EndsAt
+    /// is used — so the existing schedule-pattern caller is unchanged. Not persisted
+    /// to the recurring pattern (the pattern keeps its single StartsAt/EndsAt).
+    /// </summary>
+    IReadOnlyList<ScheduleSlot>? Slots = null) : IRequest<Result<ApplyScheduleResultDto>>;
 
 /// <summary>What the apply did — surfaced as the admin-facing toast.</summary>
 public sealed record ApplyScheduleResultDto(
