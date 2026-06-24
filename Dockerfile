@@ -5,13 +5,15 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
 # Copy only the project files first so `dotnet restore` is cached across
-# source-only changes.
-COPY LMS.sln ./
+# source-only changes. We restore the WebApi project (not the whole solution):
+# it transitively pulls Domain/Application/Infrastructure, and deliberately
+# excludes tests/LMS.Tests — the deploy image neither copies nor needs the test
+# project, and restoring LMS.sln would fail looking for its csproj.
 COPY LMS.Domain/LMS.Domain.csproj           LMS.Domain/
 COPY LMS.Application/LMS.Application.csproj  LMS.Application/
 COPY LMS.Infrastructure/LMS.Infrastructure.csproj LMS.Infrastructure/
 COPY LMS.WebApi/LMS.WebApi.csproj           LMS.WebApi/
-RUN dotnet restore LMS.sln
+RUN dotnet restore LMS.WebApi/LMS.WebApi.csproj
 
 # Copy the rest and publish the WebApi.
 COPY . .
