@@ -61,6 +61,28 @@ public sealed class TasksController(ISender sender, ICurrentUserService currentU
             : BadRequest(ApiResponse<LearningTaskDto>.Fail(r.Message ?? "Failed"));
     }
 
+    /// <summary>
+    /// F4: materialise a lesson's default tasks into real LearningTasks under one
+    /// assignment for the session. Idempotent — re-running adds only missing tasks.
+    /// Self-scoped in the handler to the class teacher or an admin.
+    /// </summary>
+    [HttpPost("lesson-session/{sessionId:guid}/materialize")]
+    [PermissionAuthorize(Permissions.Tasks.Manage)]
+    public async Task<ActionResult<ApiResponse<MaterializeLessonTasksResultDto>>> Materialize(
+        Guid sessionId, CancellationToken ct)
+    {
+        var r = await sender.Send(new MaterializeLessonTasksCommand(sessionId), ct);
+        return r.Success
+            ? Ok(ApiResponse<MaterializeLessonTasksResultDto>.Ok(r.Data, r.Message))
+            : r.ErrorCode switch
+            {
+                "NOT_FOUND" => NotFound(ApiResponse<MaterializeLessonTasksResultDto>.Fail(r.Message ?? "Not found")),
+                "FORBIDDEN" => StatusCode(StatusCodes.Status403Forbidden,
+                    ApiResponse<MaterializeLessonTasksResultDto>.Fail(r.Message ?? "Forbidden")),
+                _ => BadRequest(ApiResponse<MaterializeLessonTasksResultDto>.Fail(r.Message ?? "Failed")),
+            };
+    }
+
     [HttpPut("{id:guid}")]
     [PermissionAuthorize(Permissions.Tasks.Manage)]
     public async Task<ActionResult<ApiResponse<LearningTaskDto>>> Update(Guid id,
