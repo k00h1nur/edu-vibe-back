@@ -115,6 +115,36 @@ public sealed record ScheduleEntryDto(
 public sealed record GetScheduleQuery(DateOnly From, DateOnly To)
     : IRequest<Result<IReadOnlyCollection<ScheduleEntryDto>>>;
 
+/// <summary>
+/// Admin schedule report row (F2) — one per session, enriched with the teacher's
+/// full name, the curriculum lesson topic, and present-vs-enrolled counts. Heavier
+/// than <see cref="ScheduleEntryDto"/> (per-session aggregation), so it lives in its
+/// own query rather than bloating the lightweight schedule grid.
+/// </summary>
+public sealed record AdminScheduleEntryDto(
+    Guid Id,
+    Guid ClassId,
+    string ClassName,
+    Guid? TeacherUserId,
+    string? TeacherFullName,
+    DateOnly SessionDate,
+    TimeOnly StartsAt,
+    TimeOnly EndsAt,
+    string? Topic,
+    int PresentCount,
+    int EnrolledCount);
+
+/// <summary>
+/// Admin schedule across [<paramref name="From"/>, <paramref name="To"/>], optionally
+/// narrowed to one teacher and/or one class. Present/enrolled counts are aggregated in
+/// grouped queries (never per session). Dates inclusive.
+/// </summary>
+public sealed record GetAdminScheduleQuery(
+    DateOnly From,
+    DateOnly To,
+    Guid? TeacherId = null,
+    Guid? ClassId = null) : IRequest<Result<IReadOnlyCollection<AdminScheduleEntryDto>>>;
+
 // ---- Recurring schedule patterns -----------------------------------------
 
 public sealed record SchedulePatternDto(

@@ -113,6 +113,26 @@ public sealed class ClassSessionsController(
             : BadRequest(ApiResponse<IReadOnlyCollection<ScheduleEntryDto>>.Fail(r.Message ?? "Failed"));
     }
 
+    /// <summary>
+    /// Admin schedule report (F2): each session over a date range with teacher name,
+    /// curriculum topic, and present-vs-enrolled counts. Optional teacher/class filters.
+    /// Counts are aggregated in grouped queries (no N+1). Inclusive on both ends.
+    /// </summary>
+    [HttpGet("admin/schedule")]
+    [PermissionAuthorize(Permissions.Sessions.Read)]
+    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<AdminScheduleEntryDto>>>> AdminSchedule(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? teacherId,
+        [FromQuery] Guid? classId,
+        CancellationToken ct)
+    {
+        var r = await sender.Send(new GetAdminScheduleQuery(from, to, teacherId, classId), ct);
+        return r.Success
+            ? Ok(ApiResponse<IReadOnlyCollection<AdminScheduleEntryDto>>.Ok(r.Data, r.Message))
+            : BadRequest(ApiResponse<IReadOnlyCollection<AdminScheduleEntryDto>>.Fail(r.Message ?? "Failed"));
+    }
+
     [HttpPost]
     [PermissionAuthorize(Permissions.Sessions.Create)]
     public async Task<ActionResult<ApiResponse<SessionDto>>> Create([FromBody] CreateClassSessionCommand cmd,

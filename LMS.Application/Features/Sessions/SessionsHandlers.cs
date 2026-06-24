@@ -1,6 +1,7 @@
 using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Models;
 using LMS.Domain.Entities;
+using LMS.Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,6 +18,7 @@ public sealed class SessionsHandlers(IApplicationDbContext db, ICurrentUserServi
     IRequestHandler<GetUpcomingSessionsQuery, Result<IReadOnlyCollection<ScheduleEntryDto>>>,
     IRequestHandler<GetSessionsForDateQuery, Result<IReadOnlyCollection<SessionDto>>>,
     IRequestHandler<GetScheduleQuery, Result<IReadOnlyCollection<ScheduleEntryDto>>>,
+    IRequestHandler<GetAdminScheduleQuery, Result<IReadOnlyCollection<AdminScheduleEntryDto>>>,
     IRequestHandler<GetClassSchedulePatternQuery, Result<SchedulePatternDto>>,
     IRequestHandler<ApplyClassScheduleCommand, Result<ApplyScheduleResultDto>>
 {
@@ -200,6 +202,75 @@ public sealed class SessionsHandlers(IApplicationDbContext db, ICurrentUserServi
                 s.SessionDate, s.StartsAt, s.EndsAt, s.RoomId, s.Topic, s.MeetingUrl))
             .ToListAsync(ct);
         return Result<IReadOnlyCollection<ScheduleEntryDto>>.Ok(data);
+    }
+
+    public async Task<Result<IReadOnlyCollection<AdminScheduleEntryDto>>> Handle(GetAdminScheduleQuery request,
+        CancellationToken ct)
+    {
+        if (request.To < request.From)
+            return Result<IReadOnlyCollection<AdminScheduleEntryDto>>.Fail("VALIDATION", "To must be on or after From.");
+
+        // 1) Base rows: session + class + (optional) teacher name + curriculum topic.
+        //    StaffProfile is LEFT-joined on UserId == Class.TeacherUserId (not a modelled
+        //    relationship); the curriculum lesson title is the authoritative topic when the
+        //    session is curriculum-linked, otherwise the ad-hoc Topic.
+        var baseRows = await (
+            from s in db.ClassSessions.AsNoTracking()
+            join c in db.Classes.AsNoTracking() on s.ClassId equals c.Id
+            join sp in db.StaffProfiles.AsNoTracking() on c.TeacherUserId equals sp.UserId into sps
+            from sp in sps.DefaultIfEmpty()
+            where s.SessionDate >= request.From && s.SessionDate <= request.To
+                  && (request.TeacherId == null || c.TeacherUserId == request.TeacherId)
+                  && (request.ClassId == null || s.ClassId == request.ClassId)
+            orderby s.SessionDate, s.StartsAt
+            select new
+            {
+                s.Id,
+                s.ClassId,
+                ClassName = c.Title,
+                c.TeacherUserId,
+                TeacherFirst = sp != null ? sp.FirstName : null,
+                TeacherLast = sp != null ? sp.LastName : null,
+                s.SessionDate,
+                s.StartsAt,
+                s.EndsAt,
+                Topic = s.CurriculumLessonId != null ? s.CurriculumLesson!.Title : s.Topic,
+            }).ToListAsync(ct);
+
+        if (baseRows.Count == 0)
+            return Result<IReadOnlyCollection<AdminScheduleEntryDto>>.Ok(Array.Empty<AdminScheduleEntryDto>());
+
+        var sessionIds = baseRows.Select(r => r.Id).ToList();
+        var classIds = baseRows.Select(r => r.ClassId).Distinct().ToList();
+
+        // 2) Present counts — ONE grouped query over Attendance, keyed by session (no N+1).
+        var presentBySession = (await db.Attendance.AsNoTracking()
+                .Where(a => sessionIds.Contains(a.SessionId) && a.Status == AttendanceStatus.Present)
+                .GroupBy(a => a.SessionId)
+                .Select(g => new { SessionId = g.Key, Count = g.Count() })
+                .ToListAsync(ct))
+            .ToDictionary(x => x.SessionId, x => x.Count);
+
+        // 3) Active-enrolment counts — ONE grouped query over Enrollments, keyed by class.
+        var enrolledByClass = (await db.Enrollments.AsNoTracking()
+                .Where(e => classIds.Contains(e.ClassId) && e.Status == EnrollmentStatus.Active)
+                .GroupBy(e => e.ClassId)
+                .Select(g => new { ClassId = g.Key, Count = g.Count() })
+                .ToListAsync(ct))
+            .ToDictionary(x => x.ClassId, x => x.Count);
+
+        var rows = baseRows.Select(r =>
+        {
+            var name = $"{r.TeacherFirst ?? ""} {r.TeacherLast ?? ""}".Trim();
+            return new AdminScheduleEntryDto(
+                r.Id, r.ClassId, r.ClassName, r.TeacherUserId,
+                string.IsNullOrEmpty(name) ? null : name,
+                r.SessionDate, r.StartsAt, r.EndsAt, r.Topic,
+                presentBySession.TryGetValue(r.Id, out var pc) ? pc : 0,
+                enrolledByClass.TryGetValue(r.ClassId, out var ec) ? ec : 0);
+        }).ToList();
+
+        return Result<IReadOnlyCollection<AdminScheduleEntryDto>>.Ok(rows);
     }
 
     public async Task<Result<SchedulePatternDto>> Handle(GetClassSchedulePatternQuery request,
