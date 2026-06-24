@@ -31,6 +31,7 @@ public interface IApplicationDbContext
     DbSet<LessonMaterial> LessonMaterials { get; }
     DbSet<LessonProgress> LessonProgress { get; }
     DbSet<Payment> Payments { get; }
+    DbSet<Punishment> Punishments { get; }
     DbSet<Conversation> Conversations { get; }
     DbSet<ConversationParticipant> ConversationParticipants { get; }
     DbSet<Message> Messages { get; }

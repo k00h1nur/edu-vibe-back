@@ -619,6 +619,21 @@ public sealed class OfficeInfoConfiguration : IEntityTypeConfiguration<OfficeInf
     }
 }
 
+public sealed class PunishmentConfiguration : IEntityTypeConfiguration<Punishment>
+{
+    public void Configure(EntityTypeBuilder<Punishment> b)
+    {
+        b.ToTable("punishments");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Title).IsRequired().HasMaxLength(256);
+        b.Property(x => x.Description).HasMaxLength(2000);
+        b.Property(x => x.Reason).HasMaxLength(2000);
+        b.Property(x => x.Value).HasColumnType("numeric(18,2)");
+        b.HasIndex(x => new { x.TeacherId, x.PeriodMonth });
+        b.HasOne(x => x.Teacher).WithMany().HasForeignKey(x => x.TeacherId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 public sealed class AnnouncementConfiguration : IEntityTypeConfiguration<Announcement>
 {
     public void Configure(EntityTypeBuilder<Announcement> b)
