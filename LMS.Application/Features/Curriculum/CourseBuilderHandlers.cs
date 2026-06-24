@@ -60,6 +60,14 @@ public sealed class CourseBuilderHandlers(IApplicationDbContext db, ICurrentUser
         var lessons = await db.CurriculumLessons.AsNoTracking()
             .Where(l => unitIds.Contains(l.UnitId)).OrderBy(l => l.Order).ToListAsync(ct);
 
+        // Source default tasks, grouped by lesson — deep-copied onto the clone's
+        // lessons below (F3 copy-at-clone). Loaded once to avoid per-lesson queries.
+        var lessonIds = lessons.Select(l => l.Id).ToList();
+        var defaultTasksBySource = (await db.LessonDefaultTasks.AsNoTracking()
+                .Where(t => lessonIds.Contains(t.CurriculumLessonId)).ToListAsync(ct))
+            .GroupBy(t => t.CurriculumLessonId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
         foreach (var m in modules)
         {
             var mc = new CurriculumModule(clone.Id, m.Order, m.Title);
@@ -72,13 +80,26 @@ public sealed class CourseBuilderHandlers(IApplicationDbContext db, ICurrentUser
                 uc.SetMeta(u.Icon, u.EstimatedMinutes, u.XpReward);
                 await db.CurriculumUnits.AddAsync(uc, ct);
                 await db.SaveChangesAsync(ct);
+                var lessonClones = new List<(Guid SourceId, CurriculumLesson Clone)>();
                 foreach (var l in lessons.Where(x => x.UnitId == u.Id))
                 {
                     var lc = new CurriculumLesson(uc.Id, l.Order, l.Title,
                         l.Objectives, l.HomeworkPlaceholder, l.MaterialsPlaceholder, l.IsAssessment);
                     lc.SetMeta(l.LessonType, l.DurationMinutes, l.XpReward);
                     await db.CurriculumLessons.AddAsync(lc, ct);
+                    lessonClones.Add((l.Id, lc));
                 }
+                await db.SaveChangesAsync(ct);
+
+                // Copy each source lesson's default tasks onto its clone — the
+                // clone's Id is populated by the save above. Each clone is a fresh
+                // template, so this never duplicates (GenerateCourse also skips a
+                // re-clone when the class already holds this template's clone).
+                foreach (var (sourceId, lc) in lessonClones)
+                    if (defaultTasksBySource.TryGetValue(sourceId, out var dts))
+                        foreach (var dt in dts)
+                            await db.LessonDefaultTasks.AddAsync(
+                                new LessonDefaultTask(lc.Id, dt.Order, dt.Type, dt.Title, dt.Points, dt.ContentJson, dt.SolutionJson), ct);
                 await db.SaveChangesAsync(ct);
             }
         }

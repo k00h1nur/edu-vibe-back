@@ -814,3 +814,16 @@ public sealed class CurriculumLessonConfiguration : IEntityTypeConfiguration<Cur
         b.HasIndex(x => new { x.UnitId, x.Order });
     }
 }
+
+public sealed class LessonDefaultTaskConfiguration : IEntityTypeConfiguration<LessonDefaultTask>
+{
+    public void Configure(EntityTypeBuilder<LessonDefaultTask> b)
+    {
+        b.ToTable("lesson_default_tasks");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Title).IsRequired().HasMaxLength(256);
+        b.HasIndex(x => new { x.CurriculumLessonId, x.Order });
+        b.HasOne(x => x.CurriculumLesson).WithMany().HasForeignKey(x => x.CurriculumLessonId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
