@@ -310,6 +310,15 @@ public sealed class SessionsHandlers(IApplicationDbContext db, ICurrentUserServi
         if (request.StartsAt >= request.EndsAt)
             return Result<ApplyScheduleResultDto>.Fail("VALIDATION", "Start time must be before end time.");
 
+        // Effective per-day slots (F3): caller-supplied slots if any (deduped by
+        // start time so the (ClassId, SessionDate, StartsAt) unique index can't
+        // collide), else the single primary slot — i.e. the original behaviour.
+        var slots = request.Slots is { Count: > 0 }
+            ? request.Slots.GroupBy(s => s.StartsAt).Select(g => g.First()).OrderBy(s => s.StartsAt).ToList()
+            : new List<ScheduleSlot> { new(request.StartsAt, request.EndsAt) };
+        if (slots.Any(s => s.StartsAt >= s.EndsAt))
+            return Result<ApplyScheduleResultDto>.Fail("VALIDATION", "Each slot's start time must be before its end time.");
+
         // Phase 1 — upsert the pattern.
         var pattern = await db.ClassSchedulePatterns
             .FirstOrDefaultAsync(x => x.ClassId == request.ClassId, ct);
@@ -368,10 +377,16 @@ public sealed class SessionsHandlers(IApplicationDbContext db, ICurrentUserServi
         var generated = 0;
         for (var d = generateFrom; d <= request.EndDate; d = d.AddDays(1))
         {
+            // A date kept for a preserved (attendance-bearing) session is skipped
+            // wholesale — we never partially repopulate it — which also keeps the
+            // unique index safe.
             if (!pattern.Matches(d) || occupiedDates.Contains(d)) continue;
-            await db.ClassSessions.AddAsync(
-                new ClassSession(request.ClassId, d, request.StartsAt, request.EndsAt, request.RoomId), ct);
-            generated++;
+            foreach (var slot in slots)
+            {
+                await db.ClassSessions.AddAsync(
+                    new ClassSession(request.ClassId, d, slot.StartsAt, slot.EndsAt, request.RoomId), ct);
+                generated++;
+            }
         }
         if (generated > 0) await db.SaveChangesAsync(ct);
 
