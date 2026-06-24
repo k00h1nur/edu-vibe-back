@@ -21,6 +21,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\LMS.Application\LMS.Application.csproj" />
     <ProjectReference Include="..\..\LMS.Domain\LMS.Domain.csproj" />
+    <!-- TaskGrader (and its DI registration) live in Infrastructure; referenced
+         so the grader can be unit-tested directly. -->
+    <ProjectReference Include="..\..\LMS.Infrastructure\LMS.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

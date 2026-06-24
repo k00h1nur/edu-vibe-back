@@ -66,13 +66,19 @@ public sealed class TaskGrader(ILogger<TaskGrader> logger) : ITaskGrader
         var len = Math.Min(solution.Fills.Count, response.Fills.Count);
         for (var i = 0; i < len; i++)
         {
-            if (string.Equals(
-                    solution.Fills[i]?.Trim(),
-                    response.Fills[i]?.Trim(),
-                    StringComparison.OrdinalIgnoreCase))
-            {
+            var given = response.Fills[i]?.Trim();
+
+            // Accepted = the canonical fill plus any per-blank variants for this
+            // index (English spelling/contraction differences like "color"/"colour",
+            // "I'm"/"I am"). Backward-compatible: with no AcceptedVariants this is
+            // just the canonical fill — identical to the original behaviour. Always
+            // trimmed + case-insensitive.
+            var accepted = new List<string?> { solution.Fills[i] };
+            if (solution.AcceptedVariants is { } variants && i < variants.Count && variants[i] is { } vs)
+                accepted.AddRange(vs);
+
+            if (accepted.Any(a => string.Equals(a?.Trim(), given, StringComparison.OrdinalIgnoreCase)))
                 matches++;
-            }
         }
 
         var score = (decimal)matches / solution.Fills.Count;
@@ -156,7 +162,12 @@ public sealed class TaskGrader(ILogger<TaskGrader> logger) : ITaskGrader
     private sealed record MultipleChoiceSolution(List<int> CorrectIndices);
     private sealed record MultipleChoiceResponse(List<int> SelectedIndices);
 
-    private sealed record FillGapsSolution(List<string> Fills);
+    /// <summary>
+    /// <c>Fills</c> = the canonical accepted answer per blank. Optional
+    /// <c>AcceptedVariants</c> aligns by index: variants[i] is extra acceptable
+    /// answers for blank i (e.g. ["colour"]). Null/short → canonical only.
+    /// </summary>
+    private sealed record FillGapsSolution(List<string> Fills, List<List<string>>? AcceptedVariants = null);
     private sealed record FillGapsResponse(List<string> Fills);
 
     private sealed record ShortAnswerSolution(List<string> AcceptedAnswers, bool? CaseSensitive);
