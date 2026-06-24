@@ -42,6 +42,13 @@ public sealed class TaskSubmission : BaseEntity
     public Guid? GradedByUserId { get; private set; }
     public string? TeacherFeedback { get; private set; }
 
+    /// <summary>
+    /// True once XP has been granted for this submission (F4). Award-once:
+    /// deliberately NOT reset by <see cref="UpdateResponse"/>, so re-submitting or
+    /// re-grading can never grant XP twice. No claw-back or top-up on re-grade.
+    /// </summary>
+    public bool XpAwarded { get; private set; }
+
     /// <summary>Apply a grader's verdict (auto or manual).</summary>
     public void Grade(decimal score, bool isCorrect, Guid? gradedByUserId, string? feedback)
     {
@@ -52,6 +59,13 @@ public sealed class TaskSubmission : BaseEntity
         GradedAt = DateTime.UtcNow;
         GradedByUserId = gradedByUserId;
         TeacherFeedback = string.IsNullOrWhiteSpace(feedback) ? null : feedback.Trim();
+        Touch();
+    }
+
+    /// <summary>Flag that XP has been granted for this submission (idempotency guard).</summary>
+    public void MarkXpAwarded()
+    {
+        XpAwarded = true;
         Touch();
     }
 
