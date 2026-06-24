@@ -88,6 +88,11 @@ public static class Permissions
         public const string Update = "Payments.Update";
     }
 
+    public static class Punishments
+    {
+        public const string Manage = "Punishments.Manage";
+    }
+
     public static class Badges
     {
         public const string Read = "Badges.Read";
@@ -279,6 +284,7 @@ public static class Permissions
             Submissions.Read, Submissions.Create, Submissions.Grade,
             Attendance.Read, Attendance.Mark, Attendance.Update,
             Payments.Read, Payments.Create, Payments.Update,
+            Punishments.Manage,
             Badges.Read, Badges.Create, Badges.Update, Badges.Award,
             Xp.Read, Xp.Grant,
             Conversations.Read, Conversations.Create, Conversations.ManageParticipants,

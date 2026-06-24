@@ -36,6 +36,7 @@ public sealed class LMSDbContext : DbContext, IApplicationDbContext
     public DbSet<LessonMaterial> LessonMaterials => Set<LessonMaterial>();
     public DbSet<LessonProgress> LessonProgress => Set<LessonProgress>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<Punishment> Punishments => Set<Punishment>();
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<ConversationParticipant> ConversationParticipants => Set<ConversationParticipant>();
     public DbSet<Message> Messages => Set<Message>();
