@@ -10,6 +10,9 @@ public sealed class LMSDbContext : DbContext, IApplicationDbContext
     {
     }
 
+    public Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction> BeginTransactionAsync(
+        CancellationToken cancellationToken) => Database.BeginTransactionAsync(cancellationToken);
+
     public DbSet<User> Users => Set<User>();
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<Permission> Permissions => Set<Permission>();
