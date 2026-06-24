@@ -40,6 +40,9 @@ public sealed class Class : BaseEntity
     public Guid? CurriculumTemplateId { get; private set; }
     public CurriculumTemplate? CurriculumTemplate { get; private set; }
 
+    /// <summary>Monthly group price per student (currency-agnostic). Null = not priced yet.</summary>
+    public decimal? MonthlyPrice { get; private set; }
+
     public ICollection<Enrollment> Enrollments { get; } = new List<Enrollment>();
     public ICollection<Assignment> Assignments { get; } = new List<Assignment>();
     public ICollection<ClassResource> Resources { get; } = new List<ClassResource>();
@@ -91,6 +94,14 @@ public sealed class Class : BaseEntity
     public void SetCurriculumTemplate(Guid? templateId)
     {
         CurriculumTemplateId = templateId;
+        Touch();
+    }
+
+    /// <summary>Sets (or clears) the monthly group price. Negative is rejected.</summary>
+    public void SetMonthlyPrice(decimal? price)
+    {
+        if (price is < 0m) throw new DomainException("Monthly price can't be negative.");
+        MonthlyPrice = price;
         Touch();
     }
 }

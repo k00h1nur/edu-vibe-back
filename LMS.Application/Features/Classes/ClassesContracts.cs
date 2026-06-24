@@ -11,7 +11,8 @@ public sealed record ClassDto(
     Modality Modality,
     ClassStatus Status,
     Guid? TeacherUserId,
-    int EnrolledCount);
+    int EnrolledCount,
+    decimal? MonthlyPrice = null);
 
 public sealed record ClassesPingCommand : IRequest<Result<string>>;
 

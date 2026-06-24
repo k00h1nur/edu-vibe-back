@@ -105,7 +105,7 @@ public sealed class ClassesHandlers(IApplicationDbContext db, ICurrentUserServic
         return Result<IReadOnlyCollection<ClassDto>>.Ok(await db.Classes
             .Where(x => x.TeacherUserId == request.TeacherUserId)
             .Select(c => new ClassDto(c.Id, c.Title, c.MaxStudents, c.Modality, c.Status, c.TeacherUserId,
-                c.Enrollments.Count(e => e.Status == EnrollmentStatus.Active)))
+                c.Enrollments.Count(e => e.Status == EnrollmentStatus.Active), c.MonthlyPrice))
             .ToListAsync(cancellationToken));
     }
 
@@ -207,7 +207,7 @@ public sealed class ClassesHandlers(IApplicationDbContext db, ICurrentUserServic
             .Skip(page.Skip)
             .Take(page.NormalizedPageSize)
             .Select(c => new ClassDto(c.Id, c.Title, c.MaxStudents, c.Modality, c.Status, c.TeacherUserId,
-                c.Enrollments.Count(e => e.Status == EnrollmentStatus.Active)))
+                c.Enrollments.Count(e => e.Status == EnrollmentStatus.Active), c.MonthlyPrice))
             .ToListAsync(cancellationToken);
 
         return Result<PagedResult<ClassDto>>.Ok(PagedResult<ClassDto>.From(items, total, page));
@@ -254,6 +254,6 @@ public sealed class ClassesHandlers(IApplicationDbContext db, ICurrentUserServic
         // round-trip. Returns 0 if Include(Enrollments) wasn't applied,
         // which is the safe default for callers that don't need the count.
         var active = c.Enrollments?.Count(e => e.Status == EnrollmentStatus.Active) ?? 0;
-        return new ClassDto(c.Id, c.Title, c.MaxStudents, c.Modality, c.Status, c.TeacherUserId, active);
+        return new ClassDto(c.Id, c.Title, c.MaxStudents, c.Modality, c.Status, c.TeacherUserId, active, c.MonthlyPrice);
     }
 }
