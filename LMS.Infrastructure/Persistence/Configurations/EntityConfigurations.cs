@@ -132,6 +132,7 @@ public sealed class ClassConfiguration : IEntityTypeConfiguration<Class>
         b.ToTable("classes");
         b.HasKey(x => x.Id);
         b.Property(x => x.Title).IsRequired().HasMaxLength(256);
+        b.Property(x => x.MonthlyPrice).HasPrecision(18, 2);
         // Used by Classes/assigned/{teacherUserId} + ResolveUserClassIds in the
         // session handlers. EF doesn't auto-index FKs on optional one-to-many.
         b.HasIndex(x => x.TeacherUserId).HasDatabaseName("ix_classes_teacher_user_id");
@@ -289,6 +290,24 @@ public sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         b.ToTable("payments");
         b.HasKey(x => x.Id);
         b.Property(x => x.Amount).HasPrecision(18, 2);
+        b.HasOne(x => x.Class).WithMany().HasForeignKey(x => x.ClassId).OnDelete(DeleteBehavior.SetNull);
+        b.HasIndex(x => new { x.ClassId, x.PeriodMonth });
+    }
+}
+
+public sealed class TeacherSalaryConfigConfiguration : IEntityTypeConfiguration<TeacherSalaryConfig>
+{
+    public void Configure(EntityTypeBuilder<TeacherSalaryConfig> b)
+    {
+        b.ToTable("teacher_salary_configs");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Percentage).HasPrecision(5, 2);
+        // Uniqueness on (TeacherId, ClassId) with NULLS NOT DISTINCT is enforced
+        // by the migration (EF can't express NULLS NOT DISTINCT) — one default
+        // + one per-class row. Plain index here for lookups.
+        b.HasIndex(x => new { x.TeacherId, x.ClassId });
+        b.HasOne(x => x.Teacher).WithMany().HasForeignKey(x => x.TeacherId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(x => x.Class).WithMany().HasForeignKey(x => x.ClassId).OnDelete(DeleteBehavior.Cascade);
     }
 }
 

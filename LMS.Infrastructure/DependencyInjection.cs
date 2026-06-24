@@ -78,6 +78,7 @@ public static class DependencyInjection
         services.AddScoped<INotificationService, NotificationService>();
 
         services.AddSingleton<ITaskGrader, TaskGrader>();
+        services.AddSingleton<LMS.Application.Common.Salary.ISalaryCalculator, LMS.Application.Common.Salary.SalaryCalculator>();
         services.AddSingleton<IAvatarFileStore, LocalAvatarFileStore>();
         services.AddSingleton<IMaterialFileStore, LocalMaterialFileStore>();
         services.AddSingleton<ISubmissionFileStore, LocalSubmissionFileStore>();

@@ -54,7 +54,5 @@ jobs:
             --output /tmp/migrations.sql --no-build --configuration Release
           test -s /tmp/migrations.sql
 
-      # Tests are scaffolded but the project doesn't exist yet. When LMS.Tests
-      # lands, uncomment:
-      # - name: Test
-      #   run: dotnet test LMS.sln --configuration Release --no-build --logger trx --collect:"XPlat Code Coverage"
+      - name: Test
+        run: dotnet test LMS.sln --configuration Release --no-build --logger "console;verbosity=normal"
