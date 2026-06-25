@@ -1,6 +1,7 @@
 using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Models;
 using LMS.Domain.Entities;
+using LMS.Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -49,9 +50,14 @@ public sealed class TaskSubmissionsHandlers(
 
         var verdict = grader.Grade(task, request.ResponseJson);
         if (verdict.AutoGraded)
+        {
             submission.Grade(verdict.Score, verdict.IsCorrect, gradedByUserId: null, feedback: null);
+            await AwardXpIfFirstGradeAsync(submission, task, cancellationToken);
+        }
         else
+        {
             submission.AwaitManualGrading();
+        }
 
         await db.SaveChangesAsync(cancellationToken);
         return Result<TaskSubmissionDto>.Ok(Map(submission), "Submission recorded.");
@@ -66,6 +72,11 @@ public sealed class TaskSubmissionsHandlers(
 
         var isCorrect = request.Score >= 1m;
         submission.Grade(request.Score, isCorrect, currentUser.UserId, request.Feedback);
+
+        var task = await db.LearningTasks.FirstOrDefaultAsync(t => t.Id == submission.TaskId, cancellationToken);
+        if (task is not null)
+            await AwardXpIfFirstGradeAsync(submission, task, cancellationToken);
+
         await db.SaveChangesAsync(cancellationToken);
         return Result<TaskSubmissionDto>.Ok(Map(submission));
     }
@@ -118,6 +129,28 @@ public sealed class TaskSubmissionsHandlers(
                 s.CreatedAt, s.GradedAt))
             .ToListAsync(cancellationToken);
         return Result<IReadOnlyCollection<TaskSubmissionDto>>.Ok(items);
+    }
+
+    /// <summary>
+    /// Grants XP for a freshly graded submission — ONCE. The single award path for
+    /// both auto-grade (submit) and manual grade. XP = round(points × score);
+    /// skipped cleanly when already awarded or when it rounds to 0 (AddXp throws on
+    /// ≤ 0). The AddXp + ledger row + XpAwarded flag all flush in the caller's one
+    /// SaveChanges, so they can never drift apart.
+    /// </summary>
+    private async Task AwardXpIfFirstGradeAsync(TaskSubmission submission, LearningTask task, CancellationToken ct)
+    {
+        if (submission.XpAwarded || submission.Score is not { } score) return;
+        var xp = TaskXp.ForGrade(task.Points, score);
+        if (xp <= 0) return;
+
+        var sp = await db.StudentProfiles.FirstOrDefaultAsync(p => p.Id == submission.StudentProfileId, ct);
+        if (sp is null) return;
+
+        sp.AddXp(xp);
+        await db.XpLedger.AddAsync(
+            XpLedger.CreateEntry(sp.Id, xp, XpSourceType.TaskGrading, $"Task:{task.Title}"), ct);
+        submission.MarkXpAwarded();
     }
 
     private static TaskSubmissionDto Map(TaskSubmission s) => new(
