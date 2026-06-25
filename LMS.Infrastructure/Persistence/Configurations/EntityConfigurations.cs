@@ -827,3 +827,63 @@ public sealed class LessonDefaultTaskConfiguration : IEntityTypeConfiguration<Le
             .OnDelete(DeleteBehavior.Cascade);
     }
 }
+
+public sealed class ExamConfiguration : IEntityTypeConfiguration<Exam>
+{
+    public void Configure(EntityTypeBuilder<Exam> b)
+    {
+        b.ToTable("exams");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Title).IsRequired().HasMaxLength(256);
+        b.Property(x => x.PassThresholdPercent).HasPrecision(5, 2);
+        // One exam per exam-type curriculum lesson.
+        b.HasIndex(x => x.CurriculumLessonId).IsUnique();
+        b.HasOne(x => x.Class).WithMany().HasForeignKey(x => x.ClassId).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne(x => x.CurriculumLesson).WithMany().HasForeignKey(x => x.CurriculumLessonId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public sealed class ExamSectionConfiguration : IEntityTypeConfiguration<ExamSection>
+{
+    public void Configure(EntityTypeBuilder<ExamSection> b)
+    {
+        b.ToTable("exam_sections");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Name).IsRequired().HasMaxLength(128);
+        b.Property(x => x.MaxScore).HasPrecision(9, 2);
+        b.HasIndex(x => new { x.ExamId, x.Order });
+        b.HasOne(x => x.Exam).WithMany(e => e.Sections).HasForeignKey(x => x.ExamId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public sealed class ExamResultConfiguration : IEntityTypeConfiguration<ExamResult>
+{
+    public void Configure(EntityTypeBuilder<ExamResult> b)
+    {
+        b.ToTable("exam_results");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.OverallPercent).HasPrecision(5, 2);
+        // One result per (exam, student) — drives the idempotent upsert.
+        b.HasIndex(x => new { x.ExamId, x.StudentProfileId }).IsUnique();
+        b.HasOne(x => x.Exam).WithMany().HasForeignKey(x => x.ExamId).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne(x => x.StudentProfile).WithMany().HasForeignKey(x => x.StudentProfileId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public sealed class ExamSectionScoreConfiguration : IEntityTypeConfiguration<ExamSectionScore>
+{
+    public void Configure(EntityTypeBuilder<ExamSectionScore> b)
+    {
+        b.ToTable("exam_section_scores");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Score).HasPrecision(9, 2);
+        b.HasIndex(x => new { x.ExamResultId, x.ExamSectionId }).IsUnique();
+        b.HasOne(x => x.ExamResult).WithMany(r => r.SectionScores).HasForeignKey(x => x.ExamResultId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.HasOne(x => x.ExamSection).WithMany().HasForeignKey(x => x.ExamSectionId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
