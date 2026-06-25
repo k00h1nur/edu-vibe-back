@@ -165,6 +165,20 @@ public sealed class CurriculumTemplateSeederHostedService(
 
     public async Task StartAsync(CancellationToken ct)
     {
+        try
+        {
+            await SeedAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            // Non-critical data seed — log and continue so a seeding failure can't
+            // crash the host (migrations + RBAC seeders stay fail-fast).
+            logger.LogError(ex, "Curriculum template seeding failed; continuing startup without it.");
+        }
+    }
+
+    private async Task SeedAsync(CancellationToken ct)
+    {
         using var scope = serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
 
