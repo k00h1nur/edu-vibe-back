@@ -21,6 +21,23 @@ public sealed class ClassSession : BaseEntity
         IsPublished = true;
     }
 
+    /// <summary>
+    /// Creates a synthetic, already-Completed session for F6 existing-group
+    /// onboarding — links the curriculum lesson and flags it <see cref="IsBackfilled"/>
+    /// so session-count analytics exclude it. Never carries attendance.
+    /// </summary>
+    public static ClassSession CreateBackfilled(
+        Guid classId, DateOnly sessionDate, TimeOnly startsAt, TimeOnly endsAt,
+        Guid curriculumLessonId, string? topic, DateTime now)
+    {
+        if (curriculumLessonId == Guid.Empty) throw new DomainException("Curriculum lesson id is required.");
+        var s = new ClassSession(classId, sessionDate, startsAt, endsAt);
+        s.LinkCurriculumLesson(curriculumLessonId, topic);
+        s.SetStatus(ClassSessionStatus.Completed, now);
+        s.IsBackfilled = true;
+        return s;
+    }
+
     public Guid ClassId { get; private set; }
     public Class? Class { get; private set; }
     public DateOnly SessionDate { get; private set; }
@@ -73,6 +90,13 @@ public sealed class ClassSession : BaseEntity
     public ClassSessionStatus Status { get; private set; } = ClassSessionStatus.Planned;
     /// <summary>When the teacher marked the lesson Completed (null otherwise).</summary>
     public DateTime? CompletedAt { get; private set; }
+
+    /// <summary>
+    /// True for a synthetic session created by F6 existing-group onboarding to mark
+    /// a pre-join lesson Completed. Excluded from session-count analytics; the
+    /// student roadmap still counts it (that's the point). Never has attendance.
+    /// </summary>
+    public bool IsBackfilled { get; private set; }
 
     /// <summary>
     /// Plans this session against a curriculum lesson — sets the lesson link,
