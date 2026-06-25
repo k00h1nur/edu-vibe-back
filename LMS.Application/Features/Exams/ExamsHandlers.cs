@@ -252,27 +252,47 @@ public sealed class ExamsHandlers(IApplicationDbContext db, ICurrentUserService 
                     "FORBIDDEN", "You can only view your own exam results.");
         }
 
+        // Load each collection in its own single-collection query — a single query
+        // that Includes both SectionScores AND Exam.Sections would trip the context's
+        // MultipleCollectionIncludeWarning (configured to throw). Kept provider-agnostic
+        // (no AsSplitQuery, which lives in the Relational assembly the Application layer
+        // doesn't reference).
         var results = await db.ExamResults.AsNoTracking()
             .Where(r => r.StudentProfileId == request.StudentProfileId)
             .Include(r => r.SectionScores)
-            .Include(r => r.Exam!).ThenInclude(e => e.Sections)
-            .Include(r => r.Exam!).ThenInclude(e => e.Class)
             .OrderByDescending(r => r.EnteredAt)
             .ToListAsync(ct);
 
-        var dtos = results.Select(r =>
-        {
-            var sectionById = r.Exam!.Sections.ToDictionary(s => s.Id);
-            var sections = r.SectionScores
-                .Where(ss => sectionById.ContainsKey(ss.ExamSectionId))
-                .Select(ss => new { Sec = sectionById[ss.ExamSectionId], ss.Score })
-                .OrderBy(x => x.Sec.Order)
-                .Select(x => new StudentExamSectionDto(x.Sec.Name, x.Score, x.Sec.MaxScore))
-                .ToList();
-            return new StudentExamResultDto(
-                r.ExamId, r.Exam!.Title, r.Exam.ClassId, r.Exam.Class?.Title,
-                r.OverallPercent, r.Passed, r.Exam.EffectiveThresholdPercent, r.EnteredAt, sections);
-        }).ToList();
+        var examIds = results.Select(r => r.ExamId).Distinct().ToList();
+        var exams = await db.Exams.AsNoTracking()
+            .Where(e => examIds.Contains(e.Id))
+            .Include(e => e.Sections) // single collection — safe
+            .ToListAsync(ct);
+        var examById = exams.ToDictionary(e => e.Id);
+
+        var classIds = exams.Select(e => e.ClassId).Distinct().ToList();
+        var classTitleById = await db.Classes.AsNoTracking()
+            .Where(c => classIds.Contains(c.Id))
+            .Select(c => new { c.Id, c.Title })
+            .ToDictionaryAsync(x => x.Id, x => x.Title, ct);
+
+        var dtos = results
+            .Where(r => examById.ContainsKey(r.ExamId))
+            .Select(r =>
+            {
+                var exam = examById[r.ExamId];
+                var sectionById = exam.Sections.ToDictionary(s => s.Id);
+                var sections = r.SectionScores
+                    .Where(ss => sectionById.ContainsKey(ss.ExamSectionId))
+                    .Select(ss => new { Sec = sectionById[ss.ExamSectionId], ss.Score })
+                    .OrderBy(x => x.Sec.Order)
+                    .Select(x => new StudentExamSectionDto(x.Sec.Name, x.Score, x.Sec.MaxScore))
+                    .ToList();
+                return new StudentExamResultDto(
+                    r.ExamId, exam.Title, exam.ClassId,
+                    classTitleById.TryGetValue(exam.ClassId, out var clsTitle) ? clsTitle : null,
+                    r.OverallPercent, r.Passed, exam.EffectiveThresholdPercent, r.EnteredAt, sections);
+            }).ToList();
 
         return Result<IReadOnlyCollection<StudentExamResultDto>>.Ok(dtos);
     }
