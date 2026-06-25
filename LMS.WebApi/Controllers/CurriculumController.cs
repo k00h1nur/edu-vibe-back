@@ -53,6 +53,38 @@ public sealed class CurriculumController(ISender sender) : ControllerBase
             : BadRequest(ApiResponse<ClassCurriculumDto>.Fail(r.Message ?? "Failed"));
     }
 
+    /// <summary>
+    /// F6: suggests the class's current curriculum position from its schedule
+    /// pattern (StartDate + cadence). Always returns the ordered lesson list so the
+    /// admin can edit the suggestion; with no pattern, CanSuggest is false.
+    /// </summary>
+    [HttpGet("class/{classId:guid}/suggest-position")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<SuggestPositionDto>>> SuggestPosition(Guid classId, CancellationToken ct)
+    {
+        var r = await sender.Send(new SuggestPositionQuery(classId), ct);
+        return r.Success
+            ? Ok(ApiResponse<SuggestPositionDto>.Ok(r.Data, r.Message))
+            : BadRequest(ApiResponse<SuggestPositionDto>.Fail(r.Message ?? "Failed"));
+    }
+
+    /// <summary>
+    /// F6 (LIVE DATA): marks every lesson before the chosen one Completed via
+    /// backfilled sessions. Idempotent + reconciling — re-run with a corrected
+    /// lesson to fix a mistake; excess backfill is removed, real sessions untouched.
+    /// Body: {"lessonId":"..."}.
+    /// </summary>
+    [HttpPost("class/{classId:guid}/set-position")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<SetPositionResultDto>>> SetPosition(
+        Guid classId, [FromBody] SetPositionCommand cmd, CancellationToken ct)
+    {
+        var r = await sender.Send(cmd with { ClassId = classId }, ct);
+        return r.Success
+            ? Ok(ApiResponse<SetPositionResultDto>.Ok(r.Data, r.Message))
+            : BadRequest(ApiResponse<SetPositionResultDto>.Fail(r.Message ?? "Failed"));
+    }
+
     /// <summary>A class's dated curriculum: progress + today + next + the full plan.</summary>
     [HttpGet("class/{classId:guid}")]
     public async Task<ActionResult<ApiResponse<ClassCurriculumDto>>> ForClass(Guid classId, CancellationToken ct)
