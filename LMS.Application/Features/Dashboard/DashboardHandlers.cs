@@ -34,7 +34,7 @@ public sealed class DashboardHandlers(IApplicationDbContext db) :
         var dto = new OfficeAdminDashboardDto(
             await db.StudentProfiles.CountAsync(cancellationToken),
             await db.Enrollments.CountAsync(cancellationToken),
-            await db.ClassSessions.CountAsync(cancellationToken),
+            await db.ClassSessions.CountAsync(x => !x.IsBackfilled, cancellationToken),
             await db.Payments.Where(x => x.Status == PaymentStatus.Pending).SumAsync(x => x.Amount, cancellationToken));
         return Result<OfficeAdminDashboardDto>.Ok(dto);
     }
@@ -49,7 +49,7 @@ public sealed class DashboardHandlers(IApplicationDbContext db) :
         var dto = new StudentDashboardDto(
             sp.XP,
             sp.Streak,
-            await db.ClassSessions.CountAsync(x => classIds.Contains(x.ClassId), cancellationToken),
+            await db.ClassSessions.CountAsync(x => classIds.Contains(x.ClassId) && !x.IsBackfilled, cancellationToken),
             await db.Assignments.CountAsync(x => classIds.Contains(x.ClassId) && x.Status != AssignmentStatus.Closed,
                 cancellationToken),
             await db.StudentBadges.CountAsync(x => x.StudentProfileId == sp.Id, cancellationToken),

@@ -220,6 +220,7 @@ public sealed class SessionsHandlers(IApplicationDbContext db, ICurrentUserServi
             join sp in db.StaffProfiles.AsNoTracking() on c.TeacherUserId equals sp.UserId into sps
             from sp in sps.DefaultIfEmpty()
             where s.SessionDate >= request.From && s.SessionDate <= request.To
+                  && !s.IsBackfilled
                   && (request.TeacherId == null || c.TeacherUserId == request.TeacherId)
                   && (request.ClassId == null || s.ClassId == request.ClassId)
             orderby s.SessionDate, s.StartsAt
