@@ -66,6 +66,20 @@ public sealed class MarketingCoursesSeederHostedService(
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        try
+        {
+            await SeedAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // Non-critical data seed — log and continue so a seeding failure can't
+            // crash the host (migrations + RBAC seeders stay fail-fast).
+            logger.LogError(ex, "Marketing course catalog seeding failed; continuing startup without it.");
+        }
+    }
+
+    private async Task SeedAsync(CancellationToken cancellationToken)
+    {
         if (!configuration.GetValue("MarketingCourses:SeedCatalog", true))
         {
             logger.LogDebug("Marketing course catalog seeding disabled by config.");

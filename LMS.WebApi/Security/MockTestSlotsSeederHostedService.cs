@@ -20,6 +20,20 @@ public sealed class MockTestSlotsSeederHostedService(
 {
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        try
+        {
+            await SeedAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // Non-critical data seed — log and continue so a seeding failure can't
+            // crash the host (migrations + RBAC seeders stay fail-fast).
+            logger.LogError(ex, "Mock test slot seeding failed; continuing startup without it.");
+        }
+    }
+
+    private async Task SeedAsync(CancellationToken cancellationToken)
+    {
         if (!configuration.GetValue("MockTestSlots:Seed", true))
         {
             logger.LogDebug("Mock test slot seeding disabled by config.");

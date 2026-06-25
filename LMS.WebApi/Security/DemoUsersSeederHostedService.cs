@@ -68,6 +68,20 @@ public sealed class DemoUsersSeederHostedService(
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        try
+        {
+            await SeedAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // Non-critical data seed — log and continue so a seeding failure can't
+            // crash the host (migrations + RBAC seeders stay fail-fast).
+            logger.LogError(ex, "Demo users seeding failed; continuing startup without it.");
+        }
+    }
+
+    private async Task SeedAsync(CancellationToken cancellationToken)
+    {
         if (!configuration.GetValue("DemoUsers:Enabled", true))
         {
             logger.LogInformation("Demo users seeder disabled by config.");
