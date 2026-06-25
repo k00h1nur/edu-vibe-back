@@ -22,6 +22,10 @@ public interface IApplicationDbContext
     DbSet<CurriculumUnit> CurriculumUnits { get; }
     DbSet<CurriculumLesson> CurriculumLessons { get; }
     DbSet<LessonDefaultTask> LessonDefaultTasks { get; }
+    DbSet<Exam> Exams { get; }
+    DbSet<ExamSection> ExamSections { get; }
+    DbSet<ExamResult> ExamResults { get; }
+    DbSet<ExamSectionScore> ExamSectionScores { get; }
     DbSet<Enrollment> Enrollments { get; }
     DbSet<ClassSession> ClassSessions { get; }
     DbSet<ClassSchedulePattern> ClassSchedulePatterns { get; }
