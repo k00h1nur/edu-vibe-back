@@ -1,5 +1,6 @@
 using FluentValidation;
 using LMS.Application.Common.Behaviors;
+using LMS.Application.Features.Tasks;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -14,6 +15,8 @@ public static class DependencyInjection
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(PerformanceBehavior<,>));
+        // F3↔F4: shared idempotent lesson-task materializer (manual endpoint + auto-on-generate).
+        services.AddScoped<ILessonTaskMaterializer, LessonTaskMaterializer>();
         return services;
     }
 }

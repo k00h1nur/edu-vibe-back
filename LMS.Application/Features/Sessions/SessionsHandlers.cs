@@ -345,20 +345,33 @@ public sealed class SessionsHandlers(IApplicationDbContext db, ICurrentUserServi
         }
         await db.SaveChangesAsync(ct);
 
-        // Phase 2 — drop replaceable future sessions. "Replaceable" = dated
-        // today or later AND has no attendance rows.
+        // Phase 2 — drop replaceable future sessions. "Replaceable" = dated today or
+        // later AND carrying no real dependent data — NO attendance marks AND NO
+        // materialised homework. Preserving homework'd sessions (stable Id) means a
+        // generate/reschedule re-run can never orphan or duplicate auto-materialised
+        // tasks or student submissions; moving such a lesson requires clearing its
+        // homework first (a deliberate act, not an accidental side effect).
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var futureSessions = await db.ClassSessions
             .Where(s => s.ClassId == request.ClassId && s.SessionDate >= today)
             .ToListAsync(ct);
-        var protectedSessionIds = (await db.Attendance.AsNoTracking()
-                .Where(a => a.ClassId == request.ClassId)
-                .Select(a => a.SessionId)
-                .Distinct()
-                .ToListAsync(ct))
-            .ToHashSet();
 
-        var removable = futureSessions.Where(s => !protectedSessionIds.Contains(s.Id)).ToList();
+        var attendanceSessionIds = await db.Attendance.AsNoTracking()
+            .Where(a => a.ClassId == request.ClassId)
+            .Select(a => a.SessionId).Distinct().ToListAsync(ct);
+        // "Has homework" = an assignment linked to the session with at least one task.
+        var homeworkSessionIds = await db.Assignments.AsNoTracking()
+            .Where(a => a.ClassId == request.ClassId && a.ClassSessionId != null
+                        && db.LearningTasks.Any(t => t.AssignmentId == a.Id))
+            .Select(a => a.ClassSessionId!.Value).Distinct().ToListAsync(ct);
+        var protectedSessionIds = attendanceSessionIds.Concat(homeworkSessionIds).ToHashSet();
+
+        // Pure core decides what's removable + which dates stay occupied.
+        var plan = SchedulePreserve.Partition(
+            futureSessions.Select(s => new ScheduleSessionRef(s.Id, s.SessionDate)).ToList(),
+            protectedSessionIds);
+        var removableIds = plan.RemovableIds.ToHashSet();
+        var removable = futureSessions.Where(s => removableIds.Contains(s.Id)).ToList();
         var preserved = futureSessions.Count - removable.Count;
         if (removable.Count > 0)
         {
@@ -369,10 +382,7 @@ public sealed class SessionsHandlers(IApplicationDbContext db, ICurrentUserServi
         // Phase 3 — generate. Dates already occupied by a preserved session
         // are skipped so the (ClassId, SessionDate, StartsAt) unique index
         // can't collide with a session we deliberately kept.
-        var occupiedDates = futureSessions
-            .Where(s => protectedSessionIds.Contains(s.Id))
-            .Select(s => s.SessionDate)
-            .ToHashSet();
+        var occupiedDates = plan.OccupiedDates;
 
         var generateFrom = request.StartDate > today ? request.StartDate : today;
         var generated = 0;

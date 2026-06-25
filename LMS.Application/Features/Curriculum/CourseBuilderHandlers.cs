@@ -404,6 +404,15 @@ public sealed class CourseBuilderHandlers(IApplicationDbContext db, ICurrentUser
             .Select(l => new { l.UnitId, l.Id, l.Order, l.Title, l.Objectives, l.HomeworkPlaceholder, l.MaterialsPlaceholder, l.IsAssessment, l.LessonType, l.DurationMinutes, l.XpReward })
             .ToListAsync(ct);
 
+        // Homework count reflects materialisable default-task BLUEPRINTS, not the
+        // free-text HomeworkPlaceholder — so the teacher's count matches the tasks a
+        // student will actually get once the lesson is materialised.
+        var lessonIdsForCount = lessons.Select(l => l.Id).ToList();
+        var lessonIdsWithBlueprints = (await db.LessonDefaultTasks.AsNoTracking()
+                .Where(t => lessonIdsForCount.Contains(t.CurriculumLessonId))
+                .Select(t => t.CurriculumLessonId).Distinct().ToListAsync(ct))
+            .ToHashSet();
+
         var unitDtos = units.Select(u =>
         {
             var ls = lessons.Where(x => x.UnitId == u.Id).ToList();
@@ -412,7 +421,7 @@ public sealed class CourseBuilderHandlers(IApplicationDbContext db, ICurrentUser
                 u.Icon, u.EstimatedMinutes, u.XpReward,
                 ls.Count,
                 ls.Count(x => x.MaterialsPlaceholder != null),
-                ls.Count(x => x.HomeworkPlaceholder != null),
+                ls.Count(x => lessonIdsWithBlueprints.Contains(x.Id)),
                 ls.Count(x => x.IsAssessment),
                 u.XpReward + ls.Sum(x => x.XpReward),
                 ls.Select(x => new CourseBuilderLessonDto(x.Id, x.Order, x.Title, x.Objectives,

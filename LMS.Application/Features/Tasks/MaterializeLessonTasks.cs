@@ -19,7 +19,8 @@ public sealed record MaterializeLessonTasksCommand(Guid ClassSessionId)
 
 public sealed record MaterializeLessonTasksResultDto(Guid AssignmentId, int CreatedTasks, int TotalDefaultTasks);
 
-public sealed class MaterializeLessonTasksHandler(IApplicationDbContext db, ICurrentUserService currentUser)
+public sealed class MaterializeLessonTasksHandler(
+    IApplicationDbContext db, ICurrentUserService currentUser, ILessonTaskMaterializer materializer)
     : IRequestHandler<MaterializeLessonTasksCommand, Result<MaterializeLessonTasksResultDto>>
 {
     public async Task<Result<MaterializeLessonTasksResultDto>> Handle(
@@ -34,49 +35,20 @@ public sealed class MaterializeLessonTasksHandler(IApplicationDbContext db, ICur
             return Result<MaterializeLessonTasksResultDto>.Fail(
                 "FORBIDDEN", "Only the class teacher or an admin can add tasks to this lesson.");
 
-        if (session.CurriculumLessonId is not { } lessonId)
+        if (session.CurriculumLessonId is null)
             return Result<MaterializeLessonTasksResultDto>.Fail(
                 "VALIDATION", "This session isn't linked to a curriculum lesson.");
 
-        var blueprints = await db.LessonDefaultTasks.AsNoTracking()
-            .Where(t => t.CurriculumLessonId == lessonId)
-            .OrderBy(t => t.Order)
-            .ToListAsync(ct);
-        if (blueprints.Count == 0)
+        // Delegate to the shared idempotent core (same path GenerateCourse uses).
+        var outcome = await materializer.MaterializeAsync(session.Id, currentUser.UserId!.Value, ct);
+        if (!outcome.HadBlueprints)
             return Result<MaterializeLessonTasksResultDto>.Fail("VALIDATION", "This lesson has no default tasks to add.");
-
-        // Reuse the session's assignment if present (idempotent); else create one.
-        var assignment = await db.Assignments.FirstOrDefaultAsync(a => a.ClassSessionId == session.Id, ct);
-        if (assignment is null)
-        {
-            var teacher = await db.Users.FirstOrDefaultAsync(u => u.Id == currentUser.UserId, ct);
-            if (teacher is null) return Result<MaterializeLessonTasksResultDto>.Fail("FORBIDDEN", "Caller not found.");
-            var title = string.IsNullOrWhiteSpace(session.Topic) ? "Lesson tasks" : session.Topic!;
-            assignment = new Assignment(session.ClassId, title, teacher);
-            assignment.SetSession(session.Id);
-            await db.Assignments.AddAsync(assignment, ct);
-            await db.SaveChangesAsync(ct);
-        }
-
-        // Existing task orders under this assignment — skip them so a re-run can't
-        // duplicate a blueprint that was already materialised.
-        var existingOrders = (await db.LearningTasks.AsNoTracking()
-                .Where(t => t.AssignmentId == assignment.Id).Select(t => t.Order).ToListAsync(ct))
-            .ToHashSet();
-
-        var created = 0;
-        foreach (var bp in blueprints)
-        {
-            if (!existingOrders.Add(bp.Order)) continue;
-            await db.LearningTasks.AddAsync(
-                new LearningTask(assignment.Id, bp.Order, bp.Type, bp.Title, bp.Points, bp.ContentJson, bp.SolutionJson), ct);
-            created++;
-        }
-        if (created > 0) await db.SaveChangesAsync(ct);
+        if (outcome.AssignmentId is not { } assignmentId)
+            return Result<MaterializeLessonTasksResultDto>.Fail("FORBIDDEN", "Caller not found.");
 
         return Result<MaterializeLessonTasksResultDto>.Ok(
-            new MaterializeLessonTasksResultDto(assignment.Id, created, blueprints.Count),
-            created > 0 ? $"Added {created} task(s) to the lesson." : "Tasks already added.");
+            new MaterializeLessonTasksResultDto(assignmentId, outcome.CreatedTasks, outcome.TotalBlueprints),
+            outcome.CreatedTasks > 0 ? $"Added {outcome.CreatedTasks} task(s) to the lesson." : "Tasks already added.");
     }
 
     private bool IsAdmin =>

@@ -1,3 +1,4 @@
+using LMS.Application.Common;
 using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Models;
 using LMS.Domain.Entities;
@@ -6,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LMS.Application.Features.Tasks;
 
-public sealed class TasksHandlers(IApplicationDbContext db) :
+public sealed class TasksHandlers(IApplicationDbContext db, ICurrentUserService currentUser) :
     IRequestHandler<GetAssignmentTasksQuery, Result<IReadOnlyCollection<LearningTaskDto>>>,
     IRequestHandler<GetTaskByIdQuery, Result<LearningTaskDto>>,
     IRequestHandler<CreateTaskCommand, Result<LearningTaskDto>>,
@@ -14,9 +15,30 @@ public sealed class TasksHandlers(IApplicationDbContext db) :
     IRequestHandler<DeleteTaskCommand, Result>,
     IRequestHandler<ReorderTasksCommand, Result>
 {
+    /// <summary>
+    /// F3↔F4 date-gate (shared rule): a STUDENT may only read a lesson's tasks on/after
+    /// the lesson day (school-local). Staff are never gated. Assignments with no dated
+    /// lesson are always visible. Enrollment scoping is handled elsewhere — this is the date lock.
+    /// </summary>
+    private async Task<bool> IsAssignmentDateVisibleToCallerAsync(Guid assignmentId, CancellationToken ct)
+    {
+        if (currentUser.StaffProfileId is not null || currentUser.StudentProfileId is null) return true;
+        var lessonDate = await db.Assignments.Where(a => a.Id == assignmentId)
+            .Select(a => a.ClassSessionId == null
+                ? (DateOnly?)null
+                : db.ClassSessions.Where(s => s.Id == a.ClassSessionId)
+                    .Select(s => (DateOnly?)s.SessionDate).FirstOrDefault())
+            .FirstOrDefaultAsync(ct);
+        return SchoolCalendar.IsLessonHomeworkVisibleToStudent(lessonDate, SchoolCalendar.Today(DateTime.UtcNow));
+    }
+
     public async Task<Result<IReadOnlyCollection<LearningTaskDto>>> Handle(
         GetAssignmentTasksQuery request, CancellationToken cancellationToken)
     {
+        if (!await IsAssignmentDateVisibleToCallerAsync(request.AssignmentId, cancellationToken))
+            return Result<IReadOnlyCollection<LearningTaskDto>>.Fail(
+                "FORBIDDEN", "This lesson's homework unlocks on the lesson day.");
+
         var items = await db.LearningTasks
             .Where(t => t.AssignmentId == request.AssignmentId)
             .OrderBy(t => t.Order)
@@ -33,6 +55,8 @@ public sealed class TasksHandlers(IApplicationDbContext db) :
     {
         var t = await db.LearningTasks.FirstOrDefaultAsync(x => x.Id == request.TaskId, cancellationToken);
         if (t is null) return Result<LearningTaskDto>.Fail("NOT_FOUND", "Task not found.");
+        if (!await IsAssignmentDateVisibleToCallerAsync(t.AssignmentId, cancellationToken))
+            return Result<LearningTaskDto>.Fail("FORBIDDEN", "This lesson's homework unlocks on the lesson day.");
         return Result<LearningTaskDto>.Ok(new LearningTaskDto(
             t.Id, t.AssignmentId, t.Order, t.Type, t.Title, t.Points,
             t.ContentJson,
