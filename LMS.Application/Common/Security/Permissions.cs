@@ -165,6 +165,14 @@ public static class Permissions
         public const string Grade = "TaskSubmissions.Grade";
     }
 
+    // F8 — offline exams. Manage = teacher/admin config + score entry; Read = view
+    // results (students self-scoped to their own in the handler).
+    public static class Exams
+    {
+        public const string Read = "Exams.Read";
+        public const string Manage = "Exams.Manage";
+    }
+
     // Results / Roles / Permissions already existed in controllers — kept stable here.
     public static class Results
     {
@@ -296,6 +304,7 @@ public static class Permissions
             Books.Read, Books.Manage,
             Tasks.Read, Tasks.Manage,
             TaskSubmissions.Read, TaskSubmissions.Submit, TaskSubmissions.Grade,
+            Exams.Read, Exams.Manage,
             Results.Read, Results.Create, Results.Update, Results.Delete,
             Roles.Read, Roles.Create, Roles.Update, Roles.Delete, Roles.AssignPermissions,
             PermissionsCatalog.Read, PermissionsCatalog.Create, PermissionsCatalog.Update, PermissionsCatalog.Delete,
@@ -408,6 +417,8 @@ public static class Permissions
             Permissions.Books.Read,
             Permissions.Tasks.Read, Permissions.Tasks.Manage,
             Permissions.TaskSubmissions.Read, Permissions.TaskSubmissions.Grade,
+            // F8 — teacher configures offline exams + enters scores for own classes.
+            Permissions.Exams.Read, Permissions.Exams.Manage,
             // UI capability gates — Teacher curates materials, sees class-level
             // analytics, and authors practice exercises (Practice page).
             Permissions.Materials.Read, Permissions.Materials.Manage,
@@ -460,6 +471,8 @@ public static class Permissions
             Permissions.Books.Read,
             Permissions.Tasks.Read,
             Permissions.TaskSubmissions.Submit, Permissions.TaskSubmissions.Read,
+            // F8 — student reads only their own exam results (self-scoped in handler).
+            Permissions.Exams.Read,
             // UI capability gates — Student gets self-directed practice + reference materials.
             Permissions.Materials.Read,
             Permissions.Practice.Read,
