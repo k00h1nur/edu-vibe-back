@@ -73,7 +73,7 @@ public sealed class AnalyticsHandlers(IApplicationDbContext db, ICurrentUserServ
 
         // Lesson completion
         var sessionIds = await db.ClassSessions.AsNoTracking()
-            .Where(s => classIds.Contains(s.ClassId)).Select(s => s.Id).ToListAsync(ct);
+            .Where(s => classIds.Contains(s.ClassId) && !s.IsBackfilled).Select(s => s.Id).ToListAsync(ct);
         var completedLessons = sessionIds.Count == 0 ? 0 : await db.LessonProgress.AsNoTracking()
             .CountAsync(p => p.StudentProfileId == spId && sessionIds.Contains(p.ClassSessionId), ct);
 
@@ -128,7 +128,7 @@ public sealed class AnalyticsHandlers(IApplicationDbContext db, ICurrentUserServ
             .Select(s => new { s.StudentProfileId, s.AssignmentId, s.Score }).ToListAsync(ct);
 
         var sessionIds = await db.ClassSessions.AsNoTracking()
-            .Where(s => s.ClassId == request.ClassId).Select(s => s.Id).ToListAsync(ct);
+            .Where(s => s.ClassId == request.ClassId && !s.IsBackfilled).Select(s => s.Id).ToListAsync(ct);
         var s = sessionIds.Count;
         var lpCount = sessionIds.Count == 0 ? 0 : await db.LessonProgress.AsNoTracking()
             .CountAsync(lp => sessionIds.Contains(lp.ClassSessionId) && enrolledIds.Contains(lp.StudentProfileId), ct);
