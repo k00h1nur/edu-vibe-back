@@ -1,3 +1,4 @@
+using LMS.Application.Common;
 using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Models;
 using LMS.Domain.Entities;
@@ -75,14 +76,30 @@ public sealed class AssignmentsHandlers(
         //    (the assignment has NO assignee restriction
         //     OR the student is in the assignee set)
         // No assignee rows = whole class. Some rows = targeted subset.
-        var data = await db.Assignments
+        var rows = await db.Assignments
             .Where(a => enrolledClassIds.Contains(a.ClassId))
             .Where(a =>
                 !db.AssignmentAssignees.Any(aa => aa.AssignmentId == a.Id) ||
                 db.AssignmentAssignees.Any(aa =>
                     aa.AssignmentId == a.Id && aa.StudentProfileId == request.StudentProfileId))
-            .Select(a => new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId, a.DueDate, a.Description))
+            .Select(a => new
+            {
+                Dto = new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId, a.DueDate, a.Description),
+                LessonDate = a.ClassSessionId == null
+                    ? (DateOnly?)null
+                    : db.ClassSessions.Where(s => s.Id == a.ClassSessionId)
+                        .Select(s => (DateOnly?)s.SessionDate).FirstOrDefault()
+            })
             .ToListAsync(cancellationToken);
+
+        // F3↔F4 date-gate: a student only sees a lesson's homework on/after the lesson
+        // day (school-local, shared rule). Staff see everything regardless of date.
+        var isStudent = currentUser.StaffProfileId is null;
+        var schoolToday = SchoolCalendar.Today(DateTime.UtcNow);
+        var data = rows
+            .Where(r => !isStudent || SchoolCalendar.IsLessonHomeworkVisibleToStudent(r.LessonDate, schoolToday))
+            .Select(r => r.Dto)
+            .ToList();
 
         return Result<IReadOnlyCollection<AssignmentDto>>.Ok(data);
     }

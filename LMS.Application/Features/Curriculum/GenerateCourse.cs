@@ -1,6 +1,7 @@
 using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Models;
 using LMS.Application.Features.Sessions;
+using LMS.Application.Features.Tasks;
 using LMS.Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -31,9 +32,12 @@ public sealed record GenerateCourseResultDto(
     Guid CurriculumTemplateId,
     int GeneratedSessions,
     int RemovedSessions,
-    int MappedLessons);
+    int MappedLessons,
+    int MaterializedTasks);
 
-public sealed class GenerateCourseHandler(IApplicationDbContext db, ISender sender)
+public sealed class GenerateCourseHandler(
+    IApplicationDbContext db, ISender sender,
+    ICurrentUserService currentUser, ILessonTaskMaterializer materializer)
     : IRequestHandler<GenerateCourseCommand, Result<GenerateCourseResultDto>>
 {
     public async Task<Result<GenerateCourseResultDto>> Handle(GenerateCourseCommand request, CancellationToken ct)
@@ -101,11 +105,26 @@ public sealed class GenerateCourseHandler(IApplicationDbContext db, ISender send
         var mapped = await db.ClassSessions.AsNoTracking()
             .CountAsync(s => s.ClassId == request.ClassId && s.SessionDate >= today && s.CurriculumLessonId != null, ct);
 
+        // 4. Auto-materialise each mapped lesson's default-task blueprints into real
+        //    gradeable tasks — inside the SAME transaction, so the course is fully set
+        //    up or not at all. Only sessions without an assignment yet are touched, so a
+        //    re-run is a clean no-op; the materialiser is fail-soft (no blueprints / exam
+        //    lessons => 0) and idempotent regardless.
+        var creatorId = cls.TeacherUserId ?? currentUser.UserId ?? Guid.Empty;
+        var sessionsToMaterialize = await db.ClassSessions.AsNoTracking()
+            .Where(s => s.ClassId == request.ClassId && s.CurriculumLessonId != null
+                        && !db.Assignments.Any(a => a.ClassSessionId == s.Id))
+            .Select(s => s.Id)
+            .ToListAsync(ct);
+        var materializedTasks = 0;
+        foreach (var sid in sessionsToMaterialize)
+            materializedTasks += (await materializer.MaterializeAsync(sid, creatorId, ct)).CreatedTasks;
+
         await tx.CommitAsync(ct);
 
         return Result<GenerateCourseResultDto>.Ok(
             new GenerateCourseResultDto(request.ClassId, courseTemplateId,
-                sched.Data.GeneratedCount, sched.Data.RemovedCount, mapped),
-            $"Course ready: {sched.Data.GeneratedCount} session(s), {mapped} mapped to lessons.");
+                sched.Data.GeneratedCount, sched.Data.RemovedCount, mapped, materializedTasks),
+            $"Course ready: {sched.Data.GeneratedCount} session(s), {mapped} mapped, {materializedTasks} task(s) created.");
     }
 }

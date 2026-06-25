@@ -1,3 +1,4 @@
+using LMS.Application.Common;
 using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Models;
 using LMS.Domain.Entities;
@@ -31,6 +32,17 @@ public sealed class TaskSubmissionsHandlers(
         var task = await db.LearningTasks
             .FirstOrDefaultAsync(t => t.Id == request.TaskId, cancellationToken);
         if (task is null) return Result<TaskSubmissionDto>.Fail("NOT_FOUND", "Task not found.");
+
+        // F3↔F4 date-gate (shared rule): a student can't submit before the lesson day
+        // (school-local). Closes the direct-endpoint bypass — list/read/submit all gate.
+        var lessonDate = await db.Assignments.Where(a => a.Id == task.AssignmentId)
+            .Select(a => a.ClassSessionId == null
+                ? (DateOnly?)null
+                : db.ClassSessions.Where(s => s.Id == a.ClassSessionId)
+                    .Select(s => (DateOnly?)s.SessionDate).FirstOrDefault())
+            .FirstOrDefaultAsync(cancellationToken);
+        if (!SchoolCalendar.IsLessonHomeworkVisibleToStudent(lessonDate, SchoolCalendar.Today(DateTime.UtcNow)))
+            return Result<TaskSubmissionDto>.Fail("FORBIDDEN", "This lesson's homework isn't open yet.");
 
         // Allow re-submission by updating the existing row (one submission per
         // (task, student)).
