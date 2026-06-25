@@ -373,6 +373,10 @@ public sealed class SessionsHandlers(IApplicationDbContext db, ICurrentUserServi
         var removableIds = plan.RemovableIds.ToHashSet();
         var removable = futureSessions.Where(s => removableIds.Contains(s.Id)).ToList();
         var preserved = futureSessions.Count - removable.Count;
+        // Subset of preserved that were kept specifically because they carry homework
+        // — reported so a reschedule that left lessons on their old dates is explainable.
+        var homeworkSet = homeworkSessionIds.ToHashSet();
+        var homeworkPreserved = futureSessions.Count(s => homeworkSet.Contains(s.Id));
         if (removable.Count > 0)
         {
             db.ClassSessions.RemoveRange(removable);
@@ -402,8 +406,10 @@ public sealed class SessionsHandlers(IApplicationDbContext db, ICurrentUserServi
         if (generated > 0) await db.SaveChangesAsync(ct);
 
         return Result<ApplyScheduleResultDto>.Ok(
-            new ApplyScheduleResultDto(MapPattern(pattern), generated, removable.Count, preserved),
-            $"Generated {generated} lesson(s).");
+            new ApplyScheduleResultDto(MapPattern(pattern), generated, removable.Count, preserved, homeworkPreserved),
+            homeworkPreserved > 0
+                ? $"Generated {generated} lesson(s). Kept {homeworkPreserved} lesson(s) on their original dates because they have homework — clear their homework first to move them."
+                : $"Generated {generated} lesson(s).");
     }
 
     private static SchedulePatternDto MapPattern(ClassSchedulePattern p) => new(

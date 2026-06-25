@@ -33,7 +33,10 @@ public sealed record GenerateCourseResultDto(
     int GeneratedSessions,
     int RemovedSessions,
     int MappedLessons,
-    int MaterializedTasks);
+    int MaterializedTasks,
+    /// <summary>Lessons kept on their original dates because they already have
+    /// homework (a re-run/reschedule won't move/delete them). Surfaced to the admin.</summary>
+    int HomeworkPreservedCount);
 
 public sealed class GenerateCourseHandler(
     IApplicationDbContext db, ISender sender,
@@ -122,9 +125,13 @@ public sealed class GenerateCourseHandler(
 
         await tx.CommitAsync(ct);
 
+        var keptNote = sched.Data.HomeworkPreservedCount > 0
+            ? $" {sched.Data.HomeworkPreservedCount} lesson(s) kept on their original dates because they have homework."
+            : "";
         return Result<GenerateCourseResultDto>.Ok(
             new GenerateCourseResultDto(request.ClassId, courseTemplateId,
-                sched.Data.GeneratedCount, sched.Data.RemovedCount, mapped, materializedTasks),
-            $"Course ready: {sched.Data.GeneratedCount} session(s), {mapped} mapped, {materializedTasks} task(s) created.");
+                sched.Data.GeneratedCount, sched.Data.RemovedCount, mapped, materializedTasks,
+                sched.Data.HomeworkPreservedCount),
+            $"Course ready: {sched.Data.GeneratedCount} session(s), {mapped} mapped, {materializedTasks} task(s) created.{keptNote}");
     }
 }

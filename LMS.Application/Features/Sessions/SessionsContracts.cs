@@ -192,4 +192,8 @@ public sealed record ApplyScheduleResultDto(
     SchedulePatternDto Pattern,
     int GeneratedCount,
     int RemovedCount,
-    int PreservedCount);
+    int PreservedCount,
+    /// <summary>Subset of PreservedCount kept because the lesson has materialised
+    /// homework (so a reschedule didn't move/delete it). Surfaced so the admin
+    /// understands why those sessions stayed on their original dates.</summary>
+    int HomeworkPreservedCount);
