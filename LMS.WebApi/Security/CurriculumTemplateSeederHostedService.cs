@@ -174,7 +174,12 @@ public sealed class CurriculumTemplateSeederHostedService(
 
     private async Task ReconcileTemplateAsync(IApplicationDbContext db, T spec, CancellationToken ct)
     {
+        // Modules→Units→Lessons is three nested collection includes. The context
+        // throws MultipleCollectionIncludeWarning on a single-query cartesian load,
+        // so split into one query per collection level (EF-recommended). AsSplitQuery
+        // sits on the plain IQueryable (the DbSet), before the Include chain.
         var template = await db.CurriculumTemplates
+            .AsSplitQuery()
             .Include(t => t.Modules).ThenInclude(m => m.Units).ThenInclude(u => u.Lessons)
             .FirstOrDefaultAsync(t => t.IsSystem && t.Name == spec.Name, ct);
 
