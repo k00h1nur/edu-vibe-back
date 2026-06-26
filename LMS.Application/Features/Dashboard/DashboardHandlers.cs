@@ -1,12 +1,13 @@
 using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Models;
+using LMS.Application.Common.Security;
 using LMS.Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace LMS.Application.Features.Dashboard;
 
-public sealed class DashboardHandlers(IApplicationDbContext db) :
+public sealed class DashboardHandlers(IApplicationDbContext db, ICurrentUserService currentUser) :
     IRequestHandler<GetDirectorDashboardQuery, Result<DirectorDashboardDto>>,
     IRequestHandler<GetOfficeAdminDashboardQuery, Result<OfficeAdminDashboardDto>>,
     IRequestHandler<GetTeacherDashboardQuery, Result<TeacherDashboardDto>>,
@@ -42,6 +43,14 @@ public sealed class DashboardHandlers(IApplicationDbContext db) :
     public async Task<Result<StudentDashboardDto>> Handle(GetStudentDashboardQuery request,
         CancellationToken cancellationToken)
     {
+        // SECURITY: a student may read only their OWN dashboard counters. Staff
+        // (StaffProfileId present) may read any student's for support workflows.
+        if (currentUser.StaffProfileId is null &&
+            (currentUser.StudentProfileId is null || currentUser.StudentProfileId != request.StudentProfileId))
+        {
+            return Result<StudentDashboardDto>.Fail("FORBIDDEN", "You can only view your own dashboard.");
+        }
+
         var sp = await db.StudentProfiles.FirstOrDefaultAsync(x => x.Id == request.StudentProfileId, cancellationToken);
         if (sp is null) return Result<StudentDashboardDto>.Fail("NOT_FOUND", "Student profile not found.");
         var classIds = await db.Enrollments.Where(x => x.StudentProfileId == sp.Id).Select(x => x.ClassId)
@@ -61,6 +70,17 @@ public sealed class DashboardHandlers(IApplicationDbContext db) :
     public async Task<Result<TeacherDashboardDto>> Handle(GetTeacherDashboardQuery request,
         CancellationToken cancellationToken)
     {
+        // SECURITY: a teacher may read only their OWN dashboard; admins/office may
+        // read any teacher's. Without this any Dashboard.Teacher holder could read
+        // another teacher's class/enrollment/grading/attendance counters.
+        var isAdmin = currentUser.IsInRole(RoleCodes.Admin)
+            || currentUser.IsInRole(RoleCodes.SuperAdmin)
+            || currentUser.IsInRole(RoleCodes.OfficeAdmin);
+        if (!isAdmin && currentUser.UserId != request.TeacherUserId)
+        {
+            return Result<TeacherDashboardDto>.Fail("FORBIDDEN", "You can only view your own dashboard.");
+        }
+
         var classIds = await db.Classes.Where(x => x.TeacherUserId == request.TeacherUserId).Select(x => x.Id)
             .ToListAsync(cancellationToken);
         var dto = new TeacherDashboardDto(

@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LMS.Application.Features.Badges;
 
-public sealed class BadgesHandlers(IApplicationDbContext db) :
+public sealed class BadgesHandlers(IApplicationDbContext db, ICurrentUserService currentUser) :
     IRequestHandler<CreateBadgeCommand, Result<BadgeDto>>,
     IRequestHandler<UpdateBadgeCommand, Result<BadgeDto>>,
     IRequestHandler<AwardBadgeCommand, Result>,
@@ -51,6 +51,15 @@ public sealed class BadgesHandlers(IApplicationDbContext db) :
     public async Task<Result<IReadOnlyCollection<BadgeDto>>> Handle(GetStudentBadgesQuery request,
         CancellationToken cancellationToken)
     {
+        // SECURITY: a student may read only their OWN badges. Staff (StaffProfileId
+        // present) may read any student's. Mirrors the XP-ledger / submissions guard.
+        if (currentUser.StaffProfileId is null &&
+            (currentUser.StudentProfileId is null || currentUser.StudentProfileId != request.StudentProfileId))
+        {
+            return Result<IReadOnlyCollection<BadgeDto>>.Fail(
+                "FORBIDDEN", "You can only view your own badges.");
+        }
+
         var ids = await db.StudentBadges.Where(x => x.StudentProfileId == request.StudentProfileId)
             .Select(x => x.BadgeId).ToListAsync(cancellationToken);
         var list = await db.Badges.Where(x => ids.Contains(x.Id)).Select(x => new BadgeDto(x.Id, x.Name, x.XpReward))

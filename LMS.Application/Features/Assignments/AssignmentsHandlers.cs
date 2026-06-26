@@ -48,10 +48,26 @@ public sealed class AssignmentsHandlers(
     public async Task<Result<IReadOnlyCollection<AssignmentDto>>> Handle(GetClassAssignmentsQuery request,
         CancellationToken cancellationToken)
     {
-        return Result<IReadOnlyCollection<AssignmentDto>>.Ok(await db.Assignments
-            .Where(x => x.ClassId == request.ClassId)
+        // SECURITY: non-staff callers (students) only see assignments for classes
+        // they're enrolled in; staff get the unrestricted teaching view.
+        var scope = await NonStaffEnrolledClassScopeAsync(cancellationToken);
+        var q = db.Assignments.Where(x => x.ClassId == request.ClassId);
+        if (scope is not null) q = q.Where(x => scope.Contains(x.ClassId));
+        return Result<IReadOnlyCollection<AssignmentDto>>.Ok(await q
             .Select(a => new AssignmentDto(a.Id, a.ClassId, a.Title, a.Status, a.CreatedByTeacherId, a.DueDate, a.Description))
             .ToListAsync(cancellationToken));
+    }
+
+    // SECURITY helper: null for staff (no class restriction); the caller's enrolled
+    // class ids for a student; an empty list for a profile-less caller (sees
+    // nothing). Scopes the class-level assignment listings so a student can't
+    // enumerate assignment metadata for classes they aren't enrolled in.
+    private async Task<List<Guid>?> NonStaffEnrolledClassScopeAsync(CancellationToken ct)
+    {
+        if (currentUser.StaffProfileId is not null) return null;
+        if (currentUser.StudentProfileId is not { } spid) return new List<Guid>();
+        return await db.Enrollments.Where(e => e.StudentProfileId == spid)
+            .Select(e => e.ClassId).ToListAsync(ct);
     }
 
     public async Task<Result<IReadOnlyCollection<AssignmentDto>>> Handle(GetStudentAssignmentsQuery request,
@@ -174,6 +190,10 @@ public sealed class AssignmentsHandlers(
             q = q.Where(x => x.ClassId == classId);
         if (request.Status is { } status)
             q = q.Where(x => x.Status == status);
+
+        // SECURITY: non-staff callers only see assignments for their enrolled classes.
+        var scope = await NonStaffEnrolledClassScopeAsync(cancellationToken);
+        if (scope is not null) q = q.Where(x => scope.Contains(x.ClassId));
 
         var data = await q
             .OrderByDescending(x => x.CreatedAt)
