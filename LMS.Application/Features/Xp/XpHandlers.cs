@@ -53,6 +53,17 @@ public sealed class XpHandlers(IApplicationDbContext db, ICurrentUserService cur
     public async Task<Result<IReadOnlyCollection<XpLedgerDto>>> Handle(GetStudentXpLedgerQuery request,
         CancellationToken cancellationToken)
     {
+        // SECURITY: a student may read only their OWN XP ledger. Staff
+        // (StaffProfileId present — teachers, support, office, admin) may read
+        // any student's for teaching/support workflows. Without this guard any
+        // Xp.Read holder could read another student's full XP history.
+        if (currentUser.StaffProfileId is null &&
+            (currentUser.StudentProfileId is null || currentUser.StudentProfileId != request.StudentProfileId))
+        {
+            return Result<IReadOnlyCollection<XpLedgerDto>>.Fail(
+                "FORBIDDEN", "You can only view your own XP ledger.");
+        }
+
         return Result<IReadOnlyCollection<XpLedgerDto>>.Ok(await db.XpLedger
             .Where(x => x.StudentProfileId == request.StudentProfileId).OrderByDescending(x => x.CreatedAt).Select(x =>
                 new XpLedgerDto(x.Id, x.StudentProfileId, x.Amount, x.SourceType.ToString(), x.Note, x.CreatedAt))
