@@ -1,3 +1,4 @@
+using LMS.Application.Common;
 using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Models;
 using LMS.Application.Common.Salary;
@@ -43,8 +44,22 @@ public sealed class PaymentsHandlers(IApplicationDbContext db, ISalaryCalculator
     {
         var page = new PageRequest(request.Page, request.PageSize);
 
+        // Overdue is DERIVED, never stored: a Pending payment whose period month
+        // has fully passed (school-local, Tashkent UTC+5) is shown as Overdue.
+        // Both the status filter and the projection honour this rule so the list,
+        // the badges, and the "Overdue"/"Pending" filters all agree.
+        var currentMonth = CurrentSchoolMonth();
+
         var query = db.Payments.AsQueryable();
-        if (request.Status is { } status) query = query.Where(p => p.Status == status);
+        if (request.Status is { } status)
+        {
+            query = status switch
+            {
+                PaymentStatus.Overdue => query.Where(p => p.Status == PaymentStatus.Pending && p.PeriodMonth < currentMonth),
+                PaymentStatus.Pending => query.Where(p => p.Status == PaymentStatus.Pending && p.PeriodMonth >= currentMonth),
+                _ => query.Where(p => p.Status == status),
+            };
+        }
         if (request.ClassId is { } cid) query = query.Where(p => p.ClassId == cid);
         if (request.Month is { } m)
         {
@@ -53,12 +68,17 @@ public sealed class PaymentsHandlers(IApplicationDbContext db, ISalaryCalculator
         }
 
         var total = await query.CountAsync(cancellationToken);
-        var items = await query
+        var rows = await query
             .OrderByDescending(p => p.CreatedAt)
             .Skip(page.Skip)
             .Take(page.NormalizedPageSize)
             .Select(p => new PaymentDto(p.Id, p.StudentProfileId, p.ClassId, p.PeriodMonth, p.Amount, p.Method, p.Status))
             .ToListAsync(cancellationToken);
+        // Derive the display status in memory (page is small) — keeps the EF
+        // projection trivially translatable.
+        var items = rows
+            .Select(d => d with { Status = DeriveStatus(d.Status, d.PeriodMonth, currentMonth) })
+            .ToList();
 
         return Result<PagedResult<PaymentDto>>.Ok(PagedResult<PaymentDto>.From(items, total, page));
     }
@@ -72,11 +92,32 @@ public sealed class PaymentsHandlers(IApplicationDbContext db, ISalaryCalculator
     public async Task<Result<IReadOnlyCollection<PaymentDto>>> Handle(GetStudentPaymentsQuery request,
         CancellationToken cancellationToken)
     {
-        return Result<IReadOnlyCollection<PaymentDto>>.Ok(await db.Payments
+        var currentMonth = CurrentSchoolMonth();
+        var rows = await db.Payments
             .Where(x => x.StudentProfileId == request.StudentProfileId)
             .Select(p => new PaymentDto(p.Id, p.StudentProfileId, p.ClassId, p.PeriodMonth, p.Amount, p.Method, p.Status))
-            .ToListAsync(cancellationToken));
+            .ToListAsync(cancellationToken);
+        return Result<IReadOnlyCollection<PaymentDto>>.Ok(
+            rows.Select(d => d with { Status = DeriveStatus(d.Status, d.PeriodMonth, currentMonth) }).ToList());
     }
+
+    /// <summary>
+    /// The 1st-of-month for the current school-local month (Tashkent UTC+5). A
+    /// payment is "overdue" once its period month is strictly before this.
+    /// </summary>
+    private static DateOnly CurrentSchoolMonth()
+    {
+        var today = SchoolCalendar.Today(DateTime.UtcNow);
+        return new DateOnly(today.Year, today.Month, 1);
+    }
+
+    /// <summary>
+    /// Overdue is derived, not stored: a still-Pending payment whose period month
+    /// is strictly before the current school month is shown as Overdue. Paid /
+    /// Failed are never changed.
+    /// </summary>
+    private static PaymentStatus DeriveStatus(PaymentStatus status, DateOnly periodMonth, DateOnly currentMonth)
+        => status == PaymentStatus.Pending && periodMonth < currentMonth ? PaymentStatus.Overdue : status;
 
     public async Task<Result<PaymentDto>> Handle(MarkPaymentFailedCommand request, CancellationToken cancellationToken)
     {
