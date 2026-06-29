@@ -60,34 +60,13 @@ public sealed class GenerateCourseHandler(
         if (template is null) return Result<GenerateCourseResultDto>.Fail("NOT_FOUND", "Template not found.");
 
         var primary = request.Slots.OrderBy(s => s.StartsAt).First();
-        var expectedCloneName = $"{cls.Title} — {template.Name}";
 
-        // 1. Clone — unless this class already holds the clone of THIS template
-        //    (idempotent re-run). A clone of a different template, or a directly
-        //    assigned system template, is superseded by a fresh clone.
-        Guid? reuseId = null;
-        if (cls.CurriculumTemplateId is { } currentId)
-        {
-            var current = await db.CurriculumTemplates.AsNoTracking()
-                .FirstOrDefaultAsync(t => t.Id == currentId, ct);
-            if (current is { IsSystem: false } && current.Name == expectedCloneName)
-                reuseId = currentId;
-        }
-
-        Guid courseTemplateId;
-        if (reuseId is { } rid)
-        {
-            courseTemplateId = rid;
-        }
-        else
-        {
-            var clone = await sender.Send(new CloneTemplateToClassCommand(request.ClassId, request.TemplateId), ct);
-            if (!clone.Success)
-                return Result<GenerateCourseResultDto>.Fail(clone.ErrorCode ?? "FAILED", clone.Message ?? "Clone failed.");
-            // The clone set Class.CurriculumTemplateId on the shared tracked entity.
-            courseTemplateId = cls.CurriculumTemplateId
-                ?? throw new InvalidOperationException("Clone did not set the class curriculum template.");
-        }
+        // 1. Bind the class DIRECTLY to the chosen master template — NO per-class clone.
+        //    The class shares the ready library template; its sessions map to that
+        //    template's own lessons (step 3), and its day-plan is read from the master.
+        //    Curriculum edits happen in the Template Library, never per-class.
+        var courseTemplateId = template.Id;
+        cls.SetCurriculumTemplate(courseTemplateId);
 
         // 2. Generate the session calendar (N-per-day via Slots).
         var sched = await sender.Send(new ApplyClassScheduleCommand(
@@ -97,7 +76,7 @@ public sealed class GenerateCourseHandler(
         if (!sched.Success || sched.Data is null)
             return Result<GenerateCourseResultDto>.Fail(sched.ErrorCode ?? "FAILED", sched.Message ?? "Scheduling failed.");
 
-        // 3. Map upcoming sessions to the cloned course's lessons in order.
+        // 3. Map upcoming sessions to the master template's lessons in order.
         var assign = await sender.Send(new AssignCurriculumToClassCommand(request.ClassId, courseTemplateId), ct);
         if (!assign.Success)
             return Result<GenerateCourseResultDto>.Fail(assign.ErrorCode ?? "FAILED", assign.Message ?? "Curriculum mapping failed.");
