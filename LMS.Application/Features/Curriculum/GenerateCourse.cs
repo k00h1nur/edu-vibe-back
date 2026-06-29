@@ -45,6 +45,13 @@ public sealed class GenerateCourseHandler(
         if (request.Slots is null || request.Slots.Count == 0)
             return Result<GenerateCourseResultDto>.Fail("VALIDATION", "At least one daily time slot is required.");
 
+        // One transaction across all four steps so a mid-flow failure leaves the class
+        // entirely unconfigured rather than half-set-up. Wrapped in the execution
+        // strategy because the context enables retry-on-failure — a bare
+        // BeginTransactionAsync throws under NpgsqlRetryingExecutionStrategy. An early
+        // Result.Fail returns from the lambda uncommitted ⇒ the helper rolls back.
+        return await db.ExecuteInTransactionAsync<GenerateCourseResultDto>(async () =>
+        {
         var cls = await db.Classes.FirstOrDefaultAsync(c => c.Id == request.ClassId, ct);
         if (cls is null) return Result<GenerateCourseResultDto>.Fail("NOT_FOUND", "Class not found.");
 
@@ -54,12 +61,6 @@ public sealed class GenerateCourseHandler(
 
         var primary = request.Slots.OrderBy(s => s.StartsAt).First();
         var expectedCloneName = $"{cls.Title} — {template.Name}";
-
-        // One transaction across all three steps. We return early (without
-        // committing) on any sub-failure; `await using` then disposes the
-        // transaction and rolls everything back — no double-save, no swallowed
-        // errors, no half-configured class.
-        await using var tx = await db.BeginTransactionAsync(ct);
 
         // 1. Clone — unless this class already holds the clone of THIS template
         //    (idempotent re-run). A clone of a different template, or a directly
@@ -120,11 +121,10 @@ public sealed class GenerateCourseHandler(
         foreach (var sid in sessionsToMaterialize)
             materializedTasks += (await materializer.MaterializeAsync(sid, creatorId, ct)).CreatedTasks;
 
-        await tx.CommitAsync(ct);
-
         return Result<GenerateCourseResultDto>.Ok(
             new GenerateCourseResultDto(request.ClassId, courseTemplateId,
                 sched.Data.GeneratedCount, sched.Data.RemovedCount, mapped, materializedTasks),
             $"Course ready: {sched.Data.GeneratedCount} session(s), {mapped} mapped, {materializedTasks} task(s) created.");
+        }, ct);
     }
 }

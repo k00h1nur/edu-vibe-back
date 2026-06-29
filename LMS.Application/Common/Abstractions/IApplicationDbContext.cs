@@ -1,3 +1,4 @@
+using LMS.Application.Common.Models;
 using LMS.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -76,6 +77,18 @@ public interface IApplicationDbContext
     /// <summary>
     /// Opens a DB transaction on the shared scoped context so a multi-step command
     /// (e.g. F3 GenerateCourse) can commit all of its SaveChanges atomically.
+    /// NOTE: a bare call throws under the retry-on-failure execution strategy — use
+    /// <see cref="ExecuteInTransactionAsync{T}"/> for multi-step transactional work.
     /// </summary>
     Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Runs <paramref name="action"/> as a RETRIABLE transaction. The context enables
+    /// EnableRetryOnFailure (NpgsqlRetryingExecutionStrategy), which forbids a bare
+    /// user-initiated <see cref="BeginTransactionAsync"/>; this wraps the whole unit in
+    /// the execution strategy so it re-executes atomically on a transient failure. The
+    /// change tracker is reset on each attempt. Commits when the returned Result
+    /// succeeds, rolls back otherwise.
+    /// </summary>
+    Task<Result<T>> ExecuteInTransactionAsync<T>(Func<Task<Result<T>>> action, CancellationToken cancellationToken);
 }

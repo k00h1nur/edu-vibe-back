@@ -1,4 +1,5 @@
 using LMS.Application.Common.Abstractions;
+using LMS.Application.Common.Models;
 using LMS.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,6 +13,24 @@ public sealed class LMSDbContext : DbContext, IApplicationDbContext
 
     public Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction> BeginTransactionAsync(
         CancellationToken cancellationToken) => Database.BeginTransactionAsync(cancellationToken);
+
+    public async Task<Result<T>> ExecuteInTransactionAsync<T>(
+        Func<Task<Result<T>>> action, CancellationToken cancellationToken)
+    {
+        // EnableRetryOnFailure requires the manual transaction to run INSIDE the
+        // execution strategy so the whole unit can be retried as one. The change
+        // tracker is cleared each attempt so a retry never re-saves stale state.
+        var strategy = Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            ChangeTracker.Clear();
+            await using var tx = await Database.BeginTransactionAsync(cancellationToken);
+            var result = await action();
+            if (result.Success) await tx.CommitAsync(cancellationToken);
+            else await tx.RollbackAsync(cancellationToken);
+            return result;
+        });
+    }
 
     public DbSet<User> Users => Set<User>();
     public DbSet<Role> Roles => Set<Role>();
