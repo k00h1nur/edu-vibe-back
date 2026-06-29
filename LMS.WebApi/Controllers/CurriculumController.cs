@@ -38,6 +38,16 @@ public sealed class CurriculumController(ISender sender) : ControllerBase
             : NotFound(ApiResponse<CurriculumTreeDto>.Fail(r.Message ?? "Not found"));
     }
 
+    /// <summary>The reusable day-by-day teaching plan for a template (Day 1 = 1A + 1B …).</summary>
+    [HttpGet("templates/{id:guid}/plan")]
+    public async Task<ActionResult<ApiResponse<TemplatePlanDto>>> Plan(Guid id, CancellationToken ct)
+    {
+        var r = await sender.Send(new GetTemplatePlanQuery(id), ct);
+        return r.Success
+            ? Ok(ApiResponse<TemplatePlanDto>.Ok(r.Data, r.Message))
+            : NotFound(ApiResponse<TemplatePlanDto>.Fail(r.Message ?? "Not found"));
+    }
+
     /// <summary>
     /// Bind a template to a class and auto-map its upcoming sessions to the
     /// template's lessons. Body: {"classId": "...", "templateId": "..."}.

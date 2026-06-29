@@ -32,7 +32,7 @@ public sealed class CourseBuilderHandlers(IApplicationDbContext db, ICurrentUser
     // ---- public handlers --------------------------------------------------
 
     public async Task<Result<ClassCourseBuilderDto>> Handle(GetClassCourseBuilderQuery request, CancellationToken ct)
-        => await WithCourse(request.ClassId, ct, (_, _) => Task.CompletedTask);
+        => await WithCourse(request.ClassId, ct, (_, _) => Task.CompletedTask, isMutation: false);
 
     public async Task<Result<ClassCourseBuilderDto>> Handle(CloneTemplateToClassCommand request, CancellationToken ct)
     {
@@ -375,7 +375,7 @@ public sealed class CourseBuilderHandlers(IApplicationDbContext db, ICurrentUser
     /// returns the refreshed builder tree.
     /// </summary>
     private async Task<Result<ClassCourseBuilderDto>> WithCourse(
-        Guid classId, CancellationToken ct, Func<Guid, Guid, Task> mutate)
+        Guid classId, CancellationToken ct, Func<Guid, Guid, Task> mutate, bool isMutation = true)
     {
         var cls = await db.Classes.FirstOrDefaultAsync(c => c.Id == classId, ct);
         if (cls is null) return Fail("NOT_FOUND", "Class not found.");
@@ -383,6 +383,14 @@ public sealed class CourseBuilderHandlers(IApplicationDbContext db, ICurrentUser
             return Fail("FORBIDDEN", "Only the class teacher or an admin can edit this course.");
 
         var (templateId, moduleId) = await EnsureClassCourseAsync(cls, ct);
+
+        // A class bound to a shared LIBRARY (system) template is READ-ONLY here — a
+        // per-class edit would change the master for every class that uses it. Curriculum
+        // edits go through the Template Library instead. Reads (isMutation:false) still
+        // return the tree so the builder can display the shared course + its day-plan.
+        if (isMutation && await db.CurriculumTemplates.AnyAsync(t => t.Id == templateId && t.IsSystem, ct))
+            return Fail("READONLY", "This class uses a shared library template — edit the course in the Template Library, not per-class.");
+
         await mutate(templateId, moduleId);
         return await BuildDtoAsync(classId, templateId, ct);
     }
@@ -391,8 +399,10 @@ public sealed class CourseBuilderHandlers(IApplicationDbContext db, ICurrentUser
     private async Task<(Guid TemplateId, Guid ModuleId)> EnsureClassCourseAsync(Class cls, CancellationToken ct)
     {
         Guid templateId;
+        // Use whatever template the class is bound to — a shared LIBRARY master OR its
+        // own editable course. Never clone a master: sharing the ready template is the point.
         if (cls.CurriculumTemplateId is { } tid &&
-            await db.CurriculumTemplates.AnyAsync(t => t.Id == tid && !t.IsSystem, ct))
+            await db.CurriculumTemplates.AnyAsync(t => t.Id == tid, ct))
         {
             templateId = tid;
         }
@@ -407,16 +417,20 @@ public sealed class CourseBuilderHandlers(IApplicationDbContext db, ICurrentUser
             templateId = template.Id;
         }
 
+        // A shared master already owns its modules; never add one (that would mutate the
+        // master). Only the class's own scratch course gets a default module.
+        var isSystem = await db.CurriculumTemplates
+            .Where(t => t.Id == templateId).Select(t => t.IsSystem).FirstOrDefaultAsync(ct);
         var module = await db.CurriculumModules
             .Where(m => m.TemplateId == templateId).OrderBy(m => m.Order)
             .FirstOrDefaultAsync(ct);
-        if (module is null)
+        if (module is null && !isSystem)
         {
             module = new CurriculumModule(templateId, 1, "Course");
             await db.CurriculumModules.AddAsync(module, ct);
             await db.SaveChangesAsync(ct);
         }
-        return (templateId, module.Id);
+        return (templateId, module?.Id ?? Guid.Empty);
     }
 
     private async Task<int> NextUnitOrder(Guid templateId, CancellationToken ct)
