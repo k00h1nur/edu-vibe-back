@@ -104,9 +104,11 @@ public sealed class ExistingGroupOnboardingHandlers(IApplicationDbContext db)
 
         var plan = BackfillReconciler.Plan(targetLessonIds, existing);
 
-        // Apply the plan atomically — partial failure leaves the class unchanged.
-        await using var tx = await db.BeginTransactionAsync(ct);
-
+        // Apply the plan atomically. Wrapped in the execution strategy because the
+        // context enables retry-on-failure (a bare BeginTransactionAsync throws under
+        // NpgsqlRetryingExecutionStrategy); partial failure leaves the class unchanged.
+        return await db.ExecuteInTransactionAsync<SetPositionResultDto>(async () =>
+        {
         if (plan.DeleteSessionIds.Count > 0)
         {
             var toDelete = await db.ClassSessions
@@ -130,7 +132,6 @@ public sealed class ExistingGroupOnboardingHandlers(IApplicationDbContext db)
         }
 
         await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
 
         return Result<SetPositionResultDto>.Ok(
             new SetPositionResultDto(
@@ -139,6 +140,7 @@ public sealed class ExistingGroupOnboardingHandlers(IApplicationDbContext db)
             plan.SkippedWithAttendance.Count > 0
                 ? $"Set position: {plan.CreateForLessonIds.Count} added, {plan.DeleteSessionIds.Count} removed, {plan.SkippedWithAttendance.Count} kept (had attendance)."
                 : $"Set position: {targetLessonIds.Count} lesson(s) marked completed.");
+        }, ct);
     }
 
     private async Task<List<OrderedLesson>> OrderedLessonsAsync(Guid templateId, CancellationToken ct) =>

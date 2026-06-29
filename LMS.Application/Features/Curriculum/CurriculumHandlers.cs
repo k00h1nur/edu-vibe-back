@@ -14,7 +14,10 @@ public sealed class CurriculumHandlers(IApplicationDbContext db) :
     public async Task<Result<IReadOnlyCollection<CurriculumTemplateSummaryDto>>> Handle(
         GetCurriculumTemplatesQuery request, CancellationToken ct)
     {
-        var q = db.CurriculumTemplates.AsNoTracking().Where(t => t.IsPublished);
+        // The clone-from library = published MASTER templates only. Per-class clones
+        // (IsSystem=false, named "{Class} — {Template}") are working copies, never a
+        // clone source — excluding them keeps the picker to ready templates.
+        var q = db.CurriculumTemplates.AsNoTracking().Where(t => t.IsPublished && t.IsSystem);
         if (request.Category is { } cat) q = q.Where(t => t.Category == cat);
 
         var items = await q
