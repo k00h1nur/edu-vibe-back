@@ -28,6 +28,8 @@ public sealed class LMSDbContext : DbContext, IApplicationDbContext
     public DbSet<CurriculumModule> CurriculumModules => Set<CurriculumModule>();
     public DbSet<CurriculumUnit> CurriculumUnits => Set<CurriculumUnit>();
     public DbSet<CurriculumLesson> CurriculumLessons => Set<CurriculumLesson>();
+    public DbSet<CurriculumPlanDay> CurriculumPlanDays => Set<CurriculumPlanDay>();
+    public DbSet<CurriculumPlanDayLesson> CurriculumPlanDayLessons => Set<CurriculumPlanDayLesson>();
     public DbSet<LessonDefaultTask> LessonDefaultTasks => Set<LessonDefaultTask>();
     public DbSet<Exam> Exams => Set<Exam>();
     public DbSet<ExamSection> ExamSections => Set<ExamSection>();
@@ -35,6 +37,7 @@ public sealed class LMSDbContext : DbContext, IApplicationDbContext
     public DbSet<ExamSectionScore> ExamSectionScores => Set<ExamSectionScore>();
     public DbSet<Enrollment> Enrollments => Set<Enrollment>();
     public DbSet<ClassSession> ClassSessions => Set<ClassSession>();
+    public DbSet<ClassSessionLesson> ClassSessionLessons => Set<ClassSessionLesson>();
     public DbSet<ClassSchedulePattern> ClassSchedulePatterns => Set<ClassSchedulePattern>();
     public DbSet<Attendance> Attendance => Set<Attendance>();
     public DbSet<Assignment> Assignments => Set<Assignment>();

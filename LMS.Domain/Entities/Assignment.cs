@@ -59,12 +59,27 @@ public sealed class Assignment : BaseEntity
     /// </summary>
     public Guid? ClassSessionId { get; private set; }
 
+    /// <summary>
+    /// Optional provenance link to the curriculum lesson this assignment was
+    /// materialised from. With multi-lesson class days (1A+1B) a session can spawn
+    /// one assignment per lesson, so this keeps each separately reconcilable when a
+    /// teacher changes the day's lesson set. Null = not curriculum-derived.
+    /// </summary>
+    public Guid? CurriculumLessonId { get; private set; }
+
     public ICollection<Submission> Submissions { get; } = new List<Submission>();
 
     /// <summary>Links/unlinks this assignment to a lesson. Pass null to unlink.</summary>
     public void SetSession(Guid? classSessionId)
     {
         ClassSessionId = classSessionId;
+        Touch();
+    }
+
+    /// <summary>Sets/clears the curriculum-lesson provenance. Pass null to clear.</summary>
+    public void SetCurriculumLesson(Guid? curriculumLessonId)
+    {
+        CurriculumLessonId = curriculumLessonId;
         Touch();
     }
 
