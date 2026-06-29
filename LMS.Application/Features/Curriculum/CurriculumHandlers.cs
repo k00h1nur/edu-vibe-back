@@ -1,5 +1,6 @@
 using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Models;
+using LMS.Domain.Entities;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -77,15 +78,6 @@ public sealed class CurriculumHandlers(IApplicationDbContext db) :
 
         cls.SetCurriculumTemplate(template.Id);
 
-        // Lessons in curriculum order (module→unit→lesson).
-        var orderedLessons = await (
-            from l in db.CurriculumLessons.AsNoTracking()
-            join u in db.CurriculumUnits.AsNoTracking() on l.UnitId equals u.Id
-            join m in db.CurriculumModules.AsNoTracking() on u.ModuleId equals m.Id
-            where m.TemplateId == template.Id
-            orderby m.Order, u.Order, l.Order
-            select new { l.Id, l.Title }).ToListAsync(ct);
-
         // Upcoming sessions (today forward) in date order — these get the lessons.
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var upcoming = await db.ClassSessions
@@ -93,8 +85,55 @@ public sealed class CurriculumHandlers(IApplicationDbContext db) :
             .OrderBy(s => s.SessionDate).ThenBy(s => s.StartsAt)
             .ToListAsync(ct);
 
-        for (var i = 0; i < upcoming.Count && i < orderedLessons.Count; i++)
-            upcoming[i].LinkCurriculumLesson(orderedLessons[i].Id, orderedLessons[i].Title);
+        // Prefer the template's day-PLAN: each session covers ONE plan-day, so a paired
+        // day (1A+1B) lands together on the same session. The session's denormalised
+        // CurriculumLessonId becomes the day's first lesson; every lesson of the day is
+        // recorded in class_session_lessons (the multi-lesson join). Re-running replaces
+        // the join rows for these sessions (idempotent).
+        var planDayIds = await db.CurriculumPlanDays.AsNoTracking()
+            .Where(d => d.TemplateId == template.Id).OrderBy(d => d.Order)
+            .Select(d => d.Id).ToListAsync(ct);
+
+        if (planDayIds.Count > 0)
+        {
+            var dayLessons = await (
+                from pl in db.CurriculumPlanDayLessons.AsNoTracking()
+                join l in db.CurriculumLessons.AsNoTracking() on pl.CurriculumLessonId equals l.Id
+                where planDayIds.Contains(pl.PlanDayId)
+                orderby pl.Order
+                select new { pl.PlanDayId, pl.Order, LessonId = l.Id, l.Title }).ToListAsync(ct);
+            var lessonsByDay = planDayIds.ToDictionary(
+                id => id, id => dayLessons.Where(x => x.PlanDayId == id).OrderBy(x => x.Order).ToList());
+
+            var sessionIds = upcoming.Select(s => s.Id).ToList();
+            var staleJoins = await db.ClassSessionLessons
+                .Where(x => sessionIds.Contains(x.ClassSessionId)).ToListAsync(ct);
+            if (staleJoins.Count > 0) db.ClassSessionLessons.RemoveRange(staleJoins);
+
+            for (var i = 0; i < upcoming.Count && i < planDayIds.Count; i++)
+            {
+                var lessons = lessonsByDay[planDayIds[i]];
+                if (lessons.Count == 0) continue;
+                upcoming[i].LinkCurriculumLesson(lessons[0].LessonId, lessons[0].Title);
+                for (var j = 0; j < lessons.Count; j++)
+                    await db.ClassSessionLessons.AddAsync(
+                        new ClassSessionLesson(upcoming[i].Id, lessons[j].LessonId, j + 1), ct);
+            }
+        }
+        else
+        {
+            // No plan defined → original one-lesson-per-session map (curriculum order).
+            var orderedLessons = await (
+                from l in db.CurriculumLessons.AsNoTracking()
+                join u in db.CurriculumUnits.AsNoTracking() on l.UnitId equals u.Id
+                join m in db.CurriculumModules.AsNoTracking() on u.ModuleId equals m.Id
+                where m.TemplateId == template.Id
+                orderby m.Order, u.Order, l.Order
+                select new { l.Id, l.Title }).ToListAsync(ct);
+
+            for (var i = 0; i < upcoming.Count && i < orderedLessons.Count; i++)
+                upcoming[i].LinkCurriculumLesson(orderedLessons[i].Id, orderedLessons[i].Title);
+        }
 
         await db.SaveChangesAsync(ct);
         return await Handle(new GetClassCurriculumQuery(cls.Id), ct);
