@@ -68,6 +68,11 @@ public sealed class CourseBuilderHandlers(IApplicationDbContext db, ICurrentUser
             .GroupBy(t => t.CurriculumLessonId)
             .ToDictionary(g => g.Key, g => g.ToList());
 
+        // Source→clone lesson id map, accumulated across all units, so the template
+        // teaching plan (curriculum_plan_days) can be re-pointed onto the clone's
+        // lessons after the tree is copied.
+        var lessonIdMap = new Dictionary<Guid, Guid>();
+
         foreach (var m in modules)
         {
             var mc = new CurriculumModule(clone.Id, m.Order, m.Title);
@@ -91,6 +96,11 @@ public sealed class CourseBuilderHandlers(IApplicationDbContext db, ICurrentUser
                 }
                 await db.SaveChangesAsync(ct);
 
+                // Record source→clone lesson ids (the clone Ids are populated by the
+                // save above) so the template plan can be re-pointed onto the clone.
+                foreach (var (sourceId, lc) in lessonClones)
+                    lessonIdMap[sourceId] = lc.Id;
+
                 // Copy each source lesson's default tasks onto its clone — the
                 // clone's Id is populated by the save above. Each clone is a fresh
                 // template, so this never duplicates (GenerateCourse also skips a
@@ -104,9 +114,47 @@ public sealed class CourseBuilderHandlers(IApplicationDbContext db, ICurrentUser
             }
         }
 
+        // Inherit the book's reusable teaching plan: copy the source template's
+        // plan-days (and their lesson sets) onto the clone, re-pointing each plan-day
+        // lesson to the clone's copy. A book with no plan yet copies nothing.
+        await CopyTemplatePlanAsync(source.Id, clone.Id, lessonIdMap, ct);
+
         cls.SetCurriculumTemplate(clone.Id);
         await db.SaveChangesAsync(ct);
         return await BuildDtoAsync(request.ClassId, clone.Id, ct);
+    }
+
+    /// <summary>
+    /// Copies a source template's teaching plan (curriculum_plan_days +
+    /// curriculum_plan_day_lessons) onto a freshly-cloned template, re-pointing each
+    /// plan-day lesson to the clone's corresponding lesson via <paramref name="lessonIdMap"/>.
+    /// A plan-day lesson with no mapping (shouldn't happen for a full clone) is skipped;
+    /// an empty/exam day is still copied so its order in the plan is preserved.
+    /// </summary>
+    private async Task CopyTemplatePlanAsync(
+        Guid sourceTemplateId, Guid cloneTemplateId,
+        IReadOnlyDictionary<Guid, Guid> lessonIdMap, CancellationToken ct)
+    {
+        var planDays = await db.CurriculumPlanDays.AsNoTracking()
+            .Where(d => d.TemplateId == sourceTemplateId).OrderBy(d => d.Order).ToListAsync(ct);
+        if (planDays.Count == 0) return;
+
+        var dayIds = planDays.Select(d => d.Id).ToList();
+        var dayLessons = await db.CurriculumPlanDayLessons.AsNoTracking()
+            .Where(pl => dayIds.Contains(pl.PlanDayId)).OrderBy(pl => pl.Order).ToListAsync(ct);
+
+        foreach (var d in planDays)
+        {
+            var dc = new CurriculumPlanDay(cloneTemplateId, d.Order, d.Title);
+            await db.CurriculumPlanDays.AddAsync(dc, ct);
+            await db.SaveChangesAsync(ct);
+
+            foreach (var pl in dayLessons.Where(x => x.PlanDayId == d.Id))
+                if (lessonIdMap.TryGetValue(pl.CurriculumLessonId, out var cloneLessonId))
+                    await db.CurriculumPlanDayLessons.AddAsync(
+                        new CurriculumPlanDayLesson(dc.Id, cloneLessonId, pl.Order), ct);
+        }
+        await db.SaveChangesAsync(ct);
     }
 
     public async Task<Result<ClassCourseBuilderDto>> Handle(CreateCourseUnitCommand request, CancellationToken ct)

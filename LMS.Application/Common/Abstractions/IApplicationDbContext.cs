@@ -21,6 +21,8 @@ public interface IApplicationDbContext
     DbSet<CurriculumModule> CurriculumModules { get; }
     DbSet<CurriculumUnit> CurriculumUnits { get; }
     DbSet<CurriculumLesson> CurriculumLessons { get; }
+    DbSet<CurriculumPlanDay> CurriculumPlanDays { get; }
+    DbSet<CurriculumPlanDayLesson> CurriculumPlanDayLessons { get; }
     DbSet<LessonDefaultTask> LessonDefaultTasks { get; }
     DbSet<Exam> Exams { get; }
     DbSet<ExamSection> ExamSections { get; }
@@ -28,6 +30,7 @@ public interface IApplicationDbContext
     DbSet<ExamSectionScore> ExamSectionScores { get; }
     DbSet<Enrollment> Enrollments { get; }
     DbSet<ClassSession> ClassSessions { get; }
+    DbSet<ClassSessionLesson> ClassSessionLessons { get; }
     DbSet<ClassSchedulePattern> ClassSchedulePatterns { get; }
     DbSet<Attendance> Attendance { get; }
     DbSet<Assignment> Assignments { get; }

@@ -239,6 +239,11 @@ public sealed class AssignmentConfiguration : IEntityTypeConfiguration<Assignmen
         b.HasKey(x => x.Id);
         b.Property(x => x.Title).IsRequired().HasMaxLength(256);
         b.Property(x => x.Description).HasMaxLength(4000);
+        // Curriculum-lesson provenance (multi-lesson day homework). SET NULL matches
+        // the migration's FK so deleting a lesson doesn't cascade away an assignment.
+        b.HasIndex(x => x.CurriculumLessonId);
+        b.HasOne<CurriculumLesson>().WithMany().HasForeignKey(x => x.CurriculumLessonId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
 
@@ -825,6 +830,46 @@ public sealed class LessonDefaultTaskConfiguration : IEntityTypeConfiguration<Le
         b.HasIndex(x => new { x.CurriculumLessonId, x.Order });
         b.HasOne(x => x.CurriculumLesson).WithMany().HasForeignKey(x => x.CurriculumLessonId)
             .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+// ---- Template teaching plan + multi-lesson sessions (PR2 rails) -------------
+
+public sealed class CurriculumPlanDayConfiguration : IEntityTypeConfiguration<CurriculumPlanDay>
+{
+    public void Configure(EntityTypeBuilder<CurriculumPlanDay> b)
+    {
+        b.ToTable("curriculum_plan_days");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Title).HasMaxLength(200);
+        b.HasIndex(x => new { x.TemplateId, x.Order });
+        b.HasOne<CurriculumTemplate>().WithMany().HasForeignKey(x => x.TemplateId).OnDelete(DeleteBehavior.Cascade);
+        b.HasMany(x => x.Lessons).WithOne().HasForeignKey(l => l.PlanDayId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public sealed class CurriculumPlanDayLessonConfiguration : IEntityTypeConfiguration<CurriculumPlanDayLesson>
+{
+    public void Configure(EntityTypeBuilder<CurriculumPlanDayLesson> b)
+    {
+        b.ToTable("curriculum_plan_day_lessons");
+        b.HasKey(x => x.Id);
+        b.HasIndex(x => new { x.PlanDayId, x.Order });
+        b.HasIndex(x => new { x.PlanDayId, x.CurriculumLessonId }).IsUnique();
+        b.HasOne<CurriculumLesson>().WithMany().HasForeignKey(x => x.CurriculumLessonId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public sealed class ClassSessionLessonConfiguration : IEntityTypeConfiguration<ClassSessionLesson>
+{
+    public void Configure(EntityTypeBuilder<ClassSessionLesson> b)
+    {
+        b.ToTable("class_session_lessons");
+        b.HasKey(x => x.Id);
+        b.HasIndex(x => new { x.ClassSessionId, x.Order });
+        b.HasIndex(x => new { x.ClassSessionId, x.CurriculumLessonId }).IsUnique();
+        b.HasOne<ClassSession>().WithMany().HasForeignKey(x => x.ClassSessionId).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne<CurriculumLesson>().WithMany().HasForeignKey(x => x.CurriculumLessonId).OnDelete(DeleteBehavior.Cascade);
     }
 }
 
