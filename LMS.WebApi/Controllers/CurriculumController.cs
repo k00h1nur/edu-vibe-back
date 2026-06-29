@@ -48,6 +48,17 @@ public sealed class CurriculumController(ISender sender) : ControllerBase
             : NotFound(ApiResponse<TemplatePlanDto>.Fail(r.Message ?? "Not found"));
     }
 
+    /// <summary>A class's journey through its day-plan (24 day-cards + completion).</summary>
+    [HttpGet("class/{classId:guid}/plan-progress")]
+    public async Task<ActionResult<ApiResponse<ClassPlanProgressDto>>> ClassPlanProgress(Guid classId, CancellationToken ct)
+    {
+        var r = await sender.Send(new GetClassPlanProgressQuery(classId), ct);
+        if (r.Success) return Ok(ApiResponse<ClassPlanProgressDto>.Ok(r.Data, r.Message));
+        return r.ErrorCode == "FORBIDDEN"
+            ? StatusCode(403, ApiResponse<ClassPlanProgressDto>.Fail(r.Message ?? "Forbidden"))
+            : NotFound(ApiResponse<ClassPlanProgressDto>.Fail(r.Message ?? "Not found"));
+    }
+
     /// <summary>
     /// Bind a template to a class and auto-map its upcoming sessions to the
     /// template's lessons. Body: {"classId": "...", "templateId": "..."}.
