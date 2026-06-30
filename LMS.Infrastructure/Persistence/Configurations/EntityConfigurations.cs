@@ -521,6 +521,42 @@ public sealed class TaskSubmissionConfiguration : IEntityTypeConfiguration<TaskS
     }
 }
 
+// ---- Lesson self-check exercises (textbook-style practice) ------------------
+
+public sealed class LessonExerciseConfiguration : IEntityTypeConfiguration<LessonExercise>
+{
+    public void Configure(EntityTypeBuilder<LessonExercise> b)
+    {
+        b.ToTable("lesson_exercises");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Type).IsRequired().HasMaxLength(40);
+        b.Property(x => x.Title).HasMaxLength(300);
+        // jsonb — type-specific structure (items / parts / wordBank / answers).
+        b.Property(x => x.ContentJson).IsRequired().HasColumnType("jsonb");
+        // Upsert key for bulk add: one exercise per (lesson, orderIndex).
+        b.HasIndex(x => new { x.LessonId, x.OrderIndex }).IsUnique()
+            .HasDatabaseName("ix_lesson_exercises_lesson_order");
+        b.HasOne<CurriculumLesson>().WithMany().HasForeignKey(x => x.LessonId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.HasMany(x => x.Submissions).WithOne(x => x.LessonExercise)
+            .HasForeignKey(x => x.LessonExerciseId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public sealed class LessonExerciseSubmissionConfiguration : IEntityTypeConfiguration<LessonExerciseSubmission>
+{
+    public void Configure(EntityTypeBuilder<LessonExerciseSubmission> b)
+    {
+        b.ToTable("lesson_exercise_submissions");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.AnswersJson).IsRequired().HasColumnType("jsonb");
+        // Exactly one result per (exercise, user) — the upsert key.
+        b.HasIndex(x => new { x.LessonExerciseId, x.UserId }).IsUnique()
+            .HasDatabaseName("ix_lesson_exercise_submissions_exercise_user");
+        b.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
 public sealed class VisitorMessageConfiguration : IEntityTypeConfiguration<VisitorMessage>
 {
     public void Configure(EntityTypeBuilder<VisitorMessage> b)

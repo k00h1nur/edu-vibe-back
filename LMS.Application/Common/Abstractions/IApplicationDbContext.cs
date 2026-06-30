@@ -59,6 +59,8 @@ public interface IApplicationDbContext
     DbSet<AssignmentAssignee> AssignmentAssignees { get; }
     DbSet<LearningTask> LearningTasks { get; }
     DbSet<TaskSubmission> TaskSubmissions { get; }
+    DbSet<LessonExercise> LessonExercises { get; }
+    DbSet<LessonExerciseSubmission> LessonExerciseSubmissions { get; }
     DbSet<Reminder> Reminders { get; }
     DbSet<Specialization> Specializations { get; }
     DbSet<StaffSpecialization> StaffSpecializations { get; }
