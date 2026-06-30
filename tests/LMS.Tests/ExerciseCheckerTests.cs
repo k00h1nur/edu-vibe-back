@@ -85,4 +85,22 @@ public sealed class ExerciseCheckerTests
         score.Should().Be(1);
         total.Should().Be(2);
     }
+
+    [Fact]
+    public void Word_completion_scores_like_a_single_answer_item()
+    {
+        var content = """{"items":[{"id":"1","text":"r_ng","answer":"ring"},{"id":"2","text":"c_m_r_","answer":"camera"}]}""";
+        var (score, total) = ExerciseChecker.Check("word_completion", content, El("""{"1":"ring","2":"camra"}"""));
+        score.Should().Be(1);
+        total.Should().Be(2);
+    }
+
+    [Fact]
+    public void Matching_compares_the_selected_key_against_the_answer_key()
+    {
+        var content = """{"items":[{"id":"1","text":"What's your name?","answer":"a"},{"id":"2","text":"Are you a student?","answer":"b"}],"options":{"a":"Pat.","b":"Yes."}}""";
+        var (score, total) = ExerciseChecker.Check("matching", content, El("""{"1":"a","2":"a"}"""));
+        score.Should().Be(1);
+        total.Should().Be(2);
+    }
 }
