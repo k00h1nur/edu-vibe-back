@@ -103,4 +103,25 @@ public sealed class ExerciseCheckerTests
         score.Should().Be(1);
         total.Should().Be(2);
     }
+
+    [Fact]
+    public void True_false_scores_like_a_single_answer_item()
+    {
+        var content = """{"items":[{"id":"1","text":"Today is Carla's first day.","answer":"True"},{"id":"2","text":"Rob is Spanish.","answer":"False"}]}""";
+        var (score, total) = ExerciseChecker.Check("true_false", content, El("""{"1":"True","2":"True"}"""));
+        score.Should().Be(1);
+        total.Should().Be(2);
+    }
+
+    [Fact]
+    public void Multi_select_rewards_correct_ticks_and_penalises_wrong_ones()
+    {
+        var content = """{"choices":["Italy","Spain","Russia","Japan"],"answers":["Spain","Russia"]}""";
+        // Two correct + one wrong → 2 correct − 1 wrong = 1 / 2.
+        var (score, total) = ExerciseChecker.Check("multi_select", content, El("""["Spain","Russia","Japan"]"""));
+        score.Should().Be(1);
+        total.Should().Be(2);
+        // Exactly right → full marks.
+        ExerciseChecker.Check("multi_select", content, El("""["Spain","Russia"]""")).Should().Be((2, 2));
+    }
 }
