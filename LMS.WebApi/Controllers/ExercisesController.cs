@@ -62,6 +62,43 @@ public sealed class ExercisesController(ISender sender, ICurrentUserService curr
             ? Ok(ApiResponse<SubmitResultDto>.Ok(r.Data, r.Message))
             : NotFound(ApiResponse<SubmitResultDto>.Fail(r.Message ?? "Not found"));
     }
+
+    /// <summary>
+    /// Upload a Listening audio file (teacher/admin). Returns the stored file name; the
+    /// caller stores it as <c>content.audioUrl</c> = <c>/api/proxy/Exercises/audio/{fileName}</c>.
+    /// </summary>
+    [HttpPost("exercises/audio")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    [RequestSizeLimit(30 * 1024 * 1024)]
+    public async Task<ActionResult<ApiResponse<AudioUploadDto>>> UploadAudio(
+        IFormFile file, [FromServices] IExerciseAudioStore store, CancellationToken ct)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(ApiResponse<AudioUploadDto>.Fail("No file provided."));
+        if (file.Length > 25 * 1024 * 1024)
+            return BadRequest(ApiResponse<AudioUploadDto>.Fail("Audio must be 25 MB or smaller."));
+        try
+        {
+            await using var s = file.OpenReadStream();
+            var stored = await store.SaveAsync(s, file.FileName, ct);
+            return Ok(ApiResponse<AudioUploadDto>.Ok(new AudioUploadDto(stored), "Uploaded."));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ApiResponse<AudioUploadDto>.Fail(ex.Message));
+        }
+    }
+
+    /// <summary>Stream a previously uploaded exercise audio file (any authenticated user;
+    /// range-enabled for seeking). Reached via the same-origin proxy.</summary>
+    [HttpGet("exercises/audio/{fileName}")]
+    public async Task<IActionResult> GetAudio(
+        string fileName, [FromServices] IExerciseAudioStore store, CancellationToken ct)
+    {
+        var opened = await store.OpenAsync(fileName, ct);
+        if (opened is null) return NotFound();
+        return File(opened.Value.Stream, opened.Value.ContentType, enableRangeProcessing: true);
+    }
 }
 
 /// <summary>Request body for the bulk add/update endpoint.</summary>
@@ -69,3 +106,6 @@ public sealed record BulkExercisesRequest(List<ExerciseInputDto> Exercises);
 
 /// <summary>Request body for the submit endpoint — the user's answers (shape varies by type).</summary>
 public sealed record SubmitExerciseRequest(JsonElement Answers);
+
+/// <summary>Result of an audio upload — the opaque stored file name.</summary>
+public sealed record AudioUploadDto(string FileName);

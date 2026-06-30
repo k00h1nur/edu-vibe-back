@@ -83,6 +83,7 @@ public static class DependencyInjection
         services.AddSingleton<IMaterialFileStore, LocalMaterialFileStore>();
         services.AddSingleton<ISubmissionFileStore, LocalSubmissionFileStore>();
         services.AddSingleton<ILessonMaterialFileStore, LocalLessonMaterialFileStore>();
+        services.AddSingleton<IExerciseAudioStore, LocalExerciseAudioStore>();
         return services;
     }
 
