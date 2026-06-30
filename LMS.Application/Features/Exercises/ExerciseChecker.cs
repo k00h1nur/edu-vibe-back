@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text.Json;
 
 namespace LMS.Application.Features.Exercises;
@@ -24,10 +25,12 @@ public static class ExerciseChecker
         return type switch
         {
             "mcq" or "mcq_ab" or "fill_blank" or "error_correction" or "transform"
-                or "word_completion" or "matching"
+                or "word_completion" or "matching" or "true_false"
                 => CheckItems(content, userAnswers, multiGap: false),
             "word_bank_gap"
                 => CheckItems(content, userAnswers, multiGap: true),
+            "multi_select"
+                => CheckMultiSelect(content, userAnswers),
             "paragraph_cloze"
                 => CheckByIndex(GetArray(content, "answers"), AsList(userAnswers)),
             "dialogue"
@@ -95,6 +98,18 @@ public static class ExerciseChecker
             i++;
         }
         return (score, total);
+    }
+
+    /// <summary>"Tick all that apply": compare the user's ticked set against content.answers.
+    /// total = number of correct answers; score = correctly ticked minus wrongly ticked (floored).</summary>
+    private static (int, int) CheckMultiSelect(JsonElement content, JsonElement userAnswers)
+    {
+        var correct = GetArray(content, "answers").Select(Norm).ToHashSet();
+        if (correct.Count == 0) return (0, 0);
+        var ticked = AsList(userAnswers).Select(Norm).Where(s => s.Length > 0).ToHashSet();
+        var correctTicked = ticked.Count(t => correct.Contains(t));
+        var wrongTicked = ticked.Count - correctTicked;
+        return (Math.Max(0, correctTicked - wrongTicked), correct.Count);
     }
 
     // ---- helpers -------------------------------------------------------------
