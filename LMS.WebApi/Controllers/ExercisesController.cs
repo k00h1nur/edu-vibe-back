@@ -1,0 +1,71 @@
+using System.Text.Json;
+using LMS.Application.Common.Abstractions;
+using LMS.Application.Common.Security;
+using LMS.Application.Features.Exercises;
+using LMS.WebApi.Common;
+using LMS.WebApi.Security;
+using MediatR;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace LMS.WebApi.Controllers;
+
+/// <summary>
+/// Lesson self-check exercises (textbook-style practice). Teachers/admins bulk-author
+/// them per curriculum lesson; students fetch them with their own saved results and
+/// submit answers for instant self-check scoring. The user is ALWAYS the authenticated
+/// caller (no client-supplied userId — avoids IDOR).
+/// </summary>
+[ApiController]
+[Route("api")]
+[Authorize]
+public sealed class ExercisesController(ISender sender, ICurrentUserService currentUser) : ControllerBase
+{
+    /// <summary>
+    /// Bulk add/update a lesson's exercises (upsert by orderIndex). Teacher/admin only.
+    /// Body: <c>{ "exercises": [{ "type", "title", "orderIndex", "content": { … } }] }</c>.
+    /// See <see cref="ExerciseChecker"/> / DTO docs for each type's <c>content</c> shape.
+    /// </summary>
+    [HttpPost("lessons/{lessonId:guid}/exercises/bulk")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<Guid>>>> AddBulk(
+        Guid lessonId, [FromBody] BulkExercisesRequest body, CancellationToken ct)
+    {
+        var r = await sender.Send(new AddExercisesToLessonCommand(lessonId, body.Exercises ?? []), ct);
+        if (r.Success) return Ok(ApiResponse<IReadOnlyList<Guid>>.Ok(r.Data, r.Message));
+        return r.ErrorCode == "NOT_FOUND"
+            ? NotFound(ApiResponse<IReadOnlyList<Guid>>.Fail(r.Message ?? "Not found"))
+            : BadRequest(ApiResponse<IReadOnlyList<Guid>>.Fail(r.Message ?? "Failed"));
+    }
+
+    /// <summary>A lesson's exercises + the current user's saved results (one query).</summary>
+    [HttpGet("lessons/{lessonId:guid}/exercises")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<ExerciseWithResultDto>>>> Get(
+        Guid lessonId, CancellationToken ct)
+    {
+        if (currentUser.UserId is not { } userId)
+            return Unauthorized(ApiResponse<IReadOnlyList<ExerciseWithResultDto>>.Fail("Not authenticated."));
+        var r = await sender.Send(new GetLessonExercisesQuery(lessonId, userId), ct);
+        return Ok(ApiResponse<IReadOnlyList<ExerciseWithResultDto>>.Ok(r.Data, r.Message));
+    }
+
+    /// <summary>Submit + self-check the current user's answer for one exercise.
+    /// Body: <c>{ "answers": &lt;type-specific&gt; }</c>.</summary>
+    [HttpPost("exercises/{exerciseId:guid}/submit")]
+    public async Task<ActionResult<ApiResponse<SubmitResultDto>>> Submit(
+        Guid exerciseId, [FromBody] SubmitExerciseRequest body, CancellationToken ct)
+    {
+        if (currentUser.UserId is not { } userId)
+            return Unauthorized(ApiResponse<SubmitResultDto>.Fail("Not authenticated."));
+        var r = await sender.Send(new SubmitExerciseAnswerCommand(exerciseId, userId, body.Answers), ct);
+        return r.Success
+            ? Ok(ApiResponse<SubmitResultDto>.Ok(r.Data, r.Message))
+            : NotFound(ApiResponse<SubmitResultDto>.Fail(r.Message ?? "Not found"));
+    }
+}
+
+/// <summary>Request body for the bulk add/update endpoint.</summary>
+public sealed record BulkExercisesRequest(List<ExerciseInputDto> Exercises);
+
+/// <summary>Request body for the submit endpoint — the user's answers (shape varies by type).</summary>
+public sealed record SubmitExerciseRequest(JsonElement Answers);
