@@ -55,7 +55,17 @@ public static class ExerciseChecker
             var id = item.TryGetProperty("id", out var idEl) ? idEl.ToString() : i.ToString();
             var userForItem = UserAnswerFor(userAnswers, id, i);
 
-            if (multiGap && item.TryGetProperty("answers", out var ans) && ans.ValueKind == JsonValueKind.Array)
+            // Multi-gap choice item: one option-set per blank, answer per gap.
+            if (item.TryGetProperty("gaps", out var gaps) && gaps.ValueKind == JsonValueKind.Array)
+            {
+                var expectedGaps = new List<string>();
+                foreach (var gap in gaps.EnumerateArray())
+                    expectedGaps.Add(gap.TryGetProperty("answer", out var ga) ? ga.ToString() : string.Empty);
+                var (s, t) = CheckByIndex(expectedGaps, AsList(userForItem));
+                score += s;
+                total += t;
+            }
+            else if (multiGap && item.TryGetProperty("answers", out var ans) && ans.ValueKind == JsonValueKind.Array)
             {
                 var (s, t) = CheckByIndex(AsList(ans), AsList(userForItem));
                 score += s;
