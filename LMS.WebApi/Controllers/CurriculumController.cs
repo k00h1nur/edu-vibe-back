@@ -72,6 +72,67 @@ public sealed class CurriculumController(ISender sender) : ControllerBase
             : BadRequest(ApiResponse<bool>.Fail(r.Message ?? "Failed"));
     }
 
+    // ---- Admin template STRUCTURE editing (units + lessons) ----------------
+
+    private ActionResult<ApiResponse<TemplateCourseDto>> Course(Result<TemplateCourseDto> r) =>
+        r.Success
+            ? Ok(ApiResponse<TemplateCourseDto>.Ok(r.Data, r.Message))
+            : r.ErrorCode == "NOT_FOUND"
+                ? NotFound(ApiResponse<TemplateCourseDto>.Fail(r.Message ?? "Not found"))
+                : BadRequest(ApiResponse<TemplateCourseDto>.Fail(r.Message ?? "Failed"));
+
+    /// <summary>The master template's editable units → lessons tree.</summary>
+    [HttpGet("templates/{id:guid}/course")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<TemplateCourseDto>>> TemplateCourse(Guid id, CancellationToken ct)
+        => Course(await sender.Send(new GetTemplateCourseQuery(id), ct));
+
+    [HttpPost("templates/{id:guid}/units")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<TemplateCourseDto>>> AddTemplateUnit(
+        Guid id, [FromBody] CreateTemplateUnitCommand body, CancellationToken ct)
+        => Course(await sender.Send(body with { TemplateId = id }, ct));
+
+    [HttpPost("templates/{id:guid}/units/reorder")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<TemplateCourseDto>>> ReorderTemplateUnits(
+        Guid id, [FromBody] ReorderTemplateUnitsCommand body, CancellationToken ct)
+        => Course(await sender.Send(body with { TemplateId = id }, ct));
+
+    [HttpPut("template-units/{unitId:guid}")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<TemplateCourseDto>>> UpdateTemplateUnit(
+        Guid unitId, [FromBody] UpdateTemplateUnitCommand body, CancellationToken ct)
+        => Course(await sender.Send(body with { UnitId = unitId }, ct));
+
+    [HttpDelete("template-units/{unitId:guid}")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<TemplateCourseDto>>> DeleteTemplateUnit(Guid unitId, CancellationToken ct)
+        => Course(await sender.Send(new DeleteTemplateUnitCommand(unitId), ct));
+
+    [HttpPost("template-units/{unitId:guid}/lessons")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<TemplateCourseDto>>> AddTemplateLesson(
+        Guid unitId, [FromBody] CreateTemplateLessonCommand body, CancellationToken ct)
+        => Course(await sender.Send(body with { UnitId = unitId }, ct));
+
+    [HttpPost("template-units/{unitId:guid}/lessons/reorder")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<TemplateCourseDto>>> ReorderTemplateLessons(
+        Guid unitId, [FromBody] ReorderTemplateLessonsCommand body, CancellationToken ct)
+        => Course(await sender.Send(body with { UnitId = unitId }, ct));
+
+    [HttpPut("template-lessons/{lessonId:guid}")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<TemplateCourseDto>>> UpdateTemplateLesson(
+        Guid lessonId, [FromBody] UpdateTemplateLessonCommand body, CancellationToken ct)
+        => Course(await sender.Send(body with { LessonId = lessonId }, ct));
+
+    [HttpDelete("template-lessons/{lessonId:guid}")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<TemplateCourseDto>>> DeleteTemplateLesson(Guid lessonId, CancellationToken ct)
+        => Course(await sender.Send(new DeleteTemplateLessonCommand(lessonId), ct));
+
     /// <summary>The reusable day-by-day teaching plan for a template (Day 1 = 1A + 1B …).</summary>
     [HttpGet("templates/{id:guid}/plan")]
     public async Task<ActionResult<ApiResponse<TemplatePlanDto>>> Plan(Guid id, CancellationToken ct)
