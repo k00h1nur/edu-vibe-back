@@ -114,6 +114,20 @@ public sealed class ExerciseCheckerTests
     }
 
     [Fact]
+    public void Mcq_with_gaps_scores_each_blank_independently()
+    {
+        // "A: What time ___ now? B: It's ___ past three." — two choice blanks.
+        var content = """
+        {"items":[{"id":"q1","parts":["A: What time "," now? B: It's "," past three."],
+          "gaps":[{"options":["is it","it is"],"answer":"is it"},
+                  {"options":["half","a half"],"answer":"a half"}]}]}
+        """;
+        var (score, total) = ExerciseChecker.Check("mcq", content, El("""{"q1":["is it","half"]}"""));
+        score.Should().Be(1); // first gap right, second wrong
+        total.Should().Be(2);
+    }
+
+    [Fact]
     public void Multi_select_rewards_correct_ticks_and_penalises_wrong_ones()
     {
         var content = """{"choices":["Italy","Spain","Russia","Japan"],"answers":["Spain","Russia"]}""";
