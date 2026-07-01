@@ -46,6 +46,14 @@ public sealed class ExercisesHandlers(IApplicationDbContext db) :
                 }
             }
 
+            // Sync: drop exercises the client no longer includes (removed in the editor).
+            // The authoring dialog always sends the FULL desired set, so this only deletes
+            // what the teacher explicitly removed. Cascades that exercise's self-check
+            // submissions — intentional, since the lesson's exercise set is being redefined.
+            var keptOrders = request.Exercises.Select(e => e.OrderIndex).ToHashSet();
+            var removed = byOrder.Values.Where(e => !keptOrders.Contains(e.OrderIndex)).ToList();
+            if (removed.Count > 0) db.LessonExercises.RemoveRange(removed);
+
             await db.SaveChangesAsync(ct);
             return Result<IReadOnlyList<Guid>>.Ok(ids);
         }, ct);
