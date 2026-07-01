@@ -84,13 +84,23 @@ jobs:
             # backend deploy) reuses it instead of a stale pin.
             export IMAGE="$IMAGE_REF"
             grep -q '^IMAGE=' .env && sed -i "s|^IMAGE=.*|IMAGE=$IMAGE_REF|" .env || echo "IMAGE=$IMAGE_REF" >> .env
-            docker compose pull api
+            # Free disk BEFORE pulling. Every deploy pushes a new :SHA image; the old
+            # ones accumulate on the box and fill the disk, which surfaces as the
+            # containerd "failed commit on ref … no such file or directory" error
+            # mid-pull. Prune all unused images (named volumes — incl. the DB — are
+            # NOT touched) + build cache first.
+            docker image prune -af || true
+            docker builder prune -af || true
+            df -h / || true
+            # Pull with one retry — a partial/corrupt ingest from a previous failed
+            # pull clears after a prune; transient registry hiccups clear on retry.
+            docker compose pull api || { echo "pull failed — pruning and retrying"; docker image prune -af || true; sleep 5; docker compose pull api; }
             # Touch only the backend + edge services; never clobber the web
             # container, which the frontend repo's pipeline owns.
             docker compose up -d db redis api caddy
             # Apply any Caddyfile changes synced above (no-op if unchanged).
             docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile || true
-            docker image prune -f
+            docker image prune -af || true
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_USER: ${{ github.actor }}
