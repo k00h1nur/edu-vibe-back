@@ -38,6 +38,40 @@ public sealed class CurriculumController(ISender sender) : ControllerBase
             : NotFound(ApiResponse<CurriculumTreeDto>.Fail(r.Message ?? "Not found"));
     }
 
+    /// <summary>Admin: ALL master templates (published + unpublished) with counts + class usage.</summary>
+    [HttpGet("admin/templates")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<AdminTemplateDto>>>> AdminTemplates(CancellationToken ct)
+    {
+        var r = await sender.Send(new GetAdminTemplatesQuery(), ct);
+        return Ok(ApiResponse<IReadOnlyList<AdminTemplateDto>>.Ok(r.Data, r.Message));
+    }
+
+    /// <summary>Admin: edit a template's metadata + published flag.</summary>
+    [HttpPut("templates/{id:guid}")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<AdminTemplateDto>>> UpdateTemplate(
+        Guid id, [FromBody] UpdateTemplateCommand body, CancellationToken ct)
+    {
+        var r = await sender.Send(body with { Id = id }, ct);
+        if (r.Success) return Ok(ApiResponse<AdminTemplateDto>.Ok(r.Data, r.Message));
+        return r.ErrorCode == "NOT_FOUND"
+            ? NotFound(ApiResponse<AdminTemplateDto>.Fail(r.Message ?? "Not found"))
+            : BadRequest(ApiResponse<AdminTemplateDto>.Fail(r.Message ?? "Failed"));
+    }
+
+    /// <summary>Admin: delete a template (blocked while any class uses it).</summary>
+    [HttpDelete("templates/{id:guid}")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<bool>>> DeleteTemplate(Guid id, CancellationToken ct)
+    {
+        var r = await sender.Send(new DeleteTemplateCommand(id), ct);
+        if (r.Success) return Ok(ApiResponse<bool>.Ok(r.Data, r.Message));
+        return r.ErrorCode == "NOT_FOUND"
+            ? NotFound(ApiResponse<bool>.Fail(r.Message ?? "Not found"))
+            : BadRequest(ApiResponse<bool>.Fail(r.Message ?? "Failed"));
+    }
+
     /// <summary>The reusable day-by-day teaching plan for a template (Day 1 = 1A + 1B …).</summary>
     [HttpGet("templates/{id:guid}/plan")]
     public async Task<ActionResult<ApiResponse<TemplatePlanDto>>> Plan(Guid id, CancellationToken ct)
