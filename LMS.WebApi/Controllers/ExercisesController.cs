@@ -63,6 +63,16 @@ public sealed class ExercisesController(ISender sender, ICurrentUserService curr
             : NotFound(ApiResponse<SubmitResultDto>.Fail(r.Message ?? "Not found"));
     }
 
+    /// <summary>Teacher/admin: how every student in a class did on this lesson's exercises.</summary>
+    [HttpGet("lessons/{lessonId:guid}/exercise-results/{classId:guid}")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<LessonExerciseResultsDto>>> Results(
+        Guid lessonId, Guid classId, CancellationToken ct)
+    {
+        var r = await sender.Send(new GetLessonExerciseResultsQuery(lessonId, classId), ct);
+        return Ok(ApiResponse<LessonExerciseResultsDto>.Ok(r.Data, r.Message));
+    }
+
     /// <summary>
     /// Upload a Listening audio file (teacher/admin). Returns the stored file name; the
     /// caller stores it as <c>content.audioUrl</c> = <c>/api/proxy/Exercises/audio/{fileName}</c>.
