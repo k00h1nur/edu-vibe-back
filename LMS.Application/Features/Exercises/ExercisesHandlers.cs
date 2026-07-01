@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Models;
 using LMS.Domain.Entities;
+using LMS.Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,7 +12,8 @@ namespace LMS.Application.Features.Exercises;
 public sealed class ExercisesHandlers(IApplicationDbContext db) :
     IRequestHandler<AddExercisesToLessonCommand, Result<IReadOnlyList<Guid>>>,
     IRequestHandler<GetLessonExercisesQuery, Result<IReadOnlyList<ExerciseWithResultDto>>>,
-    IRequestHandler<SubmitExerciseAnswerCommand, Result<SubmitResultDto>>
+    IRequestHandler<SubmitExerciseAnswerCommand, Result<SubmitResultDto>>,
+    IRequestHandler<GetLessonExerciseResultsQuery, Result<LessonExerciseResultsDto>>
 {
     public async Task<Result<IReadOnlyList<Guid>>> Handle(AddExercisesToLessonCommand request, CancellationToken ct)
     {
@@ -45,6 +47,14 @@ public sealed class ExercisesHandlers(IApplicationDbContext db) :
                     ids.Add(created.Id);
                 }
             }
+
+            // Sync: drop exercises the client no longer includes (removed in the editor).
+            // The authoring dialog always sends the FULL desired set, so this only deletes
+            // what the teacher explicitly removed. Cascades that exercise's self-check
+            // submissions — intentional, since the lesson's exercise set is being redefined.
+            var keptOrders = request.Exercises.Select(e => e.OrderIndex).ToHashSet();
+            var removed = byOrder.Values.Where(e => !keptOrders.Contains(e.OrderIndex)).ToList();
+            if (removed.Count > 0) db.LessonExercises.RemoveRange(removed);
 
             await db.SaveChangesAsync(ct);
             return Result<IReadOnlyList<Guid>>.Ok(ids);
@@ -111,6 +121,52 @@ public sealed class ExercisesHandlers(IApplicationDbContext db) :
             return Result<SubmitResultDto>.Ok(new SubmitResultDto(score, total));
         }, ct);
     }
+
+    public async Task<Result<LessonExerciseResultsDto>> Handle(
+        GetLessonExerciseResultsQuery request, CancellationToken ct)
+    {
+        var exercises = await db.LessonExercises.AsNoTracking()
+            .Where(e => e.LessonId == request.LessonId)
+            .OrderBy(e => e.OrderIndex)
+            .Select(e => new ExerciseResultsHeaderDto(e.Id, e.Title, e.Type, e.OrderIndex))
+            .ToListAsync(ct);
+        var exerciseIds = exercises.Select(e => e.Id).ToList();
+
+        // The class's active students → (userId, name).
+        var students = await db.Enrollments.AsNoTracking()
+            .Where(en => en.ClassId == request.ClassId && en.Status != EnrollmentStatus.Dropped)
+            .Join(db.StudentProfiles, en => en.StudentProfileId, sp => sp.Id,
+                (en, sp) => new { sp.UserId, sp.FirstName, sp.LastName })
+            .ToListAsync(ct);
+        var userIds = students.Select(s => s.UserId).ToList();
+
+        var subs = exerciseIds.Count == 0 || userIds.Count == 0
+            ? new List<StudentSub>()
+            : await db.LessonExerciseSubmissions.AsNoTracking()
+                .Where(s => exerciseIds.Contains(s.LessonExerciseId) && userIds.Contains(s.UserId))
+                .Select(s => new StudentSub(s.UserId, s.LessonExerciseId, s.Score, s.Total, s.IsCompleted))
+                .ToListAsync(ct);
+        var byUser = subs.GroupBy(s => s.UserId).ToDictionary(g => g.Key, g => g.ToList());
+
+        var summaries = students
+            .Select(s =>
+            {
+                var mine = byUser.TryGetValue(s.UserId, out var list) ? list : new List<StudentSub>();
+                var results = mine
+                    .Select(r => new StudentExerciseResultDto(r.ExerciseId, r.Score, r.Total, r.IsCompleted))
+                    .ToList();
+                var name = $"{s.FirstName} {s.LastName}".Trim();
+                return new StudentExerciseSummaryDto(
+                    s.UserId, string.IsNullOrWhiteSpace(name) ? "Student" : name,
+                    results.Count(r => r.IsCompleted), exercises.Count, results);
+            })
+            .OrderBy(s => s.StudentName)
+            .ToList();
+
+        return Result<LessonExerciseResultsDto>.Ok(new LessonExerciseResultsDto(request.LessonId, exercises, summaries));
+    }
+
+    private sealed record StudentSub(Guid UserId, Guid ExerciseId, int Score, int Total, bool IsCompleted);
 
     private static JsonNode? ParseNode(string? json)
         => string.IsNullOrWhiteSpace(json) ? null : JsonNode.Parse(json);

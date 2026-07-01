@@ -39,3 +39,24 @@ public sealed record GetLessonExercisesQuery(Guid LessonId, Guid UserId)
 /// <summary>Check a user's answer (ExerciseChecker) and upsert the result (keyed exercise+user).</summary>
 public sealed record SubmitExerciseAnswerCommand(Guid LessonExerciseId, Guid UserId, JsonElement Answers)
     : IRequest<Result<SubmitResultDto>>;
+
+// ===== Teacher: student results for a lesson's exercises ====================
+
+public sealed record ExerciseResultsHeaderDto(Guid Id, string Title, string Type, int OrderIndex);
+
+/// <summary>One student's result for one exercise (missing ⇒ not attempted).</summary>
+public sealed record StudentExerciseResultDto(Guid ExerciseId, int Score, int Total, bool IsCompleted);
+
+public sealed record StudentExerciseSummaryDto(
+    Guid StudentUserId, string StudentName, int CompletedCount, int TotalExercises,
+    IReadOnlyList<StudentExerciseResultDto> Results);
+
+/// <summary>A lesson's exercises + every enrolled student's results (teacher view).</summary>
+public sealed record LessonExerciseResultsDto(
+    Guid LessonId,
+    IReadOnlyList<ExerciseResultsHeaderDto> Exercises,
+    IReadOnlyList<StudentExerciseSummaryDto> Students);
+
+/// <summary>Teacher/admin: how every student in a class did on a lesson's exercises.</summary>
+public sealed record GetLessonExerciseResultsQuery(Guid LessonId, Guid ClassId)
+    : IRequest<Result<LessonExerciseResultsDto>>;
