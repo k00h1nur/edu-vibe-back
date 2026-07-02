@@ -36,6 +36,9 @@ public sealed record UpdateClassCommand(
 
 public sealed record CancelClassCommand(Guid ClassId) : IRequest<Result>;
 
+/// <summary>Reactivate an archived (cancelled) class — flips it back to Planned.</summary>
+public sealed record ReactivateClassCommand(Guid ClassId) : IRequest<Result>;
+
 public sealed record GetClassesQuery(int Page = 1, int PageSize = 25, string? Search = null)
     : IRequest<Result<PagedResult<ClassDto>>>;
 
