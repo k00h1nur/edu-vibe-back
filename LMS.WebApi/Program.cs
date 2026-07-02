@@ -43,11 +43,12 @@ builder.Services.AddHostedService<DatabaseInitializerHostedService>();
 builder.Services.AddHostedService<PermissionDiscoveryHostedService>();
 builder.Services.AddHostedService<RolePermissionSeederHostedService>();
 builder.Services.AddHostedService<DemoUsersSeederHostedService>();
-// Marketing reference data — both idempotent (seed only when their table is
-// empty), so admin edits are never overwritten.
-builder.Services.AddHostedService<MarketingCoursesSeederHostedService>();
+// Mock-test slots reference data — idempotent (seeds only when the table is
+// empty), so admin edits are never overwritten. Marketing courses and the
+// built-in curriculum-template library are intentionally NOT seeded: courses
+// are managed in the CMS (with a static marketing fallback) and templates are
+// authored in the admin curriculum editor / loaded as SQL.
 builder.Services.AddHostedService<MockTestSlotsSeederHostedService>();
-builder.Services.AddHostedService<CurriculumTemplateSeederHostedService>();
 
 // ---- CORS -----------------------------------------------------------------
 // Browser clients (marketing site at :5173, LMS admin at :3000) need the API
