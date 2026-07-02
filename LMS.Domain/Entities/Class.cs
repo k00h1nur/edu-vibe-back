@@ -90,6 +90,15 @@ public sealed class Class : BaseEntity
         Touch();
     }
 
+    /// <summary>Bring an archived (cancelled) class back to the normal operating state.
+    /// No-op for a class that isn't cancelled.</summary>
+    public void Reactivate()
+    {
+        if (Status != ClassStatus.Cancelled) return;
+        Status = ClassStatus.Planned;
+        Touch();
+    }
+
     /// <summary>Sets (or clears) the curriculum template the class follows.</summary>
     public void SetCurriculumTemplate(Guid? templateId)
     {
