@@ -55,9 +55,7 @@ public sealed class AnnouncementsController(ISender sender, ICurrentUserService 
         var r = await sender.Send(new CreateAnnouncementCommand(
             body.Title, body.Body, body.IsPublic, body.Audience,
             body.PublishesAt, body.ExpiresAt, uid), ct);
-        return r.Success
-            ? Ok(ApiResponse<AnnouncementDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<AnnouncementDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPut("{id:guid}")]
@@ -69,9 +67,7 @@ public sealed class AnnouncementsController(ISender sender, ICurrentUserService 
         var r = await sender.Send(new UpdateAnnouncementCommand(
             id, body.Title, body.Body, body.IsPublic, body.Audience,
             body.PublishesAt, body.ExpiresAt), ct);
-        return r.Success
-            ? Ok(ApiResponse<AnnouncementDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<AnnouncementDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpDelete("{id:guid}")]

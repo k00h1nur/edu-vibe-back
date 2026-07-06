@@ -120,9 +120,7 @@ public sealed class PaymentsController(ISender sender) : ControllerBase
         CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success
-            ? Ok(ApiResponse<PaymentDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<PaymentDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPost("{id:guid}/paid")]
@@ -130,9 +128,7 @@ public sealed class PaymentsController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<PaymentDto>>> Paid(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new MarkPaymentPaidCommand(id), ct);
-        return r.Success
-            ? Ok(ApiResponse<PaymentDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<PaymentDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPost("{id:guid}/failed")]
@@ -140,8 +136,6 @@ public sealed class PaymentsController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<PaymentDto>>> Failed(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new MarkPaymentFailedCommand(id), ct);
-        return r.Success
-            ? Ok(ApiResponse<PaymentDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<PaymentDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 }

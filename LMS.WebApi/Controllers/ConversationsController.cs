@@ -52,9 +52,7 @@ public sealed class ConversationsController(ISender sender, ICurrentUserService 
         CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success
-            ? Ok(ApiResponse<ConversationDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<ConversationDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPost("{id:guid}/participants/{userId:guid}")]

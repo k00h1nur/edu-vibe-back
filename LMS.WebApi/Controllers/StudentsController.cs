@@ -34,9 +34,7 @@ public sealed class StudentsController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<StudentDto>>> GetMine(CancellationToken ct)
     {
         var r = await sender.Send(new GetMyStudentProfileQuery(), ct);
-        return r.Success
-            ? Ok(ApiResponse<StudentDto>.Ok(r.Data, r.Message))
-            : NotFound(ApiResponse<StudentDto>.Fail(r.Message ?? "Not found"));
+        return r.ToApiResultOrNotFound();
     }
 
     /// <summary>
@@ -67,9 +65,7 @@ public sealed class StudentsController(ISender sender) : ControllerBase
         [FromBody] UpdateMyStudentDetailsCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success
-            ? Ok(ApiResponse<StudentDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<StudentDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpGet("{id:guid}")]
@@ -77,9 +73,7 @@ public sealed class StudentsController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<StudentDto>>> Get(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new GetStudentDetailQuery(id), ct);
-        return r.Success
-            ? Ok(ApiResponse<StudentDto>.Ok(r.Data, r.Message))
-            : NotFound(ApiResponse<StudentDto>.Fail(r.Message ?? "Not found"));
+        return r.ToApiResultOrNotFound();
     }
 
     [HttpPost]
@@ -88,9 +82,7 @@ public sealed class StudentsController(ISender sender) : ControllerBase
         CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success
-            ? Ok(ApiResponse<StudentDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<StudentDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPut("{id:guid}")]
@@ -99,9 +91,7 @@ public sealed class StudentsController(ISender sender) : ControllerBase
         CancellationToken ct)
     {
         var r = await sender.Send(cmd with { StudentProfileId = id }, ct);
-        return r.Success
-            ? Ok(ApiResponse<StudentDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<StudentDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     /// <summary>
@@ -115,9 +105,7 @@ public sealed class StudentsController(ISender sender) : ControllerBase
         Guid id, [FromBody] UpdateStudentDetailsCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd with { StudentProfileId = id }, ct);
-        return r.Success
-            ? Ok(ApiResponse<StudentDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<StudentDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     /// <summary>Admin-only fields: parent phone number, CEFR level.</summary>
@@ -127,9 +115,7 @@ public sealed class StudentsController(ISender sender) : ControllerBase
         Guid id, [FromBody] UpdateStudentAdminFieldsCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd with { StudentProfileId = id }, ct);
-        return r.Success
-            ? Ok(ApiResponse<StudentDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<StudentDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     /// <summary>
@@ -143,9 +129,7 @@ public sealed class StudentsController(ISender sender) : ControllerBase
         [FromBody] SetUserStatusRequest body, CancellationToken ct)
     {
         var r = await sender.Send(new SetStudentStatusCommand(id, body.Status), ct);
-        return r.Success
-            ? Ok(ApiResponse<StudentDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<StudentDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     /// <summary>Multipart avatar upload — students or admins.</summary>

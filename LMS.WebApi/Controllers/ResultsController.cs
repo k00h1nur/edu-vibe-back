@@ -31,7 +31,7 @@ public sealed class ResultsController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<ResultDto>>> GetById(Guid id, CancellationToken cancellationToken)
     {
         var r = await sender.Send(new ResultByIdQuery(id, true), cancellationToken);
-        return r.Success ? Ok(ApiResponse<ResultDto>.Ok(r.Data, r.Message)) : NotFound(ApiResponse<ResultDto>.Fail(r.Message ?? "Not found"));
+        return r.ToApiResultOrNotFound();
     }
 
     [HttpGet("results/featured")]
@@ -93,7 +93,7 @@ public sealed class ResultsController(ISender sender) : ControllerBase
             return BadRequest(ApiResponse<ResultImageDto>.Fail("Image must be 5 MB or smaller."));
         await using var stream = file.OpenReadStream();
         var r = await sender.Send(new UploadResultImageCommand(id, stream, file.FileName, isMain), cancellationToken);
-        return r.Success ? Ok(ApiResponse<ResultImageDto>.Ok(r.Data, r.Message)) : BadRequest(ApiResponse<ResultImageDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPut("admin/results/{id:guid}/images/{imageId:guid}")]
@@ -109,7 +109,7 @@ public sealed class ResultsController(ISender sender) : ControllerBase
             return BadRequest(ApiResponse<ResultImageDto>.Fail("Image must be 5 MB or smaller."));
         await using var stream = file.OpenReadStream();
         var r = await sender.Send(new ReplaceResultImageCommand(id, imageId, stream, file.FileName), cancellationToken);
-        return r.Success ? Ok(ApiResponse<ResultImageDto>.Ok(r.Data, r.Message)) : BadRequest(ApiResponse<ResultImageDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpDelete("admin/results/{id:guid}/images/{imageId:guid}")]

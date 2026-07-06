@@ -44,9 +44,7 @@ public sealed class ClassSessionsController(
     public async Task<ActionResult<ApiResponse<SessionDto>>> Get(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new GetSessionByIdQuery(id), ct);
-        return r.Success
-            ? Ok(ApiResponse<SessionDto>.Ok(r.Data, r.Message))
-            : NotFound(ApiResponse<SessionDto>.Fail(r.Message ?? "Not found"));
+        return r.ToApiResultOrNotFound();
     }
 
     /// <summary>
@@ -108,9 +106,7 @@ public sealed class ClassSessionsController(
         [FromQuery] DateOnly from, [FromQuery] DateOnly to, CancellationToken ct)
     {
         var r = await sender.Send(new GetScheduleQuery(from, to), ct);
-        return r.Success
-            ? Ok(ApiResponse<IReadOnlyCollection<ScheduleEntryDto>>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<IReadOnlyCollection<ScheduleEntryDto>>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     /// <summary>
@@ -128,9 +124,7 @@ public sealed class ClassSessionsController(
         CancellationToken ct)
     {
         var r = await sender.Send(new GetAdminScheduleQuery(from, to, teacherId, classId), ct);
-        return r.Success
-            ? Ok(ApiResponse<IReadOnlyCollection<AdminScheduleEntryDto>>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<IReadOnlyCollection<AdminScheduleEntryDto>>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPost]
@@ -139,9 +133,7 @@ public sealed class ClassSessionsController(
         CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success
-            ? Ok(ApiResponse<SessionDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<SessionDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPut("{id:guid}")]
@@ -150,9 +142,7 @@ public sealed class ClassSessionsController(
         CancellationToken ct)
     {
         var r = await sender.Send(cmd with { SessionId = id }, ct);
-        return r.Success
-            ? Ok(ApiResponse<SessionDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<SessionDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     /// <summary>

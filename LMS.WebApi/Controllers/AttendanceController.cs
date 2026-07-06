@@ -75,9 +75,7 @@ public sealed class AttendanceController(ISender sender) : ControllerBase
         CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success
-            ? Ok(ApiResponse<AttendanceDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<AttendanceDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPut("{id:guid}")]
@@ -86,8 +84,6 @@ public sealed class AttendanceController(ISender sender) : ControllerBase
         CancellationToken ct)
     {
         var r = await sender.Send(cmd with { AttendanceId = id }, ct);
-        return r.Success
-            ? Ok(ApiResponse<AttendanceDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<AttendanceDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 }

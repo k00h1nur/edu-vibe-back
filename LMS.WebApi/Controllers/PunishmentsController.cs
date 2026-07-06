@@ -39,9 +39,7 @@ public sealed class PunishmentsController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<PunishmentDto>>> Get(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new GetPunishmentByIdQuery(id), ct);
-        return r.Success
-            ? Ok(ApiResponse<PunishmentDto>.Ok(r.Data, r.Message))
-            : NotFound(ApiResponse<PunishmentDto>.Fail(r.Message ?? "Not found"));
+        return r.ToApiResultOrNotFound();
     }
 
     [HttpPost]

@@ -32,9 +32,7 @@ public sealed class TasksController(ISender sender, ICurrentUserService currentU
     public async Task<ActionResult<ApiResponse<LearningTaskDto>>> Get(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new GetTaskByIdQuery(id, CallerCanSeeSolutions()), ct);
-        return r.Success
-            ? Ok(ApiResponse<LearningTaskDto>.Ok(r.Data, r.Message))
-            : NotFound(ApiResponse<LearningTaskDto>.Fail(r.Message ?? "Not found"));
+        return r.ToApiResultOrNotFound();
     }
 
     /// <summary>
@@ -50,9 +48,7 @@ public sealed class TasksController(ISender sender, ICurrentUserService currentU
         [FromBody] CreateTaskCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success
-            ? Ok(ApiResponse<LearningTaskDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<LearningTaskDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     /// <summary>
@@ -83,9 +79,7 @@ public sealed class TasksController(ISender sender, ICurrentUserService currentU
         [FromBody] UpdateTaskCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd with { TaskId = id }, ct);
-        return r.Success
-            ? Ok(ApiResponse<LearningTaskDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<LearningTaskDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpDelete("{id:guid}")]

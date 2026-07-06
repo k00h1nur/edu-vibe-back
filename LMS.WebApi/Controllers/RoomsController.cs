@@ -26,9 +26,7 @@ public sealed class RoomsController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<RoomDto>>> Create([FromBody] CreateRoomCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success
-            ? Ok(ApiResponse<RoomDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<RoomDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPut("{id:guid}")]
@@ -37,9 +35,7 @@ public sealed class RoomsController(ISender sender) : ControllerBase
         CancellationToken ct)
     {
         var r = await sender.Send(cmd with { RoomId = id }, ct);
-        return r.Success
-            ? Ok(ApiResponse<RoomDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<RoomDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpDelete("{id:guid}")]

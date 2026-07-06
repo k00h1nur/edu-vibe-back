@@ -42,9 +42,7 @@ public sealed class UsersController(ISender sender) : ControllerBase
         [FromBody] UpdateMyUserCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success
-            ? Ok(ApiResponse<UserDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<UserDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     /// <summary>Lets the authenticated user change their own password.</summary>
@@ -63,9 +61,7 @@ public sealed class UsersController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<UserDto>>> GetById(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new GetUserByIdQuery(id), ct);
-        return r.Success
-            ? Ok(ApiResponse<UserDto>.Ok(r.Data, r.Message))
-            : NotFound(ApiResponse<UserDto>.Fail(r.Message ?? "Not found"));
+        return r.ToApiResultOrNotFound();
     }
 
     [HttpPost]
@@ -73,9 +69,7 @@ public sealed class UsersController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<UserDto>>> Create([FromBody] CreateUserCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success
-            ? Ok(ApiResponse<UserDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<UserDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPut("{id:guid}")]
@@ -84,9 +78,7 @@ public sealed class UsersController(ISender sender) : ControllerBase
         CancellationToken ct)
     {
         var r = await sender.Send(cmd with { UserId = id }, ct);
-        return r.Success
-            ? Ok(ApiResponse<UserDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<UserDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpDelete("{id:guid}")]

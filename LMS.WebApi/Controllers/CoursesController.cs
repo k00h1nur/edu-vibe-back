@@ -26,9 +26,7 @@ public sealed class CoursesController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<CourseDto>>> Get(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new GetCourseByIdQuery(id), ct);
-        return r.Success
-            ? Ok(ApiResponse<CourseDto>.Ok(r.Data, r.Message))
-            : NotFound(ApiResponse<CourseDto>.Fail(r.Message ?? "Not found"));
+        return r.ToApiResultOrNotFound();
     }
 
     [HttpPost]
@@ -37,9 +35,7 @@ public sealed class CoursesController(ISender sender) : ControllerBase
         CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success
-            ? Ok(ApiResponse<CourseDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<CourseDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPut("{id:guid}")]
@@ -48,9 +44,7 @@ public sealed class CoursesController(ISender sender) : ControllerBase
         CancellationToken ct)
     {
         var r = await sender.Send(cmd with { CourseId = id }, ct);
-        return r.Success
-            ? Ok(ApiResponse<CourseDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<CourseDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpDelete("{id:guid}")]

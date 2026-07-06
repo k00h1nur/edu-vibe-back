@@ -20,9 +20,7 @@ public sealed class TaskSubmissionsController(ISender sender) : ControllerBase
         [FromBody] SubmitTaskResponseCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success
-            ? Ok(ApiResponse<TaskSubmissionDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<TaskSubmissionDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     /// <summary>Teacher manually grades a submission (open-ended types).</summary>
@@ -32,9 +30,7 @@ public sealed class TaskSubmissionsController(ISender sender) : ControllerBase
         [FromBody] GradeTaskSubmissionCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd with { SubmissionId = id }, ct);
-        return r.Success
-            ? Ok(ApiResponse<TaskSubmissionDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<TaskSubmissionDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     /// <summary>All submissions for a task — teacher view.</summary>

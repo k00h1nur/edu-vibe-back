@@ -63,9 +63,7 @@ public sealed class MaterialsController(
     public async Task<ActionResult<ApiResponse<MaterialDto>>> Get(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new GetMaterialByIdQuery(id), ct);
-        return r.Success
-            ? Ok(ApiResponse<MaterialDto>.Ok(r.Data, r.Message))
-            : NotFound(ApiResponse<MaterialDto>.Fail(r.Message ?? "Not found"));
+        return r.ToApiResultOrNotFound();
     }
 
     /// <summary>
@@ -170,9 +168,7 @@ public sealed class MaterialsController(
         var r = await sender.Send(new UpdateMaterialCommand(
             id, body.Title, body.Description, body.Visibility,
             body.ClassIds ?? Array.Empty<Guid>()), ct);
-        return r.Success
-            ? Ok(ApiResponse<MaterialDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<MaterialDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpDelete("{id:guid}")]

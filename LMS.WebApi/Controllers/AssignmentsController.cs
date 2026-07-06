@@ -54,9 +54,7 @@ public sealed class AssignmentsController(ISender sender) : ControllerBase
         CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success
-            ? Ok(ApiResponse<AssignmentDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<AssignmentDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPut("{id:guid}")]
@@ -65,9 +63,7 @@ public sealed class AssignmentsController(ISender sender) : ControllerBase
         CancellationToken ct)
     {
         var r = await sender.Send(cmd with { AssignmentId = id }, ct);
-        return r.Success
-            ? Ok(ApiResponse<AssignmentDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<AssignmentDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPost("{id:guid}/publish")]
@@ -75,9 +71,7 @@ public sealed class AssignmentsController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<AssignmentDto>>> Publish(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new PublishAssignmentCommand(id), ct);
-        return r.Success
-            ? Ok(ApiResponse<AssignmentDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<AssignmentDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPost("{id:guid}/close")]
@@ -85,9 +79,7 @@ public sealed class AssignmentsController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<AssignmentDto>>> Close(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new CloseAssignmentCommand(id), ct);
-        return r.Success
-            ? Ok(ApiResponse<AssignmentDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<AssignmentDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     // ----- Book attachments ------------------------------------------------
@@ -109,9 +101,7 @@ public sealed class AssignmentsController(ISender sender) : ControllerBase
         [FromBody] AttachBookToAssignmentCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd with { AssignmentId = id }, ct);
-        return r.Success
-            ? Ok(ApiResponse<AssignmentBookDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<AssignmentBookDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     /// <summary>Detach a book from this assignment.</summary>
@@ -144,8 +134,6 @@ public sealed class AssignmentsController(ISender sender) : ControllerBase
         [FromBody] IReadOnlyCollection<Guid> studentProfileIds, CancellationToken ct)
     {
         var r = await sender.Send(new SetAssignmentAssigneesCommand(id, studentProfileIds ?? Array.Empty<Guid>()), ct);
-        return r.Success
-            ? Ok(ApiResponse<IReadOnlyCollection<AssignmentAssigneeDto>>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<IReadOnlyCollection<AssignmentAssigneeDto>>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 }
