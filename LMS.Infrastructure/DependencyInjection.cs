@@ -1,4 +1,3 @@
-using System.Text;
 using LMS.Application.Common.Abstractions;
 using LMS.Infrastructure.Persistence;
 using LMS.Infrastructure.Services;
@@ -91,16 +90,15 @@ public static class DependencyInjection
     public static IServiceCollection AddJwtAuthentication(this IServiceCollection services,
         IConfiguration configuration)
     {
-        var jwtKey = configuration["Jwt:Key"]
-            ?? throw new InvalidOperationException(
-                "Jwt:Key is required. Set it via configuration or the Jwt__Key environment variable.");
+        // Bind the "Jwt" section once and register it for IOptions consumers
+        // (JwtTokenGenerator + the auth handlers) — no more scattered
+        // configuration["Jwt:*"] indexer reads.
+        var jwtSection = configuration.GetSection(JwtOptions.SectionName);
+        services.Configure<JwtOptions>(jwtSection);
 
-        var keyBytes = Encoding.UTF8.GetBytes(jwtKey);
-        if (keyBytes.Length < 32)
-        {
-            throw new InvalidOperationException(
-                "Jwt:Key must be at least 32 bytes for HS256.");
-        }
+        var jwt = jwtSection.Get<JwtOptions>() ?? new JwtOptions();
+        // Single presence + ≥32-byte validation (shared with JwtTokenGenerator).
+        var keyBytes = jwt.SigningKeyBytes();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
@@ -111,8 +109,8 @@ public static class DependencyInjection
                     ValidateAudience = true,
                     ValidateLifetime = true,
                     ValidateIssuerSigningKey = true,
-                    ValidIssuer = configuration["Jwt:Issuer"],
-                    ValidAudience = configuration["Jwt:Audience"],
+                    ValidIssuer = jwt.Issuer,
+                    ValidAudience = jwt.Audience,
                     IssuerSigningKey = new SymmetricSecurityKey(keyBytes),
                     // Defaults to 5 min — too generous for short-lived tokens.
                     ClockSkew = TimeSpan.FromSeconds(30),

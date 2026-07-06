@@ -1,8 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
 using LMS.Application.Common.Abstractions;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace LMS.Infrastructure.Services;
@@ -20,29 +19,21 @@ public sealed class JwtTokenGenerator : IJwtTokenGenerator
     private readonly TimeSpan _accessTokenLifetime;
     private readonly JwtSecurityTokenHandler _handler = new();
 
-    public JwtTokenGenerator(IConfiguration configuration)
+    public JwtTokenGenerator(IOptions<JwtOptions> options)
     {
-        var key = configuration["Jwt:Key"]
-            ?? throw new InvalidOperationException(
-                "Jwt:Key is required. Set it via configuration or the Jwt__Key environment variable.");
-
-        var keyBytes = Encoding.UTF8.GetBytes(key);
-        if (keyBytes.Length < 32)
-        {
-            throw new InvalidOperationException(
-                "Jwt:Key must be at least 32 bytes for HS256.");
-        }
+        var jwt = options.Value;
+        // Validates presence + ≥32-byte length in the one shared place (JwtOptions).
+        var keyBytes = jwt.SigningKeyBytes();
 
         _signingCredentials = new SigningCredentials(
             new SymmetricSecurityKey(keyBytes), SecurityAlgorithms.HmacSha256);
-        _issuer = configuration["Jwt:Issuer"];
-        _audience = configuration["Jwt:Audience"];
-        // Default 30 min — short enough that a stolen token is mostly stale, long
-        // enough that legitimate users don't refresh every other request.
-        // Refresh tokens live for 7 days, so silent renewal handles the rest.
-        _accessTokenLifetime = TimeSpan.FromMinutes(
-            configuration.GetValue("Jwt:AccessTokenMinutes", 30));
+        _issuer = jwt.Issuer;
+        _audience = jwt.Audience;
+        _accessTokenLifetime = jwt.AccessTokenLifetime;
+        RefreshTokenLifetime = jwt.RefreshTokenLifetime;
     }
+
+    public TimeSpan RefreshTokenLifetime { get; }
 
     public string Generate(
         Guid userId,
