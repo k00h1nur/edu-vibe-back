@@ -26,23 +26,28 @@ public sealed class SubmissionsHandlers(
     public async Task<Result<IReadOnlyCollection<SubmissionDto>>> Handle(GetAssignmentSubmissionsQuery request,
         CancellationToken cancellationToken)
     {
-        // SECURITY: students see only their OWN submissions; staff get the
-        // full roster for grading.
-        var items = await db.Submissions
-            .AsNoTracking()
-            .Where(x => x.AssignmentId == request.AssignmentId)
-            .Select(s => new SubmissionDto(s.Id, s.AssignmentId, s.StudentProfileId, s.Content, s.Status, s.Score,
-                s.IsLocked, s.Files.Count))
-            .ToListAsync(cancellationToken);
-
+        // SECURITY: students see only their OWN submissions; staff get the full
+        // roster for grading. Resolve the self-scope FIRST so the ownership filter
+        // runs in SQL — a student used to pull the whole class's rows, then discard
+        // all but their own in memory.
+        Guid? ownProfileId = null;
         if (!CallerIsStaff)
         {
-            var ownProfileId = currentUser.StudentProfileId;
+            ownProfileId = currentUser.StudentProfileId;
             if (ownProfileId is null)
                 return Result<IReadOnlyCollection<SubmissionDto>>.Fail(
                     "FORBIDDEN", "Caller is neither a student nor staff.");
-            items = items.Where(s => s.StudentProfileId == ownProfileId).ToList();
         }
+
+        var query = db.Submissions.AsNoTracking()
+            .Where(x => x.AssignmentId == request.AssignmentId);
+        if (ownProfileId is { } pid)
+            query = query.Where(x => x.StudentProfileId == pid);
+
+        var items = await query
+            .Select(s => new SubmissionDto(s.Id, s.AssignmentId, s.StudentProfileId, s.Content, s.Status, s.Score,
+                s.IsLocked, s.Files.Count))
+            .ToListAsync(cancellationToken);
 
         return Result<IReadOnlyCollection<SubmissionDto>>.Ok(items);
     }
