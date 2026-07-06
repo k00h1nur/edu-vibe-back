@@ -1,5 +1,6 @@
 using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Models;
+using LMS.Application.Common.Security;
 using LMS.Domain.Entities;
 using LMS.Domain.Enums;
 using MediatR;
@@ -20,11 +21,8 @@ public sealed class ClassResourcesHandlers(IApplicationDbContext db, ICurrentUse
     IRequestHandler<UpdateClassResourceCommand, Result<ClassResourceDto>>,
     IRequestHandler<DeleteClassResourceCommand, Result>
 {
-    private static readonly string[] AdminRoles = { "admin", "superadmin", "office_admin", "academy_director" };
-    private static readonly string[] TeacherRoles = { "teacher", "support_teacher" };
-
-    private bool IsAdmin() => AdminRoles.Any(currentUser.IsInRole);
-    private bool IsTeacher() => TeacherRoles.Any(currentUser.IsInRole);
+    private bool IsAdmin() => currentUser.IsAdmin();
+    private bool IsTeacher() => currentUser.IsTeacher();
 
     private static ClassResourceDto Map(ClassResource r) =>
         new(r.Id, r.ClassId, r.Kind, r.Title, r.Url, r.Content, r.Position, r.CreatedAt);

@@ -47,9 +47,7 @@ public sealed class StudentRoadmapHandler(IApplicationDbContext db, ICurrentUser
 {
     private const string Completed = "completed", Current = "current", Locked = "locked";
 
-    private bool IsAdmin =>
-        currentUser.IsInRole(RoleCodes.Admin) || currentUser.IsInRole(RoleCodes.SuperAdmin)
-        || currentUser.IsInRole(RoleCodes.OfficeAdmin);
+    private bool IsAdmin => currentUser.IsAdmin();
 
     public async Task<Result<StudentRoadmapDto>> Handle(GetStudentRoadmapQuery request, CancellationToken ct)
     {

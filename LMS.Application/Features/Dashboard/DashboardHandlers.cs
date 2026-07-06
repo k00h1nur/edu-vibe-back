@@ -73,9 +73,7 @@ public sealed class DashboardHandlers(IApplicationDbContext db, ICurrentUserServ
         // SECURITY: a teacher may read only their OWN dashboard; admins/office may
         // read any teacher's. Without this any Dashboard.Teacher holder could read
         // another teacher's class/enrollment/grading/attendance counters.
-        var isAdmin = currentUser.IsInRole(RoleCodes.Admin)
-            || currentUser.IsInRole(RoleCodes.SuperAdmin)
-            || currentUser.IsInRole(RoleCodes.OfficeAdmin);
+        var isAdmin = currentUser.IsAdmin();
         if (!isAdmin && currentUser.UserId != request.TeacherUserId)
         {
             return Result<TeacherDashboardDto>.Fail("FORBIDDEN", "You can only view your own dashboard.");

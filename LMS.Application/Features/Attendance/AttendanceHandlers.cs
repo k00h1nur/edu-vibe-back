@@ -1,5 +1,6 @@
 using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Models;
+using LMS.Application.Common.Security;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,13 +14,10 @@ public sealed class AttendanceHandlers(IApplicationDbContext db, ICurrentUserSer
     IRequestHandler<GetMyAttendanceQuery, Result<IReadOnlyCollection<MyAttendanceDto>>>,
     IRequestHandler<GetAttendanceQuery, Result<IReadOnlyCollection<AttendanceDto>>>
 {
-    // Roles allowed to read ANY student's attendance. Students hold
-    // Attendance.Read too (for their own history), so the permission gate
-    // alone can't tell "my attendance" from "someone else's".
-    private static readonly string[] StaffRoles =
-        { "admin", "superadmin", "teacher", "support_teacher", "office_admin", "academy_director" };
-
-    private bool CallerIsStaff() => StaffRoles.Any(currentUser.IsInRole);
+    // Staff may read ANY student's attendance. Students hold Attendance.Read
+    // too (for their own history), so the permission gate alone can't tell
+    // "my attendance" from "someone else's".
+    private bool CallerIsStaff() => currentUser.IsStaff();
 
     /// <summary>Resolves the caller's own student profile id from the JWT claim, falling back to a UserId lookup.</summary>
     private async Task<Guid?> ResolveOwnProfileIdAsync(CancellationToken ct)

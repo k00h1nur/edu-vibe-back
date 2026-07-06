@@ -1,5 +1,6 @@
 using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Models;
+using LMS.Application.Common.Security;
 using LMS.Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -20,11 +21,8 @@ public sealed class AnalyticsHandlers(IApplicationDbContext db, ICurrentUserServ
     IRequestHandler<BulkMarkAttendanceCommand, Result<SessionAttendanceDto>>,
     IRequestHandler<GetSessionAttendanceSummaryQuery, Result<SessionAttendanceDto>>
 {
-    private static readonly string[] AdminRoles = { "admin", "superadmin", "office_admin", "academy_director" };
-    private static readonly string[] TeacherRoles = { "teacher", "support_teacher" };
-
-    private bool IsAdmin() => AdminRoles.Any(currentUser.IsInRole);
-    private bool IsTeacher() => TeacherRoles.Any(currentUser.IsInRole);
+    private bool IsAdmin() => currentUser.IsAdmin();
+    private bool IsTeacher() => currentUser.IsTeacher();
 
     private static double Pct(int numerator, int denominator) =>
         denominator == 0 ? 0 : Math.Round(100.0 * numerator / denominator, 1);

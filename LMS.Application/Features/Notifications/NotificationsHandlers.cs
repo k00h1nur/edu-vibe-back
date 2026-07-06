@@ -55,9 +55,7 @@ public sealed class NotificationsHandlers(IApplicationDbContext db, ICurrentUser
 
         // 2) New visitor inquiries — staff only (mirrors who can open the
         //    Inquiries inbox). Demo lesson / mock test / level check / contact.
-        var isStaff = currentUser.IsInRole(RoleCodes.Admin)
-                      || currentUser.IsInRole(RoleCodes.SuperAdmin)
-                      || currentUser.IsInRole(RoleCodes.OfficeAdmin);
+        var isStaff = currentUser.IsAdmin();
         if (isStaff)
         {
             var inquiries = await db.VisitorMessages.AsNoTracking()
