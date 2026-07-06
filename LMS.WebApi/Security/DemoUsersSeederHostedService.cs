@@ -32,7 +32,7 @@ namespace LMS.WebApi.Security;
 ///
 /// Default password for all of them: <c>Demo!2026</c>.
 /// Override the password (and toggle the seeder off entirely) via config:
-///   "DemoUsers:Enabled": true|false   (default true)
+///   "DemoUsers:Enabled": true|false   (default FALSE — on only in Development)
 ///   "DemoUsers:Password": "..."       (default "Demo!2026")
 ///   "DemoUsers:EmailDomain": "..."     (default "eduvibe.local")
 ///
@@ -68,7 +68,9 @@ public sealed class DemoUsersSeederHostedService(
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        if (!configuration.GetValue("DemoUsers:Enabled", true))
+        // Default OFF (defense-in-depth): a forgotten prod override must NOT create
+        // a known-credential admin account. appsettings.Development.json turns it on.
+        if (!configuration.GetValue("DemoUsers:Enabled", false))
         {
             logger.LogInformation("Demo users seeder disabled by config.");
             return;

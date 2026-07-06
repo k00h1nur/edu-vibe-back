@@ -15,6 +15,7 @@ public sealed class ClassesHandlers(IApplicationDbContext db, ICurrentUserServic
     IRequestHandler<CreateClassCommand, Result<ClassDto>>,
     IRequestHandler<UpdateClassCommand, Result<ClassDto>>,
     IRequestHandler<CancelClassCommand, Result>,
+    IRequestHandler<ReactivateClassCommand, Result>,
     IRequestHandler<EnrollStudentCommand, Result>,
     IRequestHandler<RemoveStudentFromClassCommand, Result>,
     IRequestHandler<GetClassStudentsQuery, Result<IReadOnlyCollection<Guid>>>
@@ -26,6 +27,15 @@ public sealed class ClassesHandlers(IApplicationDbContext db, ICurrentUserServic
         c.Cancel();
         await db.SaveChangesAsync(cancellationToken);
         return Result.Ok("Cancelled");
+    }
+
+    public async Task<Result> Handle(ReactivateClassCommand request, CancellationToken cancellationToken)
+    {
+        var c = await db.Classes.FirstOrDefaultAsync(x => x.Id == request.ClassId, cancellationToken);
+        if (c is null) return Result.Fail("NOT_FOUND", "Class not found.");
+        c.Reactivate();
+        await db.SaveChangesAsync(cancellationToken);
+        return Result.Ok("Reactivated");
     }
 
     public async Task<Result<ClassDto>> Handle(CreateClassCommand request, CancellationToken cancellationToken)

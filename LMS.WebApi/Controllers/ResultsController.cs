@@ -75,12 +75,22 @@ public sealed class ResultsController(ISender sender) : ControllerBase
         return r.Success ? Ok(ApiResponse<object>.Ok(new { }, r.Message)) : BadRequest(ApiResponse<object>.Fail(r.Message ?? "Failed"));
     }
 
+    // Result images are small marketing screenshots; 5 MB is generous. The cap
+    // brings this endpoint in line with the other uploads (avatar/material/…),
+    // which each set their own limit rather than relying on the global body cap.
+    private const int MaxResultImageBytes = 5 * 1024 * 1024;
+
     [HttpPost("admin/results/{id:guid}/images")]
     [PermissionAuthorize("Results.Update")]
     [Consumes("multipart/form-data")]
+    [RequestSizeLimit(MaxResultImageBytes)]
     public async Task<ActionResult<ApiResponse<ResultImageDto>>> UploadImage(Guid id, IFormFile file, [FromQuery] bool isMain = false,
         CancellationToken cancellationToken = default)
     {
+        if (file is null || file.Length == 0)
+            return BadRequest(ApiResponse<ResultImageDto>.Fail("No file provided."));
+        if (file.Length > MaxResultImageBytes)
+            return BadRequest(ApiResponse<ResultImageDto>.Fail("Image must be 5 MB or smaller."));
         await using var stream = file.OpenReadStream();
         var r = await sender.Send(new UploadResultImageCommand(id, stream, file.FileName, isMain), cancellationToken);
         return r.Success ? Ok(ApiResponse<ResultImageDto>.Ok(r.Data, r.Message)) : BadRequest(ApiResponse<ResultImageDto>.Fail(r.Message ?? "Failed"));
@@ -89,9 +99,14 @@ public sealed class ResultsController(ISender sender) : ControllerBase
     [HttpPut("admin/results/{id:guid}/images/{imageId:guid}")]
     [PermissionAuthorize("Results.Update")]
     [Consumes("multipart/form-data")]
+    [RequestSizeLimit(MaxResultImageBytes)]
     public async Task<ActionResult<ApiResponse<ResultImageDto>>> ReplaceImage(Guid id, Guid imageId, IFormFile file,
         CancellationToken cancellationToken = default)
     {
+        if (file is null || file.Length == 0)
+            return BadRequest(ApiResponse<ResultImageDto>.Fail("No file provided."));
+        if (file.Length > MaxResultImageBytes)
+            return BadRequest(ApiResponse<ResultImageDto>.Fail("Image must be 5 MB or smaller."));
         await using var stream = file.OpenReadStream();
         var r = await sender.Send(new ReplaceResultImageCommand(id, imageId, stream, file.FileName), cancellationToken);
         return r.Success ? Ok(ApiResponse<ResultImageDto>.Ok(r.Data, r.Message)) : BadRequest(ApiResponse<ResultImageDto>.Fail(r.Message ?? "Failed"));

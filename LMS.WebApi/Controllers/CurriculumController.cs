@@ -143,6 +143,51 @@ public sealed class CurriculumController(ISender sender) : ControllerBase
             : NotFound(ApiResponse<TemplatePlanDto>.Fail(r.Message ?? "Not found"));
     }
 
+    // ---- Admin day-plan EDITING (define which lessons form each class day) ---
+    // Every command returns the whole refreshed plan so the editor re-renders from
+    // one response. Admin-scoped (Classes.Update), like template structure editing.
+
+    private ActionResult<ApiResponse<TemplatePlanDto>> PlanResult(Result<TemplatePlanDto> r) =>
+        r.Success
+            ? Ok(ApiResponse<TemplatePlanDto>.Ok(r.Data, r.Message))
+            : r.ErrorCode == "NOT_FOUND"
+                ? NotFound(ApiResponse<TemplatePlanDto>.Fail(r.Message ?? "Not found"))
+                : BadRequest(ApiResponse<TemplatePlanDto>.Fail(r.Message ?? "Failed"));
+
+    /// <summary>Append a new empty day to the template's plan.</summary>
+    [HttpPost("templates/{id:guid}/plan/days")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<TemplatePlanDto>>> AddPlanDay(
+        Guid id, [FromBody] AddPlanDayCommand body, CancellationToken ct)
+        => PlanResult(await sender.Send(body with { TemplateId = id }, ct));
+
+    /// <summary>Reorder a template's days (dayIds in top-to-bottom order).</summary>
+    [HttpPost("templates/{id:guid}/plan/days/reorder")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<TemplatePlanDto>>> ReorderPlanDays(
+        Guid id, [FromBody] ReorderPlanDaysCommand body, CancellationToken ct)
+        => PlanResult(await sender.Send(body with { TemplateId = id }, ct));
+
+    /// <summary>Rename a plan-day (null/blank clears the custom title).</summary>
+    [HttpPut("plan-days/{dayId:guid}")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<TemplatePlanDto>>> RenamePlanDay(
+        Guid dayId, [FromBody] RenamePlanDayCommand body, CancellationToken ct)
+        => PlanResult(await sender.Send(body with { PlanDayId = dayId }, ct));
+
+    /// <summary>Delete a plan-day and its lesson links (lessons themselves untouched).</summary>
+    [HttpDelete("plan-days/{dayId:guid}")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<TemplatePlanDto>>> DeletePlanDay(Guid dayId, CancellationToken ct)
+        => PlanResult(await sender.Send(new DeletePlanDayCommand(dayId), ct));
+
+    /// <summary>Replace a day's lessons (in-day order = list order; empty clears the day).</summary>
+    [HttpPut("plan-days/{dayId:guid}/lessons")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<TemplatePlanDto>>> SetPlanDayLessons(
+        Guid dayId, [FromBody] SetPlanDayLessonsCommand body, CancellationToken ct)
+        => PlanResult(await sender.Send(body with { PlanDayId = dayId }, ct));
+
     /// <summary>A class's journey through its day-plan (24 day-cards + completion).</summary>
     [HttpGet("class/{classId:guid}/plan-progress")]
     public async Task<ActionResult<ApiResponse<ClassPlanProgressDto>>> ClassPlanProgress(Guid classId, CancellationToken ct)
