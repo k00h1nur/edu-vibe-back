@@ -33,6 +33,8 @@ public static class ExerciseChecker
                 => CheckMultiSelect(content, userAnswers),
             "paragraph_cloze"
                 => CheckByIndex(GetArray(content, "answers"), AsList(userAnswers)),
+            "table_fill"
+                => CheckTable(content, userAnswers),
             "dialogue"
                 => CheckDialogue(content, userAnswers),
             _ => (0, 0), // unknown type → ungraded (no crash); add a case to support it.
@@ -120,6 +122,37 @@ public static class ExerciseChecker
         var correctTicked = ticked.Count(t => correct.Contains(t));
         var wrongTicked = ticked.Count - correctTicked;
         return (Math.Max(0, correctTicked - wrongTicked), correct.Count);
+    }
+
+    /// <summary>Table completion: rows[].cells[]; a cell carrying an "answer" is a blank to
+    /// fill (a cell with only "text" is pre-filled/given). User answers are keyed "r,c".
+    /// total = number of blank cells; score = matched.</summary>
+    private static (int, int) CheckTable(JsonElement content, JsonElement userAnswers)
+    {
+        int score = 0, total = 0;
+        if (!content.TryGetProperty("rows", out var rows) || rows.ValueKind != JsonValueKind.Array)
+            return (0, 0);
+
+        var r = 0;
+        foreach (var row in rows.EnumerateArray())
+        {
+            if (row.TryGetProperty("cells", out var cells) && cells.ValueKind == JsonValueKind.Array)
+            {
+                var c = 0;
+                foreach (var cell in cells.EnumerateArray())
+                {
+                    if (cell.TryGetProperty("answer", out var ansEl))
+                    {
+                        total++;
+                        var user = Single(UserAnswerFor(userAnswers, $"{r},{c}", -1));
+                        if (Norm(user) == Norm(ansEl.ToString())) score++;
+                    }
+                    c++;
+                }
+            }
+            r++;
+        }
+        return (score, total);
     }
 
     // ---- helpers -------------------------------------------------------------
