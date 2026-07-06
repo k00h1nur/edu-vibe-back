@@ -25,7 +25,7 @@ public static class ExerciseChecker
         return type switch
         {
             "mcq" or "mcq_ab" or "fill_blank" or "error_correction" or "transform"
-                or "word_completion" or "matching" or "true_false"
+                or "word_completion" or "matching" or "true_false" or "image_label"
                 => CheckItems(content, userAnswers, multiGap: false),
             "word_bank_gap"
                 => CheckItems(content, userAnswers, multiGap: true),
