@@ -138,4 +138,14 @@ public sealed class ExerciseCheckerTests
         // Exactly right → full marks.
         ExerciseChecker.Check("multi_select", content, El("""["Spain","Russia"]""")).Should().Be((2, 2));
     }
+
+    [Fact]
+    public void Word_search_scores_by_words_found_case_insensitively()
+    {
+        var content = """{"words":["DOCTOR","NURSE","PILOT"],"grid":[["x"]]}""";
+        // Found two real words (case-insensitive) + one bogus that isn't counted.
+        var (score, total) = ExerciseChecker.Check("word_search", content, El("""["doctor","pilot","zzz"]"""));
+        score.Should().Be(2);
+        total.Should().Be(3);
+    }
 }
