@@ -138,4 +138,20 @@ public sealed class ExerciseCheckerTests
         // Exactly right → full marks.
         ExerciseChecker.Check("multi_select", content, El("""["Spain","Russia"]""")).Should().Be((2, 2));
     }
+
+    [Fact]
+    public void Crossword_scores_each_entry_from_its_filled_cells()
+    {
+        // 1-across CAFE at (0,1); 1-down CAR at (0,1) sharing the C.
+        var content = """
+        {"entries":[
+          {"number":1,"direction":"across","clue":"coffee place","answer":"CAFE","row":0,"col":1},
+          {"number":1,"direction":"down","clue":"you drive it","answer":"CAR","row":0,"col":1}]}
+        """;
+        // CAFE fully correct (case-insensitive); CAR has a wrong last cell (2,1).
+        var user = El("""{"0,1":"c","0,2":"a","0,3":"f","0,4":"e","1,1":"a","2,1":"x"}""");
+        var (score, total) = ExerciseChecker.Check("crossword", content, user);
+        score.Should().Be(1);
+        total.Should().Be(2);
+    }
 }
