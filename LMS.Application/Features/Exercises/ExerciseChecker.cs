@@ -31,6 +31,8 @@ public static class ExerciseChecker
                 => CheckItems(content, userAnswers, multiGap: true),
             "multi_select"
                 => CheckMultiSelect(content, userAnswers),
+            "crossword"
+                => CheckCrossword(content, userAnswers),
             "paragraph_cloze"
                 => CheckByIndex(GetArray(content, "answers"), AsList(userAnswers)),
             "table_fill"
@@ -126,6 +128,37 @@ public static class ExerciseChecker
         return (Math.Max(0, correctTicked - wrongTicked), correct.Count);
     }
 
+    /// <summary>Crossword: content.entries = the words placed on the grid (number, direction,
+    /// clue, answer, row, col). The user submits filled letters keyed by cell "r,c". total =
+    /// entries; score = entries whose every cell matches the answer (case-insensitive).</summary>
+    private static (int, int) CheckCrossword(JsonElement content, JsonElement userAnswers)
+    {
+        if (!content.TryGetProperty("entries", out var entries) || entries.ValueKind != JsonValueKind.Array)
+            return (0, 0);
+
+        int score = 0, total = 0;
+        foreach (var e in entries.EnumerateArray())
+        {
+            var answer = Norm(e.TryGetProperty("answer", out var a) ? a.ToString() : "");
+            if (answer.Length == 0) continue;
+            total++;
+
+            var down = e.TryGetProperty("direction", out var d) && d.GetString() == "down";
+            var (dr, dc) = down ? (1, 0) : (0, 1);
+            var row = e.TryGetProperty("row", out var r0) && r0.TryGetInt32(out var rv) ? rv : 0;
+            var col = e.TryGetProperty("col", out var c0) && c0.TryGetInt32(out var cv) ? cv : 0;
+
+            var ok = true;
+            for (var i = 0; i < answer.Length; i++)
+            {
+                var user = Norm(Single(UserAnswerFor(userAnswers, $"{row + dr * i},{col + dc * i}", -1)));
+                if (user != answer[i].ToString())
+                {
+                    ok = false;
+                    break;
+                }
+            }
+            if (ok) score++;
     /// <summary>Word search: content.words = the words to find; the user submits the array of
     /// words they located. total = distinct words; score = how many were found (case-insensitive).
     /// The grid + placements are for rendering only — scoring is by word, matching the self-check
