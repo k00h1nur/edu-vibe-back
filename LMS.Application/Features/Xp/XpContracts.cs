@@ -13,16 +13,6 @@ public sealed record XpLedgerDto(
 
 public sealed record LeaderboardDto(Guid StudentProfileId, int Xp);
 
-public sealed record XpPingCommand : IRequest<Result<string>>;
-
-public sealed class XpPingCommandHandler : IRequestHandler<XpPingCommand, Result<string>>
-{
-    public Task<Result<string>> Handle(XpPingCommand request, CancellationToken cancellationToken)
-    {
-        return Task.FromResult(Result<string>.Ok("Xp module ready"));
-    }
-}
-
 public sealed record AddManualXpCommand(Guid StudentProfileId, int Amount, string? Note) : IRequest<Result>;
 
 public sealed record GetStudentXpLedgerQuery(Guid StudentProfileId)

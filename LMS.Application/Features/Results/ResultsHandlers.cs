@@ -95,8 +95,12 @@ public sealed class ResultsHandlers(
             _ => query.OrderBy(x => x.DisplayOrder).ThenByDescending(x => x.CreatedAt)
         };
 
+        // Clamp anonymous, client-supplied paging so a hostile ?pageSize=1000000
+        // (or a negative page) can't force a huge scan + image fan-out.
+        var page = Math.Max(1, q.Page);
+        var size = Math.Clamp(q.PageSize, 1, 100);
         var list = await query.AsNoTracking()
-            .Skip((q.Page - 1) * q.PageSize).Take(q.PageSize).ToListAsync(ct);
+            .Skip((page - 1) * size).Take(size).ToListAsync(ct);
         return Result<IReadOnlyCollection<ResultDto>>.Ok(await MapManyAsync(list, ct));
     }
 
@@ -117,9 +121,10 @@ public sealed class ResultsHandlers(
 
     public async Task<Result<IReadOnlyCollection<ResultDto>>> Handle(FeaturedResultsQuery q, CancellationToken ct)
     {
+        var limit = Math.Clamp(q.Limit, 1, 50);
         var list = await db.Results.AsNoTracking()
             .Where(x => !x.IsDeleted && x.IsPublished && x.IsFeatured)
-            .OrderBy(x => x.DisplayOrder).ThenByDescending(x => x.CreatedAt).Take(q.Limit).ToListAsync(ct);
+            .OrderBy(x => x.DisplayOrder).ThenByDescending(x => x.CreatedAt).Take(limit).ToListAsync(ct);
         return Result<IReadOnlyCollection<ResultDto>>.Ok(await MapManyAsync(list, ct));
     }
 

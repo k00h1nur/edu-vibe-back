@@ -30,16 +30,6 @@ public sealed record UpdateStudentAdminFieldsCommand(
 public sealed record SetStudentAvatarCommand(Guid StudentProfileId, string? AvatarUrl)
     : IRequest<Result<StudentDto>>;
 
-public sealed record StudentsPingCommand : IRequest<Result<string>>;
-
-public sealed class StudentsPingCommandHandler : IRequestHandler<StudentsPingCommand, Result<string>>
-{
-    public Task<Result<string>> Handle(StudentsPingCommand request, CancellationToken cancellationToken)
-    {
-        return Task.FromResult(Result<string>.Ok("Students module ready"));
-    }
-}
-
 public sealed record RegisterStudentCommand(Guid UserId) : IRequest<Result<StudentDto>>;
 
 public sealed record UpdateStudentProfileCommand(Guid StudentProfileId, int Xp, int Streak)

@@ -25,7 +25,7 @@ public static class ExerciseChecker
         return type switch
         {
             "mcq" or "mcq_ab" or "fill_blank" or "error_correction" or "transform"
-                or "word_completion" or "matching" or "true_false"
+                or "word_completion" or "matching" or "true_false" or "image_label"
                 => CheckItems(content, userAnswers, multiGap: false),
             "word_bank_gap"
                 => CheckItems(content, userAnswers, multiGap: true),
@@ -35,8 +35,12 @@ public static class ExerciseChecker
                 => CheckCrossword(content, userAnswers),
             "paragraph_cloze"
                 => CheckByIndex(GetArray(content, "answers"), AsList(userAnswers)),
+            "table_fill"
+                => CheckTable(content, userAnswers),
             "dialogue"
                 => CheckDialogue(content, userAnswers),
+            "word_search"
+                => CheckWordSearch(content, userAnswers),
             _ => (0, 0), // unknown type → ungraded (no crash); add a case to support it.
         };
     }
@@ -155,6 +159,43 @@ public static class ExerciseChecker
                 }
             }
             if (ok) score++;
+    /// <summary>Word search: content.words = the words to find; the user submits the array of
+    /// words they located. total = distinct words; score = how many were found (case-insensitive).
+    /// The grid + placements are for rendering only — scoring is by word, matching the self-check
+    /// model (answers ship in the content).</summary>
+    private static (int, int) CheckWordSearch(JsonElement content, JsonElement userAnswers)
+    {
+        var words = GetArray(content, "words").Select(Norm).Where(s => s.Length > 0).Distinct().ToList();
+        if (words.Count == 0) return (0, 0);
+        var found = AsList(userAnswers).Select(Norm).ToHashSet();
+        return (words.Count(w => found.Contains(w)), words.Count);
+    /// <summary>Table completion: rows[].cells[]; a cell carrying an "answer" is a blank to
+    /// fill (a cell with only "text" is pre-filled/given). User answers are keyed "r,c".
+    /// total = number of blank cells; score = matched.</summary>
+    private static (int, int) CheckTable(JsonElement content, JsonElement userAnswers)
+    {
+        int score = 0, total = 0;
+        if (!content.TryGetProperty("rows", out var rows) || rows.ValueKind != JsonValueKind.Array)
+            return (0, 0);
+
+        var r = 0;
+        foreach (var row in rows.EnumerateArray())
+        {
+            if (row.TryGetProperty("cells", out var cells) && cells.ValueKind == JsonValueKind.Array)
+            {
+                var c = 0;
+                foreach (var cell in cells.EnumerateArray())
+                {
+                    if (cell.TryGetProperty("answer", out var ansEl))
+                    {
+                        total++;
+                        var user = Single(UserAnswerFor(userAnswers, $"{r},{c}", -1));
+                        if (Norm(user) == Norm(ansEl.ToString())) score++;
+                    }
+                    c++;
+                }
+            }
+            r++;
         }
         return (score, total);
     }

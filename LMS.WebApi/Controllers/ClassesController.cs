@@ -207,6 +207,17 @@ public sealed class ClassesController(ISender sender) : ControllerBase
             : BadRequest(ApiResponse<object>.Fail(r.Message ?? "Failed"));
     }
 
+    /// <summary>Reactivate an archived (cancelled) class — flips it back to the normal state.</summary>
+    [HttpPost("{id:guid}/reactivate")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<object>>> Reactivate(Guid id, CancellationToken ct)
+    {
+        var r = await sender.Send(new ReactivateClassCommand(id), ct);
+        return r.Success
+            ? Ok(ApiResponse<object>.Ok(new { }, r.Message))
+            : BadRequest(ApiResponse<object>.Fail(r.Message ?? "Failed"));
+    }
+
     [HttpPost("{id:guid}/enroll/{studentProfileId:guid}")]
     [PermissionAuthorize(Permissions.Classes.Enroll)]
     public async Task<ActionResult<ApiResponse<object>>> Enroll(Guid id, Guid studentProfileId, CancellationToken ct)
