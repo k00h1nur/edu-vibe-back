@@ -99,6 +99,44 @@ public sealed class ExercisesController(ISender sender, ICurrentUserService curr
         if (opened is null) return NotFound();
         return File(opened.Value.Stream, opened.Value.ContentType, enableRangeProcessing: true);
     }
+
+    /// <summary>
+    /// Upload an exercise image (teacher/admin) — e.g. a "label the picture" prompt
+    /// (flags, jobs). Returns the stored file name; the caller stores it as an item's
+    /// <c>imageUrl</c> = <c>/api/proxy/Exercises/image/{fileName}</c>.
+    /// </summary>
+    [HttpPost("exercises/image")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    [RequestSizeLimit(8 * 1024 * 1024)]
+    public async Task<ActionResult<ApiResponse<ImageUploadDto>>> UploadImage(
+        IFormFile file, [FromServices] IExerciseImageStore store, CancellationToken ct)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(ApiResponse<ImageUploadDto>.Fail("No file provided."));
+        if (file.Length > 8 * 1024 * 1024)
+            return BadRequest(ApiResponse<ImageUploadDto>.Fail("Image must be 8 MB or smaller."));
+        try
+        {
+            await using var s = file.OpenReadStream();
+            var stored = await store.SaveAsync(s, file.FileName, ct);
+            return Ok(ApiResponse<ImageUploadDto>.Ok(new ImageUploadDto(stored), "Uploaded."));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ApiResponse<ImageUploadDto>.Fail(ex.Message));
+        }
+    }
+
+    /// <summary>Stream a previously uploaded exercise image (any authenticated user).
+    /// Reached via the same-origin proxy.</summary>
+    [HttpGet("exercises/image/{fileName}")]
+    public async Task<IActionResult> GetImage(
+        string fileName, [FromServices] IExerciseImageStore store, CancellationToken ct)
+    {
+        var opened = await store.OpenAsync(fileName, ct);
+        if (opened is null) return NotFound();
+        return File(opened.Value.Stream, opened.Value.ContentType);
+    }
 }
 
 /// <summary>Request body for the bulk add/update endpoint.</summary>
@@ -109,3 +147,6 @@ public sealed record SubmitExerciseRequest(JsonElement Answers);
 
 /// <summary>Result of an audio upload — the opaque stored file name.</summary>
 public sealed record AudioUploadDto(string FileName);
+
+/// <summary>Result of an image upload — the opaque stored file name.</summary>
+public sealed record ImageUploadDto(string FileName);
