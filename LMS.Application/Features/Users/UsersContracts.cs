@@ -6,16 +6,6 @@ namespace LMS.Application.Features.Users;
 
 public sealed record UserDto(Guid Id, string Email, UserStatus Status, IReadOnlyCollection<string> Roles);
 
-public sealed record UsersPingCommand : IRequest<Result<string>>;
-
-public sealed class UsersPingCommandHandler : IRequestHandler<UsersPingCommand, Result<string>>
-{
-    public Task<Result<string>> Handle(UsersPingCommand request, CancellationToken cancellationToken)
-    {
-        return Task.FromResult(Result<string>.Ok("Users module ready"));
-    }
-}
-
 public sealed record GetUsersQuery(int Page = 1, int PageSize = 25, string? Search = null)
     : IRequest<Result<PagedResult<UserDto>>>;
 

@@ -30,16 +30,6 @@ public sealed record StudentDashboardDto(
     int EarnedBadges,
     int GradedSubmissions);
 
-public sealed record DashboardPingCommand : IRequest<Result<string>>;
-
-public sealed class DashboardPingCommandHandler : IRequestHandler<DashboardPingCommand, Result<string>>
-{
-    public Task<Result<string>> Handle(DashboardPingCommand request, CancellationToken cancellationToken)
-    {
-        return Task.FromResult(Result<string>.Ok("Dashboard module ready"));
-    }
-}
-
 public sealed record GetDirectorDashboardQuery : IRequest<Result<DirectorDashboardDto>>;
 
 public sealed record GetOfficeAdminDashboardQuery : IRequest<Result<OfficeAdminDashboardDto>>;

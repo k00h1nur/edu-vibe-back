@@ -12,16 +12,6 @@ public sealed record MessageDto(
     DateTime CreatedAt,
     DateTime? ReadAt);
 
-public sealed record MessagesPingCommand : IRequest<Result<string>>;
-
-public sealed class MessagesPingCommandHandler : IRequestHandler<MessagesPingCommand, Result<string>>
-{
-    public Task<Result<string>> Handle(MessagesPingCommand request, CancellationToken cancellationToken)
-    {
-        return Task.FromResult(Result<string>.Ok("Messages module ready"));
-    }
-}
-
 /// <summary>
 /// Sends a message to a conversation. <c>SenderUserId</c> is IGNORED — the
 /// handler always uses the caller's user id from the JWT. The field is kept

@@ -13,16 +13,6 @@ public sealed record PaymentDto(
     PaymentMethod Method,
     PaymentStatus Status);
 
-public sealed record PaymentsPingCommand : IRequest<Result<string>>;
-
-public sealed class PaymentsPingCommandHandler : IRequestHandler<PaymentsPingCommand, Result<string>>
-{
-    public Task<Result<string>> Handle(PaymentsPingCommand request, CancellationToken cancellationToken)
-    {
-        return Task.FromResult(Result<string>.Ok("Payments module ready"));
-    }
-}
-
 public sealed record CreatePaymentCommand(
     Guid StudentProfileId, Guid ClassId, DateOnly PeriodMonth, decimal Amount, PaymentMethod Method)
     : IRequest<Result<PaymentDto>>;

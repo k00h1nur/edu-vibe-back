@@ -34,16 +34,6 @@ public sealed record SubmissionAuditDto(
     string? Detail,
     DateTime CreatedAt);
 
-public sealed record SubmissionsPingCommand : IRequest<Result<string>>;
-
-public sealed class SubmissionsPingCommandHandler : IRequestHandler<SubmissionsPingCommand, Result<string>>
-{
-    public Task<Result<string>> Handle(SubmissionsPingCommand request, CancellationToken cancellationToken)
-    {
-        return Task.FromResult(Result<string>.Ok("Submissions module ready"));
-    }
-}
-
 public sealed record SubmitAssignmentCommand(Guid AssignmentId, Guid StudentProfileId, string Content, bool IsLate)
     : IRequest<Result<SubmissionDto>>;
 
