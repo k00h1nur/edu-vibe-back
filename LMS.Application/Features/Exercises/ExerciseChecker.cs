@@ -37,6 +37,8 @@ public static class ExerciseChecker
                 => CheckTable(content, userAnswers),
             "dialogue"
                 => CheckDialogue(content, userAnswers),
+            "word_search"
+                => CheckWordSearch(content, userAnswers),
             _ => (0, 0), // unknown type → ungraded (no crash); add a case to support it.
         };
     }
@@ -124,6 +126,16 @@ public static class ExerciseChecker
         return (Math.Max(0, correctTicked - wrongTicked), correct.Count);
     }
 
+    /// <summary>Word search: content.words = the words to find; the user submits the array of
+    /// words they located. total = distinct words; score = how many were found (case-insensitive).
+    /// The grid + placements are for rendering only — scoring is by word, matching the self-check
+    /// model (answers ship in the content).</summary>
+    private static (int, int) CheckWordSearch(JsonElement content, JsonElement userAnswers)
+    {
+        var words = GetArray(content, "words").Select(Norm).Where(s => s.Length > 0).Distinct().ToList();
+        if (words.Count == 0) return (0, 0);
+        var found = AsList(userAnswers).Select(Norm).ToHashSet();
+        return (words.Count(w => found.Contains(w)), words.Count);
     /// <summary>Table completion: rows[].cells[]; a cell carrying an "answer" is a blank to
     /// fill (a cell with only "text" is pre-filled/given). User answers are keyed "r,c".
     /// total = number of blank cells; score = matched.</summary>
