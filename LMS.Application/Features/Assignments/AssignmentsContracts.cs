@@ -13,16 +13,6 @@ public sealed record AssignmentDto(
     DateTime? DueDate,
     string? Description = null);
 
-public sealed record AssignmentsPingCommand : IRequest<Result<string>>;
-
-public sealed class AssignmentsPingCommandHandler : IRequestHandler<AssignmentsPingCommand, Result<string>>
-{
-    public Task<Result<string>> Handle(AssignmentsPingCommand request, CancellationToken cancellationToken)
-    {
-        return Task.FromResult(Result<string>.Ok("Assignments module ready"));
-    }
-}
-
 public sealed record CreateAssignmentCommand(
     Guid ClassId, string Title, Guid TeacherUserId, DateTime? DueDate = null, string? Description = null)
     : IRequest<Result<AssignmentDto>>;

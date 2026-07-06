@@ -6,16 +6,6 @@ namespace LMS.Application.Features.Conversations;
 
 public sealed record ConversationDto(Guid Id, ConversationType Type, string? Title);
 
-public sealed record ConversationsPingCommand : IRequest<Result<string>>;
-
-public sealed class ConversationsPingCommandHandler : IRequestHandler<ConversationsPingCommand, Result<string>>
-{
-    public Task<Result<string>> Handle(ConversationsPingCommand request, CancellationToken cancellationToken)
-    {
-        return Task.FromResult(Result<string>.Ok("Conversations module ready"));
-    }
-}
-
 public sealed record CreateConversationCommand(
     ConversationType Type,
     string? Title,

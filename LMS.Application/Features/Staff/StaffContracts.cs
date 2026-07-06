@@ -31,16 +31,6 @@ public sealed record SetStaffPublicVisibilityCommand(Guid StaffProfileId, bool I
 public sealed record SetStaffAvatarCommand(Guid StaffProfileId, string? AvatarUrl)
     : IRequest<Result<StaffDto>>;
 
-public sealed record StaffPingCommand : IRequest<Result<string>>;
-
-public sealed class StaffPingCommandHandler : IRequestHandler<StaffPingCommand, Result<string>>
-{
-    public Task<Result<string>> Handle(StaffPingCommand request, CancellationToken cancellationToken)
-    {
-        return Task.FromResult(Result<string>.Ok("Staff module ready"));
-    }
-}
-
 public sealed record CreateStaffCommand(Guid UserId, EmploymentType EmploymentType) : IRequest<Result<StaffDto>>;
 
 public sealed record UpdateStaffProfileCommand(Guid StaffProfileId, EmploymentType EmploymentType)

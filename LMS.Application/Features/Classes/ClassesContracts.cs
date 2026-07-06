@@ -14,16 +14,6 @@ public sealed record ClassDto(
     int EnrolledCount,
     decimal? MonthlyPrice = null);
 
-public sealed record ClassesPingCommand : IRequest<Result<string>>;
-
-public sealed class ClassesPingCommandHandler : IRequestHandler<ClassesPingCommand, Result<string>>
-{
-    public Task<Result<string>> Handle(ClassesPingCommand request, CancellationToken cancellationToken)
-    {
-        return Task.FromResult(Result<string>.Ok("Classes module ready"));
-    }
-}
-
 public sealed record CreateClassCommand(string Title, int MaxStudents, Modality Modality, Guid? TeacherUserId)
     : IRequest<Result<ClassDto>>;
 

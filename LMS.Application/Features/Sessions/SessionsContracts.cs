@@ -15,16 +15,6 @@ public sealed record SessionDto(
     string? MeetingUrl = null,
     string? Notes = null);
 
-public sealed record SessionsPingCommand : IRequest<Result<string>>;
-
-public sealed class SessionsPingCommandHandler : IRequestHandler<SessionsPingCommand, Result<string>>
-{
-    public Task<Result<string>> Handle(SessionsPingCommand request, CancellationToken cancellationToken)
-    {
-        return Task.FromResult(Result<string>.Ok("Sessions module ready"));
-    }
-}
-
 public sealed record CreateClassSessionCommand(
     Guid ClassId,
     DateOnly SessionDate,

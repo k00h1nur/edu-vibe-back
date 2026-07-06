@@ -11,16 +11,6 @@ public sealed record AttendanceDto(
     Guid StudentProfileId,
     AttendanceStatus Status);
 
-public sealed record AttendancePingCommand : IRequest<Result<string>>;
-
-public sealed class AttendancePingCommandHandler : IRequestHandler<AttendancePingCommand, Result<string>>
-{
-    public Task<Result<string>> Handle(AttendancePingCommand request, CancellationToken cancellationToken)
-    {
-        return Task.FromResult(Result<string>.Ok("Attendance module ready"));
-    }
-}
-
 public sealed record MarkAttendanceCommand(Guid ClassId, Guid SessionId, Guid StudentProfileId, AttendanceStatus Status)
     : IRequest<Result<AttendanceDto>>;
 
