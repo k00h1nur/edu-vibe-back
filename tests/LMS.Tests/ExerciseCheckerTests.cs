@@ -181,4 +181,19 @@ public sealed class ExerciseCheckerTests
         score.Should().Be(2);
         total.Should().Be(3);
     }
+
+    [Fact]
+    public void Writing_is_completed_when_enough_words_are_written()
+    {
+        var content = """{"instructions":"Write about your day.","minWords":5}""";
+
+        // Under the floor → not complete.
+        ExerciseChecker.Check("writing", content, El("""{"text":"Too short"}""")).Should().Be((0, 1));
+        // Meets the floor → complete (writing is never marked right/wrong).
+        ExerciseChecker.Check("writing", content, El("""{"text":"I woke up and had a big breakfast."}""")).Should().Be((1, 1));
+        // Empty → not complete.
+        ExerciseChecker.Check("writing", content, El("""{"text":"   "}""")).Should().Be((0, 1));
+        // No minWords → any non-empty text completes it.
+        ExerciseChecker.Check("writing", """{"instructions":"Free write."}""", El("""{"text":"Hello"}""")).Should().Be((1, 1));
+    }
 }

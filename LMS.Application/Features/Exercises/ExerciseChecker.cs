@@ -31,6 +31,8 @@ public static class ExerciseChecker
                 => CheckItems(content, userAnswers, multiGap: true),
             "multi_select"
                 => CheckMultiSelect(content, userAnswers),
+            "writing"
+                => CheckWriting(content, userAnswers),
             "crossword"
                 => CheckCrossword(content, userAnswers),
             "paragraph_cloze"
@@ -126,6 +128,18 @@ public static class ExerciseChecker
         var correctTicked = ticked.Count(t => correct.Contains(t));
         var wrongTicked = ticked.Count - correctTicked;
         return (Math.Max(0, correctTicked - wrongTicked), correct.Count);
+    }
+
+    /// <summary>Writing: a free-text response (user answer under "text"). Prose can't be
+    /// auto-graded, so it scores as "completed" (1/1) once the learner has written enough —
+    /// at least <c>content.minWords</c> words (default 1). Keeps writing inside the self-check
+    /// flow without pretending to mark it right/wrong; a teacher can still review the text.</summary>
+    private static (int, int) CheckWriting(JsonElement content, JsonElement userAnswers)
+    {
+        var text = Single(UserAnswerFor(userAnswers, "text", -1)) ?? string.Empty;
+        var words = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
+        var min = content.TryGetProperty("minWords", out var m) && m.TryGetInt32(out var mv) && mv > 0 ? mv : 1;
+        return (words >= min ? 1 : 0, 1);
     }
 
     /// <summary>Crossword: content.entries = the words placed on the grid (number, direction,
