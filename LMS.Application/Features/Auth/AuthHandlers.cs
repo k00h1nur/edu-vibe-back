@@ -192,7 +192,8 @@ public sealed class RefreshTokenCommandHandler(
 
 /// <summary>
 /// Self-service password change. Validates the current password against the
-/// stored hash, rejects same-as-current, enforces a minimum length, and
+/// stored hash, rejects same-as-current, enforces the shared
+/// <see cref="PasswordPolicy"/> (length + character-class complexity), and
 /// wipes the refresh token so any other open session has to re-login.
 /// </summary>
 public sealed class ChangePasswordCommandHandler(
@@ -200,8 +201,6 @@ public sealed class ChangePasswordCommandHandler(
     IPasswordHasher passwordHasher,
     ICurrentUserService currentUser) : IRequestHandler<ChangePasswordCommand, Result>
 {
-    private const int MinPasswordLength = 8;
-
     public async Task<Result> Handle(ChangePasswordCommand request, CancellationToken cancellationToken)
     {
         if (currentUser.UserId is null)
@@ -209,10 +208,8 @@ public sealed class ChangePasswordCommandHandler(
 
         if (string.IsNullOrWhiteSpace(request.CurrentPassword))
             return Result.Fail("VALIDATION", "Current password is required.");
-        if (string.IsNullOrWhiteSpace(request.NewPassword))
-            return Result.Fail("VALIDATION", "New password is required.");
-        if (request.NewPassword.Length < MinPasswordLength)
-            return Result.Fail("VALIDATION", $"New password must be at least {MinPasswordLength} characters.");
+        if (PasswordPolicy.Validate(request.NewPassword) is { } policyError)
+            return Result.Fail("VALIDATION", policyError);
         if (request.NewPassword == request.CurrentPassword)
             return Result.Fail("VALIDATION", "New password must differ from the current one.");
 
