@@ -83,3 +83,17 @@ public sealed record ResultsAdminStatsDto(
     IReadOnlyCollection<ResultDto> RecentAdded);
 
 public sealed record ResultsAdminStatsQuery() : IRequest<Result<ResultsAdminStatsDto>>;
+
+/// <summary>
+/// Admin management list — unlike <see cref="ResultListQuery"/> (public, published-only),
+/// this returns ALL non-deleted results including unpublished drafts, paginated, so the
+/// admin CMS can edit/publish them. Optional filters: search by name, exam type, and the
+/// published / featured flags.
+/// </summary>
+public sealed record AdminResultListQuery(
+    string? Search,
+    ExamType? ExamType,
+    bool? Published,
+    bool? Featured,
+    int Page = 1,
+    int PageSize = 25) : IRequest<Result<PagedResult<ResultDto>>>;

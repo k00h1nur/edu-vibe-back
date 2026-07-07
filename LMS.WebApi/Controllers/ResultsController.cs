@@ -1,3 +1,4 @@
+using LMS.Application.Common.Models;
 using LMS.Application.Features.Results;
 using LMS.WebApi.Common;
 using LMS.WebApi.Security;
@@ -49,6 +50,23 @@ public sealed class ResultsController(ISender sender) : ControllerBase
     {
         var r = await sender.Send(new ResultsAdminStatsQuery(), cancellationToken);
         return Ok(ApiResponse<ResultsAdminStatsDto>.Ok(r.Data, r.Message));
+    }
+
+    // Admin management list — includes unpublished drafts (the public GET /results is
+    // published-only), paginated, so the CMS can list + edit + publish every result.
+    [HttpGet("admin/results")]
+    [PermissionAuthorize("Results.Read")]
+    public async Task<ActionResult<ApiResponse<PagedResult<ResultDto>>>> AdminList(
+        [FromQuery] string? search,
+        [FromQuery] LMS.Domain.Enums.ExamType? examType,
+        [FromQuery] bool? published,
+        [FromQuery] bool? featured,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
+        CancellationToken cancellationToken = default)
+    {
+        var r = await sender.Send(new AdminResultListQuery(search, examType, published, featured, page, pageSize), cancellationToken);
+        return Ok(ApiResponse<PagedResult<ResultDto>>.Ok(r.Data, r.Message));
     }
 
     [HttpPost("admin/results")]
