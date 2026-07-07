@@ -482,6 +482,16 @@ public sealed class CourseBuilderHandlers(IApplicationDbContext db, ICurrentUser
                 .ToListAsync(ct))
             .ToDictionary(x => x.LessonId, x => x.Count);
 
+        // Lessons referenced by this template's teaching plan — the ONLY lessons a
+        // student can reach in their journey. A lesson with exercises but not in the
+        // plan is authored-but-unreachable, so the editor warns about it.
+        var planLessonIds = (await (
+                from pl in db.CurriculumPlanDayLessons.AsNoTracking()
+                join d in db.CurriculumPlanDays.AsNoTracking() on pl.PlanDayId equals d.Id
+                where d.TemplateId == templateId
+                select pl.CurriculumLessonId).Distinct().ToListAsync(ct))
+            .ToHashSet();
+
         var unitDtos = units.Select(u =>
         {
             var ls = lessons.Where(x => x.UnitId == u.Id).ToList();
@@ -495,7 +505,8 @@ public sealed class CourseBuilderHandlers(IApplicationDbContext db, ICurrentUser
                 u.XpReward + ls.Sum(x => x.XpReward),
                 ls.Select(x => new CourseBuilderLessonDto(x.Id, x.Order, x.Title, x.Objectives,
                     x.HomeworkPlaceholder, x.MaterialsPlaceholder, x.IsAssessment,
-                    x.LessonType, x.DurationMinutes, x.XpReward, exerciseCounts.GetValueOrDefault(x.Id))).ToList());
+                    x.LessonType, x.DurationMinutes, x.XpReward, exerciseCounts.GetValueOrDefault(x.Id),
+                    planLessonIds.Contains(x.Id))).ToList());
         }).ToList();
 
         return Result<ClassCourseBuilderDto>.Ok(new ClassCourseBuilderDto(classId, templateId, templateName, unitDtos));
