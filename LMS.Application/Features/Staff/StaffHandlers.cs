@@ -1,5 +1,6 @@
 using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Models;
+using LMS.Application.Common.Storage;
 using LMS.Domain.Entities;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -144,15 +145,24 @@ public sealed class GetMyStaffProfileQueryHandler(IApplicationDbContext db, ICur
     }
 }
 
-public sealed class SetStaffAvatarCommandHandler(IApplicationDbContext db)
+public sealed class SetStaffAvatarCommandHandler(IApplicationDbContext db, IAvatarFileStore avatarStore)
     : IRequestHandler<SetStaffAvatarCommand, Result<StaffDto>>
 {
     public async Task<Result<StaffDto>> Handle(SetStaffAvatarCommand request, CancellationToken ct)
     {
         var sp = await db.StaffProfiles.FirstOrDefaultAsync(x => x.Id == request.StaffProfileId, ct);
         if (sp is null) return Result<StaffDto>.Fail("NOT_FOUND", "Staff profile not found.");
+
+        var previousUrl = sp.AvatarUrl;
         sp.SetAvatarUrl(request.AvatarUrl);
         await db.SaveChangesAsync(ct);
+
+        // Best-effort cleanup of the replaced/removed file AFTER the new value is
+        // committed, so a stored avatar is never orphaned on the disk. Only our own
+        // locally-stored files (/uploads/avatars/…) are touched; external URLs
+        // (e.g. a Telegram photo) resolve to a non-existent local name and no-op.
+        await AvatarCleanup.DeletePreviousAsync(avatarStore, previousUrl, sp.AvatarUrl, ct);
+
         var user = await db.Users.FirstAsync(x => x.Id == sp.UserId, ct);
         return Result<StaffDto>.Ok(Map(sp, user.Email, user.Status));
     }

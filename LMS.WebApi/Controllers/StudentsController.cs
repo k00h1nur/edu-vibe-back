@@ -205,4 +205,25 @@ public sealed class StudentsController(ISender sender) : ControllerBase
         }
         return Ok(ApiResponse<StudentDto>.Ok(r.Data, r.Message));
     }
+
+    /// <summary>Removes the caller's own avatar (self-service).</summary>
+    [HttpDelete("me/avatar")]
+    public async Task<ActionResult<ApiResponse<StudentDto>>> DeleteMyAvatar(CancellationToken ct)
+    {
+        var mine = await sender.Send(new GetMyStudentProfileQuery(), ct);
+        if (!mine.Success || mine.Data is null)
+            return NotFound(ApiResponse<StudentDto>.Fail(mine.Message ?? "No student profile for this user."));
+
+        var r = await sender.Send(new SetStudentAvatarCommand(mine.Data.StudentProfileId, null), ct);
+        return r.ToApiResult();
+    }
+
+    /// <summary>Admin removes a student's avatar.</summary>
+    [HttpDelete("{id:guid}/avatar")]
+    [PermissionAuthorize(Permissions.Students.Update)]
+    public async Task<ActionResult<ApiResponse<StudentDto>>> DeleteAvatar(Guid id, CancellationToken ct)
+    {
+        var r = await sender.Send(new SetStudentAvatarCommand(id, null), ct);
+        return r.ToApiResult();
+    }
 }

@@ -201,6 +201,30 @@ public sealed class StaffController(ISender sender) : ControllerBase
         }
         return Ok(ApiResponse<StaffDto>.Ok(r.Data, r.Message));
     }
+
+    /// <summary>
+    /// Removes the caller's own avatar (self-service). The stored file is deleted
+    /// from disk by the command handler once the profile is cleared.
+    /// </summary>
+    [HttpDelete("me/avatar")]
+    public async Task<ActionResult<ApiResponse<StaffDto>>> DeleteMyAvatar(CancellationToken ct)
+    {
+        var mine = await sender.Send(new GetMyStaffProfileQuery(), ct);
+        if (!mine.Success || mine.Data is null)
+            return NotFound(ApiResponse<StaffDto>.Fail(mine.Message ?? "No staff profile for this user."));
+
+        var r = await sender.Send(new SetStaffAvatarCommand(mine.Data.Id, null), ct);
+        return r.ToApiResult();
+    }
+
+    /// <summary>Admin removes another staff member's avatar.</summary>
+    [HttpDelete("{id:guid}/avatar")]
+    [PermissionAuthorize(Permissions.Staff.Update)]
+    public async Task<ActionResult<ApiResponse<StaffDto>>> DeleteAvatar(Guid id, CancellationToken ct)
+    {
+        var r = await sender.Send(new SetStaffAvatarCommand(id, null), ct);
+        return r.ToApiResult();
+    }
 }
 
 /// <summary>
