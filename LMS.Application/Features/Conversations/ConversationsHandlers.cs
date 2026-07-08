@@ -16,10 +16,7 @@ public sealed class ConversationsHandlers(
     IRequestHandler<GetMyConversationsQuery, Result<IReadOnlyCollection<ConversationDto>>>,
     IRequestHandler<GetMessageableContactsQuery, Result<IReadOnlyCollection<ContactDto>>>
 {
-    private bool IsAdmin() =>
-        currentUser.IsInRole(RoleCodes.Admin)
-        || currentUser.IsInRole(RoleCodes.SuperAdmin)
-        || currentUser.IsInRole(RoleCodes.OfficeAdmin);
+    private bool IsAdmin() => currentUser.IsAdmin();
 
     /// <summary>
     /// User ids the given user may message. Admin → everyone (minus self).

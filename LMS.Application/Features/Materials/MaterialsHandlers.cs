@@ -1,5 +1,6 @@
 using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Models;
+using LMS.Application.Common.Security;
 using LMS.Domain.Entities;
 using LMS.Domain.Enums;
 using MediatR;
@@ -30,11 +31,6 @@ public sealed class MaterialsHandlers(IApplicationDbContext db, ICurrentUserServ
     IRequestHandler<UpdateMaterialCommand, Result<MaterialDto>>,
     IRequestHandler<DeleteMaterialCommand, Result<string>>
 {
-    private const string RoleAdmin = "admin";
-    private const string RoleOfficeAdmin = "office_admin";
-    private const string RoleDirector = "academy_director";
-    private const string RoleTeacher = "teacher";
-    private const string RoleStudent = "student";
 
     public async Task<Result<IReadOnlyCollection<MaterialDto>>> Handle(
         GetMaterialsQuery request, CancellationToken ct)
@@ -220,8 +216,8 @@ public sealed class MaterialsHandlers(IApplicationDbContext db, ICurrentUserServ
         var userId = currentUser.UserId;
         if (userId is null) return new HashSet<Guid>();
 
-        var isTeacher = currentUser.IsInRole(RoleTeacher);
-        var isStudent = currentUser.IsInRole(RoleStudent);
+        var isTeacher = currentUser.IsTeacher();
+        var isStudent = currentUser.IsStudent();
 
         // Public materials are visible to anyone signed in.
         var publicIds = db.Materials
@@ -268,10 +264,8 @@ public sealed class MaterialsHandlers(IApplicationDbContext db, ICurrentUserServ
 
     private bool IsPrivileged()
     {
-        // Admin / OfficeAdmin / Director can see and manage every material.
-        return currentUser.IsInRole(RoleAdmin)
-               || currentUser.IsInRole(RoleOfficeAdmin)
-               || currentUser.IsInRole(RoleDirector);
+        // Any admin-level role can see and manage every material.
+        return currentUser.IsAdmin();
     }
 
     private bool CanManage(Material entity)

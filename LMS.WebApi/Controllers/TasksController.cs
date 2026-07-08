@@ -38,17 +38,11 @@ public sealed class TasksController(ISender sender, ICurrentUserService currentU
     }
 
     /// <summary>
-    /// True only when the caller is in one of the explicit staff roles allowed
-    /// to view answer keys. Allowlist (not denylist) so a newly-introduced role
-    /// (Parent, Observer, etc.) cannot accidentally leak solutions to students.
+    /// True only when the caller is a staff member (see <see cref="RoleGroups.Staff"/>)
+    /// allowed to view answer keys. Allowlist (not denylist) so a newly-introduced
+    /// role (Parent, Observer, etc.) cannot accidentally leak solutions to students.
     /// </summary>
-    private bool CallerCanSeeSolutions() => currentUser.Roles.Any(r =>
-        string.Equals(r, RoleCodes.SuperAdmin, StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(r, RoleCodes.Admin, StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(r, RoleCodes.AcademyDirector, StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(r, RoleCodes.OfficeAdmin, StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(r, RoleCodes.Teacher, StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(r, RoleCodes.SupportTeacher, StringComparison.OrdinalIgnoreCase));
+    private bool CallerCanSeeSolutions() => currentUser.IsStaff();
 
     [HttpPost]
     [PermissionAuthorize(Permissions.Tasks.Manage)]

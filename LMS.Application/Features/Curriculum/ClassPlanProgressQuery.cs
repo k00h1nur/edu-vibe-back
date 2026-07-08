@@ -33,9 +33,7 @@ public sealed record GetClassPlanProgressQuery(Guid ClassId) : IRequest<Result<C
 public sealed class GetClassPlanProgressHandler(IApplicationDbContext db, ICurrentUserService currentUser)
     : IRequestHandler<GetClassPlanProgressQuery, Result<ClassPlanProgressDto>>
 {
-    private bool IsAdmin =>
-        currentUser.IsInRole(RoleCodes.Admin) || currentUser.IsInRole(RoleCodes.SuperAdmin)
-        || currentUser.IsInRole(RoleCodes.OfficeAdmin);
+    private bool IsAdmin => currentUser.IsAdmin();
 
     public async Task<Result<ClassPlanProgressDto>> Handle(GetClassPlanProgressQuery request, CancellationToken ct)
     {

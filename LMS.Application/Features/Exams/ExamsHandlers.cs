@@ -299,9 +299,7 @@ public sealed class ExamsHandlers(IApplicationDbContext db, ICurrentUserService 
 
     // ---- shared plumbing ---------------------------------------------------
 
-    private bool IsAdmin =>
-        currentUser.IsInRole(RoleCodes.Admin) || currentUser.IsInRole(RoleCodes.SuperAdmin)
-        || currentUser.IsInRole(RoleCodes.OfficeAdmin);
+    private bool IsAdmin => currentUser.IsAdmin();
 
     private async Task<(Class? Cls, string? Code, string? Msg)> ResolveOwnedClassAsync(
         Guid classId, CancellationToken ct)

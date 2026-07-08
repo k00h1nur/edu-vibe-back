@@ -365,9 +365,7 @@ public sealed class CourseBuilderHandlers(IApplicationDbContext db, ICurrentUser
     private static Result<ClassCourseBuilderDto> Fail(string code, string msg) =>
         Result<ClassCourseBuilderDto>.Fail(code, msg);
 
-    private bool IsAdmin =>
-        currentUser.IsInRole(RoleCodes.Admin) || currentUser.IsInRole(RoleCodes.SuperAdmin)
-        || currentUser.IsInRole(RoleCodes.OfficeAdmin);
+    private bool IsAdmin => currentUser.IsAdmin();
 
     /// <summary>
     /// Authorizes the caller for the class, ensures the class has its own
