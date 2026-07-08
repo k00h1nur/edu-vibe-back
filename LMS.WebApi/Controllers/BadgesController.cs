@@ -28,9 +28,7 @@ public sealed class BadgesController(ISender sender) : ControllerBase
         CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success
-            ? Ok(ApiResponse<BadgeDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<BadgeDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPut("{id:guid}")]
@@ -39,9 +37,7 @@ public sealed class BadgesController(ISender sender) : ControllerBase
         CancellationToken ct)
     {
         var r = await sender.Send(cmd with { BadgeId = id }, ct);
-        return r.Success
-            ? Ok(ApiResponse<BadgeDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<BadgeDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPost("{id:guid}/award/{studentProfileId:guid}")]

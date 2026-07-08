@@ -40,9 +40,7 @@ public sealed class SubmissionsController(ISender sender, ISubmissionFileStore f
         CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success
-            ? Ok(ApiResponse<SubmissionDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<SubmissionDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     /// <summary>
@@ -56,9 +54,7 @@ public sealed class SubmissionsController(ISender sender, ISubmissionFileStore f
         Guid assignmentId, [FromBody] SaveDraftRequest body, CancellationToken ct)
     {
         var r = await sender.Send(new SaveSubmissionDraftCommand(assignmentId, body.Content ?? string.Empty), ct);
-        return r.Success
-            ? Ok(ApiResponse<SubmissionDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<SubmissionDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPost("{id:guid}/grade/{score:decimal}")]
@@ -66,9 +62,7 @@ public sealed class SubmissionsController(ISender sender, ISubmissionFileStore f
     public async Task<ActionResult<ApiResponse<SubmissionDto>>> Grade(Guid id, decimal score, CancellationToken ct)
     {
         var r = await sender.Send(new GradeSubmissionCommand(id, score), ct);
-        return r.Success
-            ? Ok(ApiResponse<SubmissionDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<SubmissionDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     // ---- File submissions -------------------------------------------------
@@ -157,9 +151,7 @@ public sealed class SubmissionsController(ISender sender, ISubmissionFileStore f
     public async Task<ActionResult<ApiResponse<SubmissionDto>>> Finalize(Guid submissionId, CancellationToken ct)
     {
         var r = await sender.Send(new FinalizeSubmissionCommand(submissionId), ct);
-        return r.Success
-            ? Ok(ApiResponse<SubmissionDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<SubmissionDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     /// <summary>Teacher locks / unlocks a submission. Body: {"locked": true|false}.</summary>
@@ -169,9 +161,7 @@ public sealed class SubmissionsController(ISender sender, ISubmissionFileStore f
         Guid submissionId, [FromBody] SetLockRequest body, CancellationToken ct)
     {
         var r = await sender.Send(new SetSubmissionLockCommand(submissionId, body.Locked), ct);
-        return r.Success
-            ? Ok(ApiResponse<SubmissionDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<SubmissionDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     /// <summary>Submission audit trail — staff only (gated by the grade permission).</summary>

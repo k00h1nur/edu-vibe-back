@@ -32,9 +32,7 @@ public sealed class StaffController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<StaffDto>>> GetMine(CancellationToken ct)
     {
         var r = await sender.Send(new GetMyStaffProfileQuery(), ct);
-        return r.Success
-            ? Ok(ApiResponse<StaffDto>.Ok(r.Data, r.Message))
-            : NotFound(ApiResponse<StaffDto>.Fail(r.Message ?? "Not found"));
+        return r.ToApiResultOrNotFound();
     }
 
     /// <summary>
@@ -48,9 +46,7 @@ public sealed class StaffController(ISender sender) : ControllerBase
         [FromBody] UpdateMyStaffDetailsCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success
-            ? Ok(ApiResponse<StaffDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<StaffDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPost]
@@ -59,9 +55,7 @@ public sealed class StaffController(ISender sender) : ControllerBase
         CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success
-            ? Ok(ApiResponse<StaffDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<StaffDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPut("{id:guid}")]
@@ -70,9 +64,7 @@ public sealed class StaffController(ISender sender) : ControllerBase
         CancellationToken ct)
     {
         var r = await sender.Send(cmd with { StaffProfileId = id }, ct);
-        return r.Success
-            ? Ok(ApiResponse<StaffDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<StaffDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     /// <summary>
@@ -85,9 +77,7 @@ public sealed class StaffController(ISender sender) : ControllerBase
         [FromBody] UpdateStaffDetailsCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd with { StaffProfileId = id }, ct);
-        return r.Success
-            ? Ok(ApiResponse<StaffDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<StaffDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     /// <summary>
@@ -104,9 +94,7 @@ public sealed class StaffController(ISender sender) : ControllerBase
         [FromBody] SetUserStatusRequest body, CancellationToken ct)
     {
         var r = await sender.Send(new SetStaffStatusCommand(id, body.Status), ct);
-        return r.Success
-            ? Ok(ApiResponse<StaffDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<StaffDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     /// <summary>
@@ -119,9 +107,7 @@ public sealed class StaffController(ISender sender) : ControllerBase
         [FromBody] SetPublicVisibilityRequest body, CancellationToken ct)
     {
         var r = await sender.Send(new SetStaffPublicVisibilityCommand(id, body.IsPubliclyVisible), ct);
-        return r.Success
-            ? Ok(ApiResponse<StaffDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<StaffDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     /// <summary>

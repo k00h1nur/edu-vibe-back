@@ -34,9 +34,7 @@ public sealed class RemindersController(ISender sender, ICurrentUserService curr
         if (currentUser.UserId is null) return Unauthorized();
         // Force the owner to the caller — ignore any body field. Self-only.
         var r = await sender.Send(cmd with { OwnerUserId = currentUser.UserId.Value }, ct);
-        return r.Success
-            ? Ok(ApiResponse<ReminderDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<ReminderDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPut("{id:guid}")]
@@ -46,9 +44,7 @@ public sealed class RemindersController(ISender sender, ICurrentUserService curr
     {
         if (currentUser.UserId is null) return Unauthorized();
         var r = await sender.Send(cmd with { ReminderId = id, OwnerUserId = currentUser.UserId.Value }, ct);
-        return r.Success
-            ? Ok(ApiResponse<ReminderDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<ReminderDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPost("{id:guid}/complete")]
@@ -58,9 +54,7 @@ public sealed class RemindersController(ISender sender, ICurrentUserService curr
     {
         if (currentUser.UserId is null) return Unauthorized();
         var r = await sender.Send(cmd with { ReminderId = id, OwnerUserId = currentUser.UserId.Value }, ct);
-        return r.Success
-            ? Ok(ApiResponse<ReminderDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<ReminderDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpDelete("{id:guid}")]

@@ -33,9 +33,7 @@ public sealed class CurriculumController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<CurriculumTreeDto>>> Tree(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new GetCurriculumTreeQuery(id), ct);
-        return r.Success
-            ? Ok(ApiResponse<CurriculumTreeDto>.Ok(r.Data, r.Message))
-            : NotFound(ApiResponse<CurriculumTreeDto>.Fail(r.Message ?? "Not found"));
+        return r.ToApiResultOrNotFound();
     }
 
     /// <summary>Admin: ALL master templates (published + unpublished) with counts + class usage.</summary>
@@ -138,9 +136,7 @@ public sealed class CurriculumController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<TemplatePlanDto>>> Plan(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new GetTemplatePlanQuery(id), ct);
-        return r.Success
-            ? Ok(ApiResponse<TemplatePlanDto>.Ok(r.Data, r.Message))
-            : NotFound(ApiResponse<TemplatePlanDto>.Fail(r.Message ?? "Not found"));
+        return r.ToApiResultOrNotFound();
     }
 
     // ---- Admin day-plan EDITING (define which lessons form each class day) ---
@@ -209,9 +205,7 @@ public sealed class CurriculumController(ISender sender) : ControllerBase
         [FromBody] AssignCurriculumToClassCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success
-            ? Ok(ApiResponse<ClassCurriculumDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<ClassCurriculumDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     /// <summary>
@@ -224,9 +218,7 @@ public sealed class CurriculumController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<SuggestPositionDto>>> SuggestPosition(Guid classId, CancellationToken ct)
     {
         var r = await sender.Send(new SuggestPositionQuery(classId), ct);
-        return r.Success
-            ? Ok(ApiResponse<SuggestPositionDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<SuggestPositionDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     /// <summary>
@@ -241,9 +233,7 @@ public sealed class CurriculumController(ISender sender) : ControllerBase
         Guid classId, [FromBody] SetPositionCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd with { ClassId = classId }, ct);
-        return r.Success
-            ? Ok(ApiResponse<SetPositionResultDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<SetPositionResultDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     /// <summary>A class's dated curriculum: progress + today + next + the full plan.</summary>
@@ -251,9 +241,7 @@ public sealed class CurriculumController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<ClassCurriculumDto>>> ForClass(Guid classId, CancellationToken ct)
     {
         var r = await sender.Send(new GetClassCurriculumQuery(classId), ct);
-        return r.Success
-            ? Ok(ApiResponse<ClassCurriculumDto>.Ok(r.Data, r.Message))
-            : NotFound(ApiResponse<ClassCurriculumDto>.Fail(r.Message ?? "Not found"));
+        return r.ToApiResultOrNotFound();
     }
 
     /// <summary>The class's curriculum as a student learning journey (units → lessons, with progress + locks).</summary>

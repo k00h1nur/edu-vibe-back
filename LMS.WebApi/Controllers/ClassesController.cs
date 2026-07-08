@@ -34,9 +34,7 @@ public sealed class ClassesController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<ClassDto>>> Get(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new GetClassByIdQuery(id), ct);
-        return r.Success
-            ? Ok(ApiResponse<ClassDto>.Ok(r.Data, r.Message))
-            : NotFound(ApiResponse<ClassDto>.Fail(r.Message ?? "Not found"));
+        return r.ToApiResultOrNotFound();
     }
 
     [HttpGet("assigned/{teacherUserId:guid}")]
@@ -152,9 +150,7 @@ public sealed class ClassesController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<SchedulePatternDto>>> GetSchedulePattern(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new GetClassSchedulePatternQuery(id), ct);
-        return r.Success
-            ? Ok(ApiResponse<SchedulePatternDto>.Ok(r.Data, r.Message))
-            : NotFound(ApiResponse<SchedulePatternDto>.Fail(r.Message ?? "Not found"));
+        return r.ToApiResultOrNotFound();
     }
 
     /// <summary>
@@ -170,9 +166,7 @@ public sealed class ClassesController(ISender sender) : ControllerBase
         Guid id, [FromBody] ApplyClassScheduleCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd with { ClassId = id }, ct);
-        return r.Success
-            ? Ok(ApiResponse<ApplyScheduleResultDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<ApplyScheduleResultDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPost]
@@ -181,9 +175,7 @@ public sealed class ClassesController(ISender sender) : ControllerBase
         CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success
-            ? Ok(ApiResponse<ClassDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<ClassDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPut("{id:guid}")]
@@ -192,9 +184,7 @@ public sealed class ClassesController(ISender sender) : ControllerBase
         CancellationToken ct)
     {
         var r = await sender.Send(cmd with { ClassId = id }, ct);
-        return r.Success
-            ? Ok(ApiResponse<ClassDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<ClassDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpDelete("{id:guid}")]

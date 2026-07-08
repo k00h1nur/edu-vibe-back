@@ -33,9 +33,7 @@ public sealed class BooksController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<BookDto>>> Get(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new GetBookByIdQuery(id), ct);
-        return r.Success
-            ? Ok(ApiResponse<BookDto>.Ok(r.Data, r.Message))
-            : NotFound(ApiResponse<BookDto>.Fail(r.Message ?? "Not found"));
+        return r.ToApiResultOrNotFound();
     }
 
     [HttpPost]
@@ -44,9 +42,7 @@ public sealed class BooksController(ISender sender) : ControllerBase
         CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success
-            ? Ok(ApiResponse<BookDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<BookDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPut("{id:guid}")]
@@ -55,9 +51,7 @@ public sealed class BooksController(ISender sender) : ControllerBase
         [FromBody] UpdateBookCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd with { BookId = id }, ct);
-        return r.Success
-            ? Ok(ApiResponse<BookDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<BookDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpDelete("{id:guid}")]

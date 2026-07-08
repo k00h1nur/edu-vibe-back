@@ -42,9 +42,7 @@ public sealed class MessagesController(ISender sender, ICurrentUserService curre
         CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success
-            ? Ok(ApiResponse<MessageDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<MessageDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPost("{id:guid}/read")]
@@ -52,9 +50,7 @@ public sealed class MessagesController(ISender sender, ICurrentUserService curre
     public async Task<ActionResult<ApiResponse<MessageDto>>> Read(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new MarkMessageAsReadCommand(id), ct);
-        return r.Success
-            ? Ok(ApiResponse<MessageDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<MessageDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     /// <summary>

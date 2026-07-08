@@ -23,7 +23,7 @@ public sealed class RolesController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<RoleDto>>> CreateRole([FromBody] CreateRoleCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success ? Ok(ApiResponse<RoleDto>.Ok(r.Data, r.Message)) : BadRequest(ApiResponse<RoleDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPut("roles/{id:guid}")]
@@ -31,7 +31,7 @@ public sealed class RolesController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<RoleDto>>> UpdateRole(Guid id, [FromBody] UpdateRoleCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd with { RoleId = id }, ct);
-        return r.Success ? Ok(ApiResponse<RoleDto>.Ok(r.Data, r.Message)) : BadRequest(ApiResponse<RoleDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpDelete("roles/{id:guid}")]
@@ -55,7 +55,7 @@ public sealed class RolesController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<PermissionDto>>> CreatePermission([FromBody] CreatePermissionCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success ? Ok(ApiResponse<PermissionDto>.Ok(r.Data, r.Message)) : BadRequest(ApiResponse<PermissionDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPut("permissions/{id:guid}")]
@@ -63,7 +63,7 @@ public sealed class RolesController(ISender sender) : ControllerBase
     public async Task<ActionResult<ApiResponse<PermissionDto>>> UpdatePermission(Guid id, [FromBody] UpdatePermissionCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd with { PermissionId = id }, ct);
-        return r.Success ? Ok(ApiResponse<PermissionDto>.Ok(r.Data, r.Message)) : BadRequest(ApiResponse<PermissionDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpDelete("permissions/{id:guid}")]

@@ -42,9 +42,7 @@ public sealed class MockTestSlotsController(ISender sender) : ControllerBase
         [FromBody] CreateMockTestSlotCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success
-            ? Ok(ApiResponse<MockTestSlotDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<MockTestSlotDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPut("{id:guid}")]
@@ -54,9 +52,7 @@ public sealed class MockTestSlotsController(ISender sender) : ControllerBase
         Guid id, [FromBody] UpdateMockTestSlotCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd with { SlotId = id }, ct);
-        return r.Success
-            ? Ok(ApiResponse<MockTestSlotDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<MockTestSlotDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpDelete("{id:guid}")]

@@ -68,8 +68,6 @@ public sealed class VisitorMessagesController(ISender sender) : ControllerBase
         Guid id, [FromQuery] bool read = true, CancellationToken ct = default)
     {
         var r = await sender.Send(new MarkVisitorMessageReadCommand(id, read), ct);
-        return r.Success
-            ? Ok(ApiResponse<VisitorMessageDto>.Ok(r.Data, r.Message))
-            : NotFound(ApiResponse<VisitorMessageDto>.Fail(r.Message ?? "Not found"));
+        return r.ToApiResultOrNotFound();
     }
 }

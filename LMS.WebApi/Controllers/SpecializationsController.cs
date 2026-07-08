@@ -42,9 +42,7 @@ public sealed class SpecializationsController(ISender sender) : ControllerBase
         [FromBody] CreateSpecializationCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success
-            ? Ok(ApiResponse<SpecializationDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<SpecializationDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPut("{id:guid}")]
@@ -53,9 +51,7 @@ public sealed class SpecializationsController(ISender sender) : ControllerBase
         Guid id, [FromBody] UpdateSpecializationCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd with { SpecializationId = id }, ct);
-        return r.Success
-            ? Ok(ApiResponse<SpecializationDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<SpecializationDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpPost("{id:guid}/active")]
@@ -64,9 +60,7 @@ public sealed class SpecializationsController(ISender sender) : ControllerBase
         Guid id, [FromBody] SetSpecializationActiveCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd with { SpecializationId = id }, ct);
-        return r.Success
-            ? Ok(ApiResponse<SpecializationDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<SpecializationDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 
     [HttpDelete("{id:guid}")]
@@ -100,8 +94,6 @@ public sealed class SpecializationsController(ISender sender) : ControllerBase
         Guid staffProfileId, [FromBody] SetStaffSpecializationsCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd with { StaffProfileId = staffProfileId }, ct);
-        return r.Success
-            ? Ok(ApiResponse<IReadOnlyCollection<SpecializationDto>>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<IReadOnlyCollection<SpecializationDto>>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 }

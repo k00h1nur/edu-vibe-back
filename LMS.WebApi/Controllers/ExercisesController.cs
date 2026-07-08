@@ -58,9 +58,7 @@ public sealed class ExercisesController(ISender sender, ICurrentUserService curr
         if (currentUser.UserId is not { } userId)
             return Unauthorized(ApiResponse<SubmitResultDto>.Fail("Not authenticated."));
         var r = await sender.Send(new SubmitExerciseAnswerCommand(exerciseId, userId, body.Answers), ct);
-        return r.Success
-            ? Ok(ApiResponse<SubmitResultDto>.Ok(r.Data, r.Message))
-            : NotFound(ApiResponse<SubmitResultDto>.Fail(r.Message ?? "Not found"));
+        return r.ToApiResultOrNotFound();
     }
 
     /// <summary>Teacher/admin: how every student in a class did on this lesson's exercises.</summary>

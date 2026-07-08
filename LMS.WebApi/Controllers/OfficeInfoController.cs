@@ -50,8 +50,6 @@ public sealed class OfficeInfoController(ISender sender) : ControllerBase
         [FromBody] UpsertOfficeInfoCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
-        return r.Success
-            ? Ok(ApiResponse<OfficeInfoDto>.Ok(r.Data, r.Message))
-            : BadRequest(ApiResponse<OfficeInfoDto>.Fail(r.Message ?? "Failed"));
+        return r.ToApiResult();
     }
 }
