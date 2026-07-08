@@ -219,6 +219,26 @@ public sealed class TemplateBuilderHandlers(IApplicationDbContext db) :
             .Select(l => new { l.UnitId, l.Id, l.Order, l.Title, l.Objectives, l.HomeworkPlaceholder, l.MaterialsPlaceholder, l.IsAssessment, l.LessonType, l.DurationMinutes, l.XpReward })
             .ToListAsync(ct);
 
+        // Self-check exercise count per lesson — surfaced as a badge so the teacher
+        // can see which lessons already have exercises (and confirm a save landed).
+        var lessonIds = lessons.Select(l => l.Id).ToList();
+        var exerciseCounts = (await db.LessonExercises.AsNoTracking()
+                .Where(e => lessonIds.Contains(e.LessonId))
+                .GroupBy(e => e.LessonId)
+                .Select(g => new { LessonId = g.Key, Count = g.Count() })
+                .ToListAsync(ct))
+            .ToDictionary(x => x.LessonId, x => x.Count);
+
+        // Lessons referenced by this template's teaching plan — the ONLY lessons a
+        // student can reach in their journey. A lesson with exercises but not in the
+        // plan is authored-but-unreachable, so the editor warns about it.
+        var planLessonIds = (await (
+                from pl in db.CurriculumPlanDayLessons.AsNoTracking()
+                join d in db.CurriculumPlanDays.AsNoTracking() on pl.PlanDayId equals d.Id
+                where d.TemplateId == templateId
+                select pl.CurriculumLessonId).Distinct().ToListAsync(ct))
+            .ToHashSet();
+
         var unitDtos = units.Select(u =>
         {
             var ls = lessons.Where(x => x.UnitId == u.Id).ToList();
@@ -231,7 +251,8 @@ public sealed class TemplateBuilderHandlers(IApplicationDbContext db) :
                 u.XpReward + ls.Sum(x => x.XpReward),
                 ls.Select(x => new CourseBuilderLessonDto(x.Id, x.Order, x.Title, x.Objectives,
                     x.HomeworkPlaceholder, x.MaterialsPlaceholder, x.IsAssessment,
-                    x.LessonType, x.DurationMinutes, x.XpReward)).ToList());
+                    x.LessonType, x.DurationMinutes, x.XpReward, exerciseCounts.GetValueOrDefault(x.Id),
+                    planLessonIds.Contains(x.Id))).ToList());
         }).ToList();
 
         return new TemplateCourseDto(templateId, t.Name, t.IsPublished, classCount, unitDtos);
