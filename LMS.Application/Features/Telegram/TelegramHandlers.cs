@@ -226,7 +226,7 @@ public sealed class TelegramAuthCommandHandler(
             studentProfileId: studentProfileId,
             staffProfileId: staffProfileId);
         var refreshToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
-        user.SetRefreshToken(passwordHasher.Hash(refreshToken), dateTimeProvider.UtcNow.AddDays(30));
+        user.SetRefreshToken(passwordHasher.Hash(refreshToken), dateTimeProvider.UtcNow.Add(jwtTokenGenerator.RefreshTokenLifetime));
 
         return new AuthTokensResponse(user.Id, user.Email, accessToken, refreshToken, roles, permissions);
     }

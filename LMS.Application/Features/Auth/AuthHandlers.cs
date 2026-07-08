@@ -74,7 +74,7 @@ public sealed class RegisterUserCommandHandler(
         var refreshToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
         var refreshHash = passwordHasher.Hash(refreshToken);
 
-        user.SetRefreshToken(refreshHash, dateTimeProvider.UtcNow.AddDays(30));
+        user.SetRefreshToken(refreshHash, dateTimeProvider.UtcNow.Add(jwtTokenGenerator.RefreshTokenLifetime));
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result<AuthTokensResponse>.Ok(new AuthTokensResponse(user.Id, user.Email, accessToken, refreshToken,
@@ -122,7 +122,7 @@ public sealed class LoginCommandHandler(
             staffProfileId: staffProfileId);
         var refreshToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
         var refreshHash = passwordHasher.Hash(refreshToken);
-        user.SetRefreshToken(refreshHash, dateTimeProvider.UtcNow.AddDays(30));
+        user.SetRefreshToken(refreshHash, dateTimeProvider.UtcNow.Add(jwtTokenGenerator.RefreshTokenLifetime));
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result<AuthTokensResponse>.Ok(new AuthTokensResponse(user.Id, user.Email, accessToken, refreshToken,
@@ -182,7 +182,7 @@ public sealed class RefreshTokenCommandHandler(
             staffProfileId: staffProfileId);
 
         var newRefreshToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
-        user.SetRefreshToken(passwordHasher.Hash(newRefreshToken), dateTimeProvider.UtcNow.AddDays(30));
+        user.SetRefreshToken(passwordHasher.Hash(newRefreshToken), dateTimeProvider.UtcNow.Add(jwtTokenGenerator.RefreshTokenLifetime));
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result<AuthTokensResponse>.Ok(new AuthTokensResponse(user.Id, user.Email, accessToken, newRefreshToken,

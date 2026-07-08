@@ -3,6 +3,13 @@ namespace LMS.Application.Common.Abstractions;
 public interface IJwtTokenGenerator
 {
     /// <summary>
+    /// How long a freshly-issued refresh token stays valid. Sourced from the
+    /// Jwt config (RefreshTokenDays, default 30) so the TTL lives in one place
+    /// instead of being hardcoded at every issue site.
+    /// </summary>
+    TimeSpan RefreshTokenLifetime { get; }
+
+    /// <summary>
     /// Issues a signed JWT for the supplied user.
     /// </summary>
     /// <param name="userId">The user's primary id.</param>
