@@ -68,6 +68,15 @@ public sealed class CourseBuilderHandlers(IApplicationDbContext db, ICurrentUser
             .GroupBy(t => t.CurriculumLessonId)
             .ToDictionary(g => g.Key, g => g.ToList());
 
+        // Source self-check exercises, grouped by lesson — deep-copied onto the clone's
+        // lessons below (alongside default tasks), so a class that clones a template
+        // inherits the lesson's exercises too. Without this, cloning silently dropped
+        // them and students saw "No exercises for this lesson yet".
+        var exercisesBySource = (await db.LessonExercises.AsNoTracking()
+                .Where(e => lessonIds.Contains(e.LessonId)).ToListAsync(ct))
+            .GroupBy(e => e.LessonId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
         // Source→clone lesson id map, accumulated across all units, so the template
         // teaching plan (curriculum_plan_days) can be re-pointed onto the clone's
         // lessons after the tree is copied.
@@ -110,6 +119,13 @@ public sealed class CourseBuilderHandlers(IApplicationDbContext db, ICurrentUser
                         foreach (var dt in dts)
                             await db.LessonDefaultTasks.AddAsync(
                                 new LessonDefaultTask(lc.Id, dt.Order, dt.Type, dt.Title, dt.Points, dt.ContentJson, dt.SolutionJson), ct);
+
+                // Carry each source lesson's self-check exercises onto its clone.
+                foreach (var (sourceId, lc) in lessonClones)
+                    if (exercisesBySource.TryGetValue(sourceId, out var exs))
+                        foreach (var ex in exs)
+                            await db.LessonExercises.AddAsync(
+                                new LessonExercise(lc.Id, ex.Type, ex.Title, ex.OrderIndex, ex.ContentJson), ct);
                 await db.SaveChangesAsync(ct);
             }
         }
