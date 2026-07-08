@@ -153,11 +153,19 @@ public sealed class ExerciseCheckerTests
         var (score, total) = ExerciseChecker.Check("crossword", content, user);
         score.Should().Be(1);
         total.Should().Be(2);
+    }
+
+    [Fact]
     public void Word_search_scores_by_words_found_case_insensitively()
     {
         var content = """{"words":["DOCTOR","NURSE","PILOT"],"grid":[["x"]]}""";
         // Found two real words (case-insensitive) + one bogus that isn't counted.
         var (score, total) = ExerciseChecker.Check("word_search", content, El("""["doctor","pilot","zzz"]"""));
+        score.Should().Be(2);
+        total.Should().Be(3);
+    }
+
+    [Fact]
     public void Table_fill_scores_only_the_blank_cells_by_coordinate()
     {
         // Row 0: given name/city + three blanks (country, nationality, job).

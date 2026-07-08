@@ -159,6 +159,10 @@ public static class ExerciseChecker
                 }
             }
             if (ok) score++;
+        }
+        return (score, total);
+    }
+
     /// <summary>Word search: content.words = the words to find; the user submits the array of
     /// words they located. total = distinct words; score = how many were found (case-insensitive).
     /// The grid + placements are for rendering only — scoring is by word, matching the self-check
@@ -169,6 +173,8 @@ public static class ExerciseChecker
         if (words.Count == 0) return (0, 0);
         var found = AsList(userAnswers).Select(Norm).ToHashSet();
         return (words.Count(w => found.Contains(w)), words.Count);
+    }
+
     /// <summary>Table completion: rows[].cells[]; a cell carrying an "answer" is a blank to
     /// fill (a cell with only "text" is pre-filled/given). User answers are keyed "r,c".
     /// total = number of blank cells; score = matched.</summary>
