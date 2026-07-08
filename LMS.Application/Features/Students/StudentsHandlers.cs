@@ -1,6 +1,7 @@
 using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Models;
 using LMS.Application.Common.Security;
+using LMS.Application.Common.Storage;
 using LMS.Domain.Entities;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -216,15 +217,19 @@ public sealed class UpdateStudentAdminFieldsCommandHandler(IApplicationDbContext
     }
 }
 
-public sealed class SetStudentAvatarCommandHandler(IApplicationDbContext db)
+public sealed class SetStudentAvatarCommandHandler(IApplicationDbContext db, IAvatarFileStore avatarStore)
     : IRequestHandler<SetStudentAvatarCommand, Result<StudentDto>>
 {
     public async Task<Result<StudentDto>> Handle(SetStudentAvatarCommand request, CancellationToken ct)
     {
         var sp = await db.StudentProfiles.FirstOrDefaultAsync(x => x.Id == request.StudentProfileId, ct);
         if (sp is null) return Result<StudentDto>.Fail("NOT_FOUND", "Student profile not found.");
+
+        var previousUrl = sp.AvatarUrl;
         sp.SetAvatarUrl(request.AvatarUrl);
         await db.SaveChangesAsync(ct);
+        await AvatarCleanup.DeletePreviousAsync(avatarStore, previousUrl, sp.AvatarUrl, ct);
+
         var user = await db.Users.FirstAsync(x => x.Id == sp.UserId, ct);
         return Result<StudentDto>.Ok(new StudentDto(sp.Id, sp.UserId, user.Email, sp.XP, sp.Streak,
             sp.FirstName, sp.LastName, sp.PhoneNumber, sp.Description,

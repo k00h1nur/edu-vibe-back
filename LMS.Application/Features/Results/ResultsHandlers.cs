@@ -19,7 +19,8 @@ public sealed class ResultsHandlers(
       IRequestHandler<UploadResultImageCommand, Result<ResultImageDto>>,
       IRequestHandler<ReplaceResultImageCommand, Result<ResultImageDto>>,
       IRequestHandler<DeleteResultImageCommand, Result>,
-      IRequestHandler<ResultsAdminStatsQuery, Result<ResultsAdminStatsDto>>
+      IRequestHandler<ResultsAdminStatsQuery, Result<ResultsAdminStatsDto>>,
+      IRequestHandler<AdminResultListQuery, Result<PagedResult<ResultDto>>>
 {
     /// <summary>
     /// Single-row mapper. Use only for the byId endpoint where you have exactly
@@ -210,6 +211,23 @@ public sealed class ResultsHandlers(
         await imageService.DeleteAsync(img.ImageUrl, img.ThumbnailUrl, ct);
         await db.SaveChangesAsync(ct);
         return Result.Ok("Image deleted.");
+    }
+
+    public async Task<Result<PagedResult<ResultDto>>> Handle(AdminResultListQuery q, CancellationToken ct)
+    {
+        var req = new PageRequest(q.Page, q.PageSize, q.Search);
+        var query = db.Results.Where(x => !x.IsDeleted);
+        if (req.NormalizedSearch is { } s) query = query.Where(x => x.StudentFullName.ToLower().Contains(s));
+        if (q.ExamType.HasValue) query = query.Where(x => x.ExamType == q.ExamType.Value);
+        if (q.Published.HasValue) query = query.Where(x => x.IsPublished == q.Published.Value);
+        if (q.Featured.HasValue) query = query.Where(x => x.IsFeatured == q.Featured.Value);
+
+        var total = await query.CountAsync(ct);
+        var list = await query.AsNoTracking()
+            .OrderBy(x => x.DisplayOrder).ThenByDescending(x => x.CreatedAt)
+            .Skip(req.Skip).Take(req.NormalizedPageSize).ToListAsync(ct);
+        var items = await MapManyAsync(list, ct);
+        return Result<PagedResult<ResultDto>>.Ok(PagedResult<ResultDto>.From(items, total, req));
     }
 
     public async Task<Result<ResultsAdminStatsDto>> Handle(ResultsAdminStatsQuery q, CancellationToken ct)

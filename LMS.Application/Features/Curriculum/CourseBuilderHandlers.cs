@@ -68,6 +68,15 @@ public sealed class CourseBuilderHandlers(IApplicationDbContext db, ICurrentUser
             .GroupBy(t => t.CurriculumLessonId)
             .ToDictionary(g => g.Key, g => g.ToList());
 
+        // Source self-check exercises, grouped by lesson — deep-copied onto the clone's
+        // lessons below (alongside default tasks), so a class that clones a template
+        // inherits the lesson's exercises too. Without this, cloning silently dropped
+        // them and students saw "No exercises for this lesson yet".
+        var exercisesBySource = (await db.LessonExercises.AsNoTracking()
+                .Where(e => lessonIds.Contains(e.LessonId)).ToListAsync(ct))
+            .GroupBy(e => e.LessonId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
         // Source→clone lesson id map, accumulated across all units, so the template
         // teaching plan (curriculum_plan_days) can be re-pointed onto the clone's
         // lessons after the tree is copied.
@@ -110,6 +119,13 @@ public sealed class CourseBuilderHandlers(IApplicationDbContext db, ICurrentUser
                         foreach (var dt in dts)
                             await db.LessonDefaultTasks.AddAsync(
                                 new LessonDefaultTask(lc.Id, dt.Order, dt.Type, dt.Title, dt.Points, dt.ContentJson, dt.SolutionJson), ct);
+
+                // Carry each source lesson's self-check exercises onto its clone.
+                foreach (var (sourceId, lc) in lessonClones)
+                    if (exercisesBySource.TryGetValue(sourceId, out var exs))
+                        foreach (var ex in exs)
+                            await db.LessonExercises.AddAsync(
+                                new LessonExercise(lc.Id, ex.Type, ex.Title, ex.OrderIndex, ex.ContentJson), ct);
                 await db.SaveChangesAsync(ct);
             }
         }
@@ -473,6 +489,25 @@ public sealed class CourseBuilderHandlers(IApplicationDbContext db, ICurrentUser
                 .Select(t => t.CurriculumLessonId).Distinct().ToListAsync(ct))
             .ToHashSet();
 
+        // Self-check exercise count per lesson — surfaced as a badge so the teacher
+        // can see which lessons already have exercises (and confirm a save landed).
+        var exerciseCounts = (await db.LessonExercises.AsNoTracking()
+                .Where(e => lessonIdsForCount.Contains(e.LessonId))
+                .GroupBy(e => e.LessonId)
+                .Select(g => new { LessonId = g.Key, Count = g.Count() })
+                .ToListAsync(ct))
+            .ToDictionary(x => x.LessonId, x => x.Count);
+
+        // Lessons referenced by this template's teaching plan — the ONLY lessons a
+        // student can reach in their journey. A lesson with exercises but not in the
+        // plan is authored-but-unreachable, so the editor warns about it.
+        var planLessonIds = (await (
+                from pl in db.CurriculumPlanDayLessons.AsNoTracking()
+                join d in db.CurriculumPlanDays.AsNoTracking() on pl.PlanDayId equals d.Id
+                where d.TemplateId == templateId
+                select pl.CurriculumLessonId).Distinct().ToListAsync(ct))
+            .ToHashSet();
+
         var unitDtos = units.Select(u =>
         {
             var ls = lessons.Where(x => x.UnitId == u.Id).ToList();
@@ -486,7 +521,8 @@ public sealed class CourseBuilderHandlers(IApplicationDbContext db, ICurrentUser
                 u.XpReward + ls.Sum(x => x.XpReward),
                 ls.Select(x => new CourseBuilderLessonDto(x.Id, x.Order, x.Title, x.Objectives,
                     x.HomeworkPlaceholder, x.MaterialsPlaceholder, x.IsAssessment,
-                    x.LessonType, x.DurationMinutes, x.XpReward)).ToList());
+                    x.LessonType, x.DurationMinutes, x.XpReward, exerciseCounts.GetValueOrDefault(x.Id),
+                    planLessonIds.Contains(x.Id))).ToList());
         }).ToList();
 
         return Result<ClassCourseBuilderDto>.Ok(new ClassCourseBuilderDto(classId, templateId, templateName, unitDtos));

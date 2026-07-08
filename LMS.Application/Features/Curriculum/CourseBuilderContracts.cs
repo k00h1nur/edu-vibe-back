@@ -10,7 +10,8 @@ namespace LMS.Application.Features.Curriculum;
 public sealed record CourseBuilderLessonDto(
     Guid Id, int Order, string Title, string? Objectives,
     string? HomeworkPlaceholder, string? MaterialsPlaceholder, bool IsAssessment,
-    CurriculumLessonType LessonType, int? DurationMinutes, int XpReward);
+    CurriculumLessonType LessonType, int? DurationMinutes, int XpReward, int ExerciseCount,
+    bool InPlan);
 
 /// <summary>A unit as shown on the teacher's roadmap card (meta + counts + its lessons).</summary>
 public sealed record CourseBuilderUnitDto(
