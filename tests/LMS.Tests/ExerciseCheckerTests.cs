@@ -51,6 +51,46 @@ public sealed class ExerciseCheckerTests
         total.Should().Be(3);
     }
 
+    // ---- worked example (content.example): first gradable slot is given, not graded ----
+
+    [Fact]
+    public void Example_flag_excludes_the_first_item_from_grading()
+    {
+        // item 1 is the shown example; only items 2 & 3 count.
+        var content = """{"example":true,"items":[{"id":"1","answer":"is"},{"id":"2","answer":"are"},{"id":"3","answer":"am"}]}""";
+        var (score, total) = ExerciseChecker.Check("mcq", content, El("""{"2":"are","3":"am"}"""));
+        score.Should().Be(2);
+        total.Should().Be(2);
+    }
+
+    [Fact]
+    public void Without_example_flag_the_first_item_is_still_graded()
+    {
+        var content = """{"items":[{"id":"1","answer":"is"},{"id":"2","answer":"are"}]}""";
+        var (_, total) = ExerciseChecker.Check("mcq", content, El("""{"1":"is","2":"are"}"""));
+        total.Should().Be(2);
+    }
+
+    [Fact]
+    public void Example_flag_skips_the_first_paragraph_cloze_gap()
+    {
+        // gap 0 ("a") is the example; the student fills gaps 1 & 2 at indices 1 & 2.
+        var content = """{"example":true,"answers":["a","the","an"]}""";
+        var (score, total) = ExerciseChecker.Check("paragraph_cloze", content, El("""["","the","an"]"""));
+        score.Should().Be(2);
+        total.Should().Be(2);
+    }
+
+    [Fact]
+    public void Example_flag_skips_the_first_dialogue_blank()
+    {
+        // blank 0 ("help") is the example; the student fills blanks 1 & 2.
+        var content = """{"example":true,"items":[{"id":"1","answers":["help","much","those"]}]}""";
+        var (score, total) = ExerciseChecker.Check("dialogue", content, El("""{"1":["","much","those"]}"""));
+        score.Should().Be(2);
+        total.Should().Be(2);
+    }
+
     [Fact]
     public void Word_bank_gap_handles_multi_gap_items()
     {
