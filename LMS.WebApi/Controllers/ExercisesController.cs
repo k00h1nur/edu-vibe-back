@@ -71,6 +71,31 @@ public sealed class ExercisesController(ISender sender, ICurrentUserService curr
         return Ok(ApiResponse<LessonExerciseResultsDto>.Ok(r.Data, r.Message));
     }
 
+    /// <summary>Teacher/admin: the writing exercises in a lesson + the class's submissions to grade
+    /// (each with the student's text and any grade so far).</summary>
+    [HttpGet("lessons/{lessonId:guid}/writing-submissions/{classId:guid}")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<WritingExerciseReviewDto>>>> WritingSubmissions(
+        Guid lessonId, Guid classId, CancellationToken ct)
+    {
+        var r = await sender.Send(new GetWritingSubmissionsQuery(lessonId, classId), ct);
+        return Ok(ApiResponse<IReadOnlyList<WritingExerciseReviewDto>>.Ok(r.Data, r.Message));
+    }
+
+    /// <summary>Teacher/admin: grade one (writing) submission — score out of max + optional feedback.
+    /// Body: <c>{ "score", "maxScore", "feedback" }</c>. The grader is the authenticated caller.</summary>
+    [HttpPost("exercise-submissions/{submissionId:guid}/grade")]
+    [PermissionAuthorize(Permissions.Classes.Update)]
+    public async Task<ActionResult<ApiResponse<WritingGradeDto>>> Grade(
+        Guid submissionId, [FromBody] GradeSubmissionRequest body, CancellationToken ct)
+    {
+        if (currentUser.UserId is not { } graderId)
+            return Unauthorized(ApiResponse<WritingGradeDto>.Fail("Not authenticated."));
+        var r = await sender.Send(
+            new GradeExerciseSubmissionCommand(submissionId, graderId, body.Score, body.MaxScore, body.Feedback), ct);
+        return r.ToApiResultOrNotFound();
+    }
+
     /// <summary>
     /// Upload a Listening audio file (teacher/admin). Returns the stored file name; the
     /// caller stores it as <c>content.audioUrl</c> = <c>/api/proxy/Exercises/audio/{fileName}</c>.
@@ -152,6 +177,9 @@ public sealed record BulkExercisesRequest(List<ExerciseInputDto> Exercises);
 
 /// <summary>Request body for the submit endpoint — the user's answers (shape varies by type).</summary>
 public sealed record SubmitExerciseRequest(JsonElement Answers);
+
+/// <summary>Request body for grading a submission — score out of max + optional feedback.</summary>
+public sealed record GradeSubmissionRequest(decimal Score, decimal MaxScore, string? Feedback);
 
 /// <summary>Result of an audio upload — the opaque stored file name.</summary>
 public sealed record AudioUploadDto(string FileName);
