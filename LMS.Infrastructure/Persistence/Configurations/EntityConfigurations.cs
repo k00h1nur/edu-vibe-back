@@ -550,6 +550,10 @@ public sealed class LessonExerciseSubmissionConfiguration : IEntityTypeConfigura
         b.ToTable("lesson_exercise_submissions");
         b.HasKey(x => x.Id);
         b.Property(x => x.AnswersJson).IsRequired().HasColumnType("jsonb");
+        // Teacher grading for open-ended types (writing): score out of max + feedback.
+        b.Property(x => x.TeacherScore).HasColumnType("numeric(6,2)");
+        b.Property(x => x.TeacherMaxScore).HasColumnType("numeric(6,2)");
+        b.Property(x => x.TeacherFeedback).HasMaxLength(4000);
         // Exactly one result per (exercise, user) — the upsert key.
         b.HasIndex(x => new { x.LessonExerciseId, x.UserId }).IsUnique()
             .HasDatabaseName("ix_lesson_exercise_submissions_exercise_user");
