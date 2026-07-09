@@ -11,8 +11,12 @@ namespace LMS.Application.Features.Exercises;
 /// raw type-specific JSON sent by the client.</summary>
 public sealed record ExerciseInputDto(string Type, string? Title, int OrderIndex, JsonElement Content);
 
-/// <summary>The current user's saved self-check result for an exercise.</summary>
-public sealed record ExerciseResultDto(JsonNode? Answers, int Score, int Total, bool IsCompleted);
+/// <summary>The current user's saved self-check result for an exercise. For open-ended
+/// types (writing) the auto Score/Total are 0/0 and the teacher grade carries the mark.</summary>
+public sealed record ExerciseResultDto(
+    JsonNode? Answers, int Score, int Total, bool IsCompleted,
+    decimal? TeacherScore = null, decimal? TeacherMaxScore = null,
+    string? TeacherFeedback = null, bool IsTeacherGraded = false);
 
 /// <summary>An exercise + the current user's result (Result null ⇒ not attempted yet).
 /// Content/Answers are emitted as nested JSON (not strings).</summary>
@@ -60,3 +64,27 @@ public sealed record LessonExerciseResultsDto(
 /// <summary>Teacher/admin: how every student in a class did on a lesson's exercises.</summary>
 public sealed record GetLessonExerciseResultsQuery(Guid LessonId, Guid ClassId)
     : IRequest<Result<LessonExerciseResultsDto>>;
+
+// ===== Teacher: grade open-ended (writing) submissions ======================
+
+/// <summary>One student's writing submission — the text they wrote plus any grade so far.</summary>
+public sealed record WritingSubmissionReviewDto(
+    Guid SubmissionId, Guid StudentUserId, string StudentName, string Text, int WordCount,
+    decimal? TeacherScore, decimal? TeacherMaxScore, string? TeacherFeedback, bool IsGraded, DateTime SubmittedAt);
+
+/// <summary>A writing exercise in a lesson + every submission from the class's students.</summary>
+public sealed record WritingExerciseReviewDto(
+    Guid ExerciseId, string Title, int OrderIndex, string? Instructions, int? MinWords, string? ModelAnswer,
+    IReadOnlyList<WritingSubmissionReviewDto> Submissions);
+
+/// <summary>Teacher/admin: the writing exercises in a lesson + the class's submissions to grade.</summary>
+public sealed record GetWritingSubmissionsQuery(Guid LessonId, Guid ClassId)
+    : IRequest<Result<IReadOnlyList<WritingExerciseReviewDto>>>;
+
+/// <summary>The grade a teacher just applied.</summary>
+public sealed record WritingGradeDto(decimal Score, decimal MaxScore, string? Feedback, DateTime GradedAt);
+
+/// <summary>Teacher/admin: grade one submission — score out of max (+ optional feedback).</summary>
+public sealed record GradeExerciseSubmissionCommand(
+    Guid SubmissionId, Guid GradedByUserId, decimal Score, decimal MaxScore, string? Feedback)
+    : IRequest<Result<WritingGradeDto>>;

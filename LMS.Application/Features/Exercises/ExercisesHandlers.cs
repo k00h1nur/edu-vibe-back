@@ -13,7 +13,9 @@ public sealed class ExercisesHandlers(IApplicationDbContext db) :
     IRequestHandler<AddExercisesToLessonCommand, Result<IReadOnlyList<Guid>>>,
     IRequestHandler<GetLessonExercisesQuery, Result<IReadOnlyList<ExerciseWithResultDto>>>,
     IRequestHandler<SubmitExerciseAnswerCommand, Result<SubmitResultDto>>,
-    IRequestHandler<GetLessonExerciseResultsQuery, Result<LessonExerciseResultsDto>>
+    IRequestHandler<GetLessonExerciseResultsQuery, Result<LessonExerciseResultsDto>>,
+    IRequestHandler<GetWritingSubmissionsQuery, Result<IReadOnlyList<WritingExerciseReviewDto>>>,
+    IRequestHandler<GradeExerciseSubmissionCommand, Result<WritingGradeDto>>
 {
     public async Task<Result<IReadOnlyList<Guid>>> Handle(AddExercisesToLessonCommand request, CancellationToken ct)
     {
@@ -77,7 +79,11 @@ public sealed class ExercisesHandlers(IApplicationDbContext db) :
                 e.ContentJson,
                 Sub = db.LessonExerciseSubmissions
                     .Where(s => s.LessonExerciseId == e.Id && s.UserId == request.UserId)
-                    .Select(s => new { s.AnswersJson, s.Score, s.Total, s.IsCompleted })
+                    .Select(s => new
+                    {
+                        s.AnswersJson, s.Score, s.Total, s.IsCompleted,
+                        s.TeacherScore, s.TeacherMaxScore, s.TeacherFeedback, s.GradedAt,
+                    })
                     .FirstOrDefault(),
             })
             .ToListAsync(ct);
@@ -86,7 +92,9 @@ public sealed class ExercisesHandlers(IApplicationDbContext db) :
                 r.Id, r.Type, r.Title, r.OrderIndex, ParseNode(r.ContentJson),
                 r.Sub is null
                     ? null
-                    : new ExerciseResultDto(ParseNode(r.Sub.AnswersJson), r.Sub.Score, r.Sub.Total, r.Sub.IsCompleted)))
+                    : new ExerciseResultDto(
+                        ParseNode(r.Sub.AnswersJson), r.Sub.Score, r.Sub.Total, r.Sub.IsCompleted,
+                        r.Sub.TeacherScore, r.Sub.TeacherMaxScore, r.Sub.TeacherFeedback, r.Sub.GradedAt != null)))
             .ToList();
 
         return Result<IReadOnlyList<ExerciseWithResultDto>>.Ok(items);
@@ -166,7 +174,126 @@ public sealed class ExercisesHandlers(IApplicationDbContext db) :
         return Result<LessonExerciseResultsDto>.Ok(new LessonExerciseResultsDto(request.LessonId, exercises, summaries));
     }
 
+    public async Task<Result<IReadOnlyList<WritingExerciseReviewDto>>> Handle(
+        GetWritingSubmissionsQuery request, CancellationToken ct)
+    {
+        var exercises = await db.LessonExercises.AsNoTracking()
+            .Where(e => e.LessonId == request.LessonId && e.Type == "writing")
+            .OrderBy(e => e.OrderIndex)
+            .Select(e => new { e.Id, e.Title, e.OrderIndex, e.ContentJson })
+            .ToListAsync(ct);
+        if (exercises.Count == 0)
+            return Result<IReadOnlyList<WritingExerciseReviewDto>>.Ok(Array.Empty<WritingExerciseReviewDto>());
+
+        var exIds = exercises.Select(e => e.Id).ToList();
+
+        // The class's active students → (userId, name).
+        var students = await db.Enrollments.AsNoTracking()
+            .Where(en => en.ClassId == request.ClassId && en.Status != EnrollmentStatus.Dropped)
+            .Join(db.StudentProfiles, en => en.StudentProfileId, sp => sp.Id,
+                (en, sp) => new { sp.UserId, sp.FirstName, sp.LastName })
+            .ToListAsync(ct);
+        var nameByUser = students.ToDictionary(s => s.UserId, s => $"{s.FirstName} {s.LastName}".Trim());
+        var userIds = students.Select(s => s.UserId).ToList();
+
+        var subs = exIds.Count == 0 || userIds.Count == 0
+            ? new List<SubRow>()
+            : await db.LessonExerciseSubmissions.AsNoTracking()
+                .Where(s => exIds.Contains(s.LessonExerciseId) && userIds.Contains(s.UserId))
+                .Select(s => new SubRow(
+                    s.Id, s.LessonExerciseId, s.UserId, s.AnswersJson,
+                    s.TeacherScore, s.TeacherMaxScore, s.TeacherFeedback, s.GradedAt,
+                    s.CompletedAt, s.UpdatedAt))
+                .ToListAsync(ct);
+        var byExercise = subs.GroupBy(s => s.ExerciseId).ToDictionary(g => g.Key, g => g.ToList());
+
+        var result = exercises.Select(e =>
+        {
+            var (instructions, minWords, modelAnswer) = ReadWritingMeta(e.ContentJson);
+            var mine = byExercise.TryGetValue(e.Id, out var list) ? list : new List<SubRow>();
+            var reviews = mine
+                .Select(s =>
+                {
+                    var text = ReadWritingText(s.AnswersJson);
+                    var wordCount = string.IsNullOrWhiteSpace(text)
+                        ? 0
+                        : text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
+                    var name = nameByUser.TryGetValue(s.UserId, out var n) && n.Length > 0 ? n : "Student";
+                    return new WritingSubmissionReviewDto(
+                        s.Id, s.UserId, name, text, wordCount,
+                        s.TeacherScore, s.TeacherMaxScore, s.TeacherFeedback, s.GradedAt != null,
+                        s.CompletedAt ?? s.UpdatedAt);
+                })
+                .OrderBy(r => r.StudentName)
+                .ToList();
+            return new WritingExerciseReviewDto(e.Id, e.Title, e.OrderIndex, instructions, minWords, modelAnswer, reviews);
+        }).ToList();
+
+        return Result<IReadOnlyList<WritingExerciseReviewDto>>.Ok(result);
+    }
+
+    public async Task<Result<WritingGradeDto>> Handle(GradeExerciseSubmissionCommand request, CancellationToken ct)
+    {
+        if (request.MaxScore <= 0)
+            return Result<WritingGradeDto>.Fail("VALIDATION", "Max score must be greater than zero.");
+        if (request.Score < 0 || request.Score > request.MaxScore)
+            return Result<WritingGradeDto>.Fail("VALIDATION", "Score must be between 0 and the max.");
+
+        return await db.ExecuteInTransactionAsync<WritingGradeDto>(async () =>
+        {
+            var sub = await db.LessonExerciseSubmissions
+                .FirstOrDefaultAsync(s => s.Id == request.SubmissionId, ct);
+            if (sub is null) return Result<WritingGradeDto>.Fail("NOT_FOUND", "Submission not found.");
+
+            sub.Grade(request.Score, request.MaxScore, request.Feedback, request.GradedByUserId);
+            await db.SaveChangesAsync(ct);
+            return Result<WritingGradeDto>.Ok(
+                new WritingGradeDto(sub.TeacherScore!.Value, sub.TeacherMaxScore!.Value, sub.TeacherFeedback, sub.GradedAt!.Value));
+        }, ct);
+    }
+
     private sealed record StudentSub(Guid UserId, Guid ExerciseId, int Score, int Total, bool IsCompleted);
+
+    private sealed record SubRow(
+        Guid Id, Guid ExerciseId, Guid UserId, string AnswersJson,
+        decimal? TeacherScore, decimal? TeacherMaxScore, string? TeacherFeedback, DateTime? GradedAt,
+        DateTime? CompletedAt, DateTime UpdatedAt);
+
+    /// <summary>Pull the essay text out of a writing submission's answers (<c>{ "text": "…" }</c>).</summary>
+    private static string ReadWritingText(string? answersJson)
+    {
+        if (string.IsNullOrWhiteSpace(answersJson)) return "";
+        try
+        {
+            using var doc = JsonDocument.Parse(answersJson);
+            var root = doc.RootElement;
+            if (root.ValueKind == JsonValueKind.Object
+                && root.TryGetProperty("text", out var t) && t.ValueKind == JsonValueKind.String)
+                return t.GetString() ?? "";
+            if (root.ValueKind == JsonValueKind.String) return root.GetString() ?? "";
+        }
+        catch { /* malformed answers → empty */ }
+        return "";
+    }
+
+    /// <summary>Read a writing exercise's prompt fields from its content JSON.</summary>
+    private static (string? Instructions, int? MinWords, string? ModelAnswer) ReadWritingMeta(string? contentJson)
+    {
+        if (string.IsNullOrWhiteSpace(contentJson)) return (null, null, null);
+        try
+        {
+            using var doc = JsonDocument.Parse(contentJson);
+            var root = doc.RootElement;
+            string? instr = root.TryGetProperty("instructions", out var i) && i.ValueKind == JsonValueKind.String
+                ? i.GetString() : null;
+            int? min = root.TryGetProperty("minWords", out var m) && m.ValueKind == JsonValueKind.Number
+                && m.TryGetInt32(out var mv) ? mv : null;
+            string? model = root.TryGetProperty("modelAnswer", out var ma) && ma.ValueKind == JsonValueKind.String
+                ? ma.GetString() : null;
+            return (instr, min, model);
+        }
+        catch { return (null, null, null); }
+    }
 
     private static JsonNode? ParseNode(string? json)
         => string.IsNullOrWhiteSpace(json) ? null : JsonNode.Parse(json);

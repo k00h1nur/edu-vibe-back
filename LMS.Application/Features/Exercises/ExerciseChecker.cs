@@ -36,7 +36,7 @@ public static class ExerciseChecker
             "crossword"
                 => CheckCrossword(content, userAnswers),
             "paragraph_cloze"
-                => CheckByIndex(GetArray(content, "answers"), AsList(userAnswers)),
+                => CheckCloze(content, userAnswers),
             "table_fill"
                 => CheckTable(content, userAnswers),
             "dialogue"
@@ -57,9 +57,11 @@ public static class ExerciseChecker
         if (!content.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Array)
             return (0, 0);
 
+        var example = IsExample(content);
         var i = 0;
         foreach (var item in items.EnumerateArray())
         {
+            if (example && i == 0) { i++; continue; } // first item is a shown worked example — not graded
             var id = item.TryGetProperty("id", out var idEl) ? idEl.ToString() : i.ToString();
             var userForItem = UserAnswerFor(userAnswers, id, i);
 
@@ -106,17 +108,45 @@ public static class ExerciseChecker
         if (!content.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Array)
             return (0, 0);
 
+        var example = IsExample(content);
         var i = 0;
         foreach (var item in items.EnumerateArray())
         {
             var id = item.TryGetProperty("id", out var idEl) ? idEl.ToString() : i.ToString();
-            var (s, t) = CheckByIndex(GetArray(item, "answers"), AsList(UserAnswerFor(userAnswers, id, i)));
+            IReadOnlyList<string> expected = GetArray(item, "answers");
+            IReadOnlyList<string> actual = AsList(UserAnswerFor(userAnswers, id, i));
+            // First blank overall is a shown worked example — drop it from grading.
+            if (example && i == 0 && expected.Count > 0)
+            {
+                expected = expected.Skip(1).ToList();
+                actual = actual.Count > 0 ? actual.Skip(1).ToList() : actual;
+            }
+            var (s, t) = CheckByIndex(expected, actual);
             score += s;
             total += t;
             i++;
         }
         return (score, total);
     }
+
+    /// <summary>paragraph_cloze: answers[] compared by index. When content.example is set the
+    /// first gap is a shown worked example, so skip index 0 on both sides.</summary>
+    private static (int, int) CheckCloze(JsonElement content, JsonElement userAnswers)
+    {
+        IReadOnlyList<string> expected = GetArray(content, "answers");
+        IReadOnlyList<string> actual = AsList(userAnswers);
+        if (IsExample(content) && expected.Count > 0)
+        {
+            expected = expected.Skip(1).ToList();
+            actual = actual.Count > 0 ? actual.Skip(1).ToList() : actual;
+        }
+        return CheckByIndex(expected, actual);
+    }
+
+    /// <summary>True when content marks its first gradable slot as a worked example
+    /// (shown pre-filled, not graded) — mirrors the textbook "item 1 is given" convention.</summary>
+    private static bool IsExample(JsonElement content)
+        => content.TryGetProperty("example", out var e) && e.ValueKind == JsonValueKind.True;
 
     /// <summary>"Tick all that apply": compare the user's ticked set against content.answers.
     /// total = number of correct answers; score = correctly ticked minus wrongly ticked (floored).</summary>
