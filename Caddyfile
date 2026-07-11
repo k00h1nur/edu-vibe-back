@@ -23,3 +23,30 @@ admin.edu-vibe.uz {
 	encode gzip zstd
 	reverse_proxy admin:3000
 }
+
+# ── Co-hosted sites on this shared edge ──
+# These live in THIS Caddyfile so a redeploy of it never drops them (their
+# containers run in separate stacks on the shared `eduvibe_default` network).
+# They sit behind Cloudflare (Full mode) so TLS is `tls internal`.
+
+# yapp.uz — Yapp.Uz IELTS app (static frontend + .NET backend)
+yapp.uz, www.yapp.uz {
+	tls internal
+	reverse_proxy yapp-web:80
+}
+
+api.yapp.uz {
+	tls internal
+	reverse_proxy yapp-api:8080
+}
+
+# turbozor.uz
+turbozor.uz, www.turbozor.uz {
+	tls internal
+	reverse_proxy turbozor-frontend-1:3000
+}
+
+api.turbozor.uz {
+	tls internal
+	reverse_proxy turbozor-app-1:8080
+}
