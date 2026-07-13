@@ -28,7 +28,12 @@ public sealed record StudentDashboardDto(
     int UpcomingSessions,
     int PendingAssignments,
     int EarnedBadges,
-    int GradedSubmissions);
+    int GradedSubmissions,
+    // Numeric game level derived from CurrentXp, plus progress into it (XP earned
+    // toward the next level / the level's total span) for a progress ring.
+    int Level,
+    int XpIntoLevel,
+    int XpForNextLevel);
 
 public sealed record GetDirectorDashboardQuery : IRequest<Result<DirectorDashboardDto>>;
 

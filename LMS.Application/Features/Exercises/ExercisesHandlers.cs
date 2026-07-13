@@ -130,6 +130,7 @@ public sealed class ExercisesHandlers(IApplicationDbContext db) :
             // ONCE for a perfect completion (2/slot, 5..40). Both flush in the
             // SaveChanges below so they can never drift from the submission row.
             // Non-students (no profile) are skipped cleanly.
+            var awardedXp = 0;
             var sp = await db.StudentProfiles.FirstOrDefaultAsync(p => p.UserId == request.UserId, ct);
             if (sp is not null)
             {
@@ -143,12 +144,16 @@ public sealed class ExercisesHandlers(IApplicationDbContext db) :
                         await db.XpLedger.AddAsync(
                             XpLedger.CreateEntry(sp.Id, xp, XpSourceType.Exercise, "Exercise complete"), ct);
                         sub.MarkXpAwarded();
+                        awardedXp = xp;
                     }
                 }
             }
 
             await db.SaveChangesAsync(ct);
-            return Result<SubmitResultDto>.Ok(new SubmitResultDto(score, total));
+            // The game shows the real reward: XP granted now, the fresh streak, and
+            // the numeric level derived from the (possibly just-bumped) total XP.
+            return Result<SubmitResultDto>.Ok(new SubmitResultDto(
+                score, total, awardedXp, sp?.Streak ?? 0, LevelCurve.LevelFor(sp?.XP ?? 0)));
         }, ct);
     }
 

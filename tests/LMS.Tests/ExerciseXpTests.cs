@@ -1,4 +1,5 @@
 using FluentAssertions;
+using LMS.Application.Common;
 using LMS.Application.Features.Exercises;
 using LMS.Domain.Entities;
 using Xunit;
@@ -62,5 +63,26 @@ public sealed class ExerciseXpTests
 
         sp.RegisterDailyActivity(day1.AddDays(5));
         sp.Streak.Should().Be(1);           // 3-day gap → reset
+    }
+
+    [Theory]
+    [InlineData(0, 1)]     // floor
+    [InlineData(49, 1)]
+    [InlineData(50, 2)]    // level 2 @ 50
+    [InlineData(199, 2)]
+    [InlineData(200, 3)]   // level 3 @ 200
+    [InlineData(450, 4)]   // level 4 @ 450
+    [InlineData(800, 5)]
+    public void LevelFor_matches_the_50x_squared_curve(int xp, int expectedLevel)
+        => LevelCurve.LevelFor(xp).Should().Be(expectedLevel);
+
+    [Fact]
+    public void Progress_reports_into_level_and_span()
+    {
+        // 120 XP → level 2 (floor 50, next 200): 70 into a 150-wide level.
+        var (level, into, span) = LevelCurve.Progress(120);
+        level.Should().Be(2);
+        into.Should().Be(70);
+        span.Should().Be(150);
     }
 }

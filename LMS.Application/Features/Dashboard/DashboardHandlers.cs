@@ -1,3 +1,4 @@
+using LMS.Application.Common;
 using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Models;
 using LMS.Application.Common.Security;
@@ -55,6 +56,7 @@ public sealed class DashboardHandlers(IApplicationDbContext db, ICurrentUserServ
         if (sp is null) return Result<StudentDashboardDto>.Fail("NOT_FOUND", "Student profile not found.");
         var classIds = await db.Enrollments.Where(x => x.StudentProfileId == sp.Id).Select(x => x.ClassId)
             .ToListAsync(cancellationToken);
+        var (level, xpIntoLevel, xpForNextLevel) = LevelCurve.Progress(sp.XP);
         var dto = new StudentDashboardDto(
             sp.XP,
             sp.Streak,
@@ -63,7 +65,10 @@ public sealed class DashboardHandlers(IApplicationDbContext db, ICurrentUserServ
                 cancellationToken),
             await db.StudentBadges.CountAsync(x => x.StudentProfileId == sp.Id, cancellationToken),
             await db.Submissions.CountAsync(x => x.StudentProfileId == sp.Id && x.Status == SubmissionStatus.Graded,
-                cancellationToken));
+                cancellationToken),
+            level,
+            xpIntoLevel,
+            xpForNextLevel);
         return Result<StudentDashboardDto>.Ok(dto);
     }
 
