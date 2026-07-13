@@ -31,6 +31,10 @@ public sealed class StudentProfile : BaseEntity
     public int XP { get; private set; }
     public int Streak { get; private set; }
 
+    /// <summary>UTC calendar day of the student's last XP-earning activity. Drives the
+    /// consecutive-day streak in <see cref="RegisterDailyActivity"/>. Null ⇒ no activity yet.</summary>
+    public DateOnly? LastActivityOn { get; private set; }
+
     // Profile details surfaced to the admin UI. All optional — existing rows
     // stay valid after migration because every column is nullable. The admin
     // search filter (firstName/lastName) reads from these.
@@ -66,6 +70,19 @@ public sealed class StudentProfile : BaseEntity
         if (newStreak < 0) throw new DomainException("Streak cannot be negative.");
 
         Streak = newStreak;
+        Touch();
+    }
+
+    /// <summary>
+    /// Advances the daily-practice streak for activity on <paramref name="today"/> (UTC day).
+    /// Same day ⇒ no change; the very next day ⇒ streak + 1; any longer gap (or first ever)
+    /// ⇒ streak resets to 1. Idempotent within a day, so it's safe to call on every submit.
+    /// </summary>
+    public void RegisterDailyActivity(DateOnly today)
+    {
+        if (LastActivityOn == today) return;
+        Streak = LastActivityOn == today.AddDays(-1) ? Streak + 1 : 1;
+        LastActivityOn = today;
         Touch();
     }
 

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using LMS.Application.Common;
 using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Models;
 using LMS.Domain.Entities;
@@ -123,6 +124,27 @@ public sealed class ExercisesHandlers(IApplicationDbContext db) :
             else
             {
                 sub.Apply(answersJson, score, total);
+            }
+
+            // Game rewards: advance the daily streak on any activity, and grant XP
+            // ONCE for a perfect completion (2/slot, 5..40). Both flush in the
+            // SaveChanges below so they can never drift from the submission row.
+            // Non-students (no profile) are skipped cleanly.
+            var sp = await db.StudentProfiles.FirstOrDefaultAsync(p => p.UserId == request.UserId, ct);
+            if (sp is not null)
+            {
+                sp.RegisterDailyActivity(SchoolCalendar.Today(DateTime.UtcNow));
+                if (!sub.XpAwarded && total > 0 && score == total)
+                {
+                    var xp = ExerciseXp.ForCompletion(total);
+                    if (xp > 0)
+                    {
+                        sp.AddXp(xp);
+                        await db.XpLedger.AddAsync(
+                            XpLedger.CreateEntry(sp.Id, xp, XpSourceType.Exercise, "Exercise complete"), ct);
+                        sub.MarkXpAwarded();
+                    }
+                }
             }
 
             await db.SaveChangesAsync(ct);
