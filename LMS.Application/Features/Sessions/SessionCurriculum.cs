@@ -219,8 +219,10 @@ public sealed class SessionCurriculumHandler(IApplicationDbContext db, ICurrentU
         var sessionIds = sessions.Select(s => s.Id).ToList();
         var matCounts = (await db.LessonMaterials.AsNoTracking()
                 .Where(m => sessionIds.Contains(m.ClassSessionId))
-                .Select(m => m.ClassSessionId).ToListAsync(ct))
-            .GroupBy(x => x).ToDictionary(g => g.Key, g => g.Count());
+                .GroupBy(m => m.ClassSessionId)
+                .Select(g => new { SessionId = g.Key, Count = g.Count() })
+                .ToListAsync(ct))
+            .ToDictionary(x => x.SessionId, x => x.Count);
 
         return sessions.Select(s =>
         {

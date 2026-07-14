@@ -144,17 +144,6 @@ builder.Services.AddRateLimiter(options =>
             }));
 });
 
-// ---- Caching --------------------------------------------------------------
-var redisConn = builder.Configuration["Redis:ConnectionString"];
-if (!string.IsNullOrWhiteSpace(redisConn))
-{
-    builder.Services.AddStackExchangeRedisCache(o => o.Configuration = redisConn);
-}
-else
-{
-    builder.Services.AddDistributedMemoryCache();
-}
-
 var app = builder.Build();
 
 // ---- Middleware pipeline --------------------------------------------------
