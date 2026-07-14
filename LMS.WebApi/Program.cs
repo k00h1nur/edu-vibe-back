@@ -43,6 +43,9 @@ builder.Services.AddHostedService<DatabaseInitializerHostedService>();
 builder.Services.AddHostedService<PermissionDiscoveryHostedService>();
 builder.Services.AddHostedService<RolePermissionSeederHostedService>();
 builder.Services.AddHostedService<DemoUsersSeederHostedService>();
+// Promotes a configured account (SuperAdmin:Email) to SuperAdmin — runs after
+// the demo seeder so a freshly-seeded dev account can be the target.
+builder.Services.AddHostedService<SuperAdminSeederHostedService>();
 // Mock-test slots reference data — idempotent (seeds only when the table is
 // empty), so admin edits are never overwritten. Marketing courses and the
 // built-in curriculum-template library are intentionally NOT seeded: courses

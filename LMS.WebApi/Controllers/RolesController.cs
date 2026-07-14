@@ -1,17 +1,26 @@
+using LMS.Application.Common.Security;
 using LMS.Application.Features.Roles;
 using LMS.WebApi.Common;
-using LMS.WebApi.Security;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LMS.WebApi.Controllers;
 
+/// <summary>
+/// RBAC administration — roles, the permission catalog, the role→permission
+/// matrix, and a "who can access what" overview. Deliberately SuperAdmin-ONLY:
+/// this is the god-mode surface that can grant any permission to any role, so a
+/// regular Admin (who holds every operational permission) still can't reach it.
+/// The gate is role-based, not permission-based, precisely so it can't be
+/// self-granted through the matrix it controls.
+/// </summary>
 [ApiController]
 [Route("api/admin/rbac")]
+[Authorize(Roles = RoleCodes.SuperAdmin)]
 public sealed class RolesController(ISender sender) : ControllerBase
 {
     [HttpGet("roles")]
-    [PermissionAuthorize("Roles.Read")]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<RoleDto>>>> GetRoles(CancellationToken ct)
     {
         var r = await sender.Send(new GetRolesQuery(), ct);
@@ -19,7 +28,6 @@ public sealed class RolesController(ISender sender) : ControllerBase
     }
 
     [HttpPost("roles")]
-    [PermissionAuthorize("Roles.Create")]
     public async Task<ActionResult<ApiResponse<RoleDto>>> CreateRole([FromBody] CreateRoleCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
@@ -27,7 +35,6 @@ public sealed class RolesController(ISender sender) : ControllerBase
     }
 
     [HttpPut("roles/{id:guid}")]
-    [PermissionAuthorize("Roles.Update")]
     public async Task<ActionResult<ApiResponse<RoleDto>>> UpdateRole(Guid id, [FromBody] UpdateRoleCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd with { RoleId = id }, ct);
@@ -35,7 +42,6 @@ public sealed class RolesController(ISender sender) : ControllerBase
     }
 
     [HttpDelete("roles/{id:guid}")]
-    [PermissionAuthorize("Roles.Delete")]
     public async Task<ActionResult<ApiResponse<object>>> DeleteRole(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new DeleteRoleCommand(id), ct);
@@ -43,7 +49,6 @@ public sealed class RolesController(ISender sender) : ControllerBase
     }
 
     [HttpGet("permissions")]
-    [PermissionAuthorize("Permissions.Read")]
     public async Task<ActionResult<ApiResponse<IReadOnlyCollection<PermissionDto>>>> GetPermissions(CancellationToken ct)
     {
         var r = await sender.Send(new GetPermissionsQuery(), ct);
@@ -51,7 +56,6 @@ public sealed class RolesController(ISender sender) : ControllerBase
     }
 
     [HttpPost("permissions")]
-    [PermissionAuthorize("Permissions.Create")]
     public async Task<ActionResult<ApiResponse<PermissionDto>>> CreatePermission([FromBody] CreatePermissionCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd, ct);
@@ -59,7 +63,6 @@ public sealed class RolesController(ISender sender) : ControllerBase
     }
 
     [HttpPut("permissions/{id:guid}")]
-    [PermissionAuthorize("Permissions.Update")]
     public async Task<ActionResult<ApiResponse<PermissionDto>>> UpdatePermission(Guid id, [FromBody] UpdatePermissionCommand cmd, CancellationToken ct)
     {
         var r = await sender.Send(cmd with { PermissionId = id }, ct);
@@ -67,7 +70,6 @@ public sealed class RolesController(ISender sender) : ControllerBase
     }
 
     [HttpDelete("permissions/{id:guid}")]
-    [PermissionAuthorize("Permissions.Delete")]
     public async Task<ActionResult<ApiResponse<object>>> DeletePermission(Guid id, CancellationToken ct)
     {
         var r = await sender.Send(new DeletePermissionCommand(id), ct);
@@ -75,10 +77,17 @@ public sealed class RolesController(ISender sender) : ControllerBase
     }
 
     [HttpPut("roles/{id:guid}/permissions")]
-    [PermissionAuthorize("Roles.AssignPermissions")]
     public async Task<ActionResult<ApiResponse<object>>> AssignPermissions(Guid id, [FromBody] IReadOnlyCollection<Guid> permissionIds, CancellationToken ct)
     {
         var r = await sender.Send(new AssignRolePermissionsCommand(id, permissionIds), ct);
         return r.Success ? Ok(ApiResponse<object>.Ok(new { }, r.Message)) : BadRequest(ApiResponse<object>.Fail(r.Message ?? "Failed"));
+    }
+
+    /// <summary>Access overview: every user with their roles + effective permission codes.</summary>
+    [HttpGet("users")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<UserAccessDto>>>> GetAccessOverview(CancellationToken ct)
+    {
+        var r = await sender.Send(new GetAccessOverviewQuery(), ct);
+        return Ok(ApiResponse<IReadOnlyCollection<UserAccessDto>>.Ok(r.Data, r.Message));
     }
 }

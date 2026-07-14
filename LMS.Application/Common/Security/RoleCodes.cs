@@ -22,4 +22,19 @@ public static class RoleCodes
     public const string AcademyDirector = "AcademyDirector";
     public const string OfficeAdmin = "OfficeAdmin";
     public const string SupportTeacher = "SupportTeacher";
+
+    /// <summary>
+    /// The seven platform roles seeded by <c>SeedData</c>. These are structural —
+    /// the auth stack, seeders and solution-strip allowlists reference them by
+    /// code — so the RBAC admin API must never let them be renamed (their
+    /// <c>Code</c>) or deleted. Their permission grants stay fully editable; a
+    /// SuperAdmin can also freely create/rename/delete any CUSTOM role.
+    /// </summary>
+    public static readonly IReadOnlySet<string> BuiltIn = new HashSet<string>(
+        StringComparer.OrdinalIgnoreCase)
+    {
+        Admin, Teacher, Student, SuperAdmin, AcademyDirector, OfficeAdmin, SupportTeacher,
+    };
+
+    public static bool IsBuiltIn(string? code) => code is not null && BuiltIn.Contains(code);
 }
