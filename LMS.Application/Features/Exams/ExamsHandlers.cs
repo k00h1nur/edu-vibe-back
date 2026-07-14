@@ -304,7 +304,7 @@ public sealed class ExamsHandlers(IApplicationDbContext db, ICurrentUserService 
     private async Task<(Class? Cls, string? Code, string? Msg)> ResolveOwnedClassAsync(
         Guid classId, CancellationToken ct)
     {
-        var cls = await db.Classes.FirstOrDefaultAsync(c => c.Id == classId, ct);
+        var cls = await db.Classes.AsNoTracking().FirstOrDefaultAsync(c => c.Id == classId, ct);
         if (cls is null) return (null, "NOT_FOUND", "Class not found.");
         if (!IsAdmin && (cls.TeacherUserId is null || cls.TeacherUserId != currentUser.UserId))
             return (null, "FORBIDDEN", "Only the class teacher or an admin can manage exams for this class.");
