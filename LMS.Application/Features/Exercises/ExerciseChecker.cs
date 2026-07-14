@@ -43,11 +43,38 @@ public static class ExerciseChecker
                 => CheckDialogue(content, userAnswers),
             "word_search"
                 => CheckWordSearch(content, userAnswers),
+            "multi"
+                => CheckMulti(content, userAnswers),
             _ => (0, 0), // unknown type → ungraded (no crash); add a case to support it.
         };
     }
 
     // ---- per-type strategies -------------------------------------------------
+
+    /// <summary>Composite (multi) exercise: content.sections[] are sub-exercises, each of its
+    /// own type. The user's answers are keyed by section index ("0","1",…); score/total is the
+    /// sum over sections. Recurses into <see cref="Check"/> — sections are always leaf types
+    /// (the authoring UI forbids nesting a multi inside a multi).</summary>
+    private static (int, int) CheckMulti(JsonElement content, JsonElement userAnswers)
+    {
+        if (!content.TryGetProperty("sections", out var sections) || sections.ValueKind != JsonValueKind.Array)
+            return (0, 0);
+
+        int score = 0, total = 0, i = 0;
+        foreach (var sec in sections.EnumerateArray())
+        {
+            var stype = sec.TryGetProperty("type", out var t) ? t.GetString() ?? "" : "";
+            var scontent = sec.TryGetProperty("content", out var c) ? c.GetRawText() : "{}";
+            JsonElement subAnswers = default; // Undefined ⇒ the sub-checker treats it as "unanswered".
+            if (userAnswers.ValueKind == JsonValueKind.Object && userAnswers.TryGetProperty(i.ToString(), out var sa))
+                subAnswers = sa;
+            var (s, t2) = Check(stype, scontent, subAnswers);
+            score += s;
+            total += t2;
+            i++;
+        }
+        return (score, total);
+    }
 
     /// <summary>items[] each with a single "answer" (or, when multiGap, an "answers" array
     /// = one expected per gap in that item).</summary>
