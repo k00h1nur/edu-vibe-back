@@ -147,6 +147,29 @@ public sealed class ExercisesHandlers(IApplicationDbContext db) :
                         awardedXp = xp;
                     }
                 }
+
+                // Auto-badges: award each milestone the student now qualifies for but
+                // doesn't yet hold (once each). Badge XP counts toward their total too.
+                var earnedCodes = GameBadges.EarnedFor(awardedXp > 0, sp.Streak).ToList();
+                if (earnedCodes.Count > 0)
+                {
+                    var held = await db.StudentBadges.Where(x => x.StudentProfileId == sp.Id).ToListAsync(ct);
+                    var heldIds = held.Select(x => x.BadgeId).ToHashSet();
+                    var toAward = await db.Badges
+                        .Where(bd => earnedCodes.Contains(EF.Property<string>(bd, "Code")))
+                        .Select(bd => new { bd.Id, bd.XpReward })
+                        .ToListAsync(ct);
+                    foreach (var badge in toAward.Where(bd => !heldIds.Contains(bd.Id)))
+                    {
+                        await db.StudentBadges.AddAsync(StudentBadge.Award(sp.Id, badge.Id, held), ct);
+                        if (badge.XpReward > 0)
+                        {
+                            sp.AddXp(badge.XpReward);
+                            await db.XpLedger.AddAsync(
+                                XpLedger.CreateEntry(sp.Id, badge.XpReward, XpSourceType.Badge, "Badge"), ct);
+                        }
+                    }
+                }
             }
 
             await db.SaveChangesAsync(ct);

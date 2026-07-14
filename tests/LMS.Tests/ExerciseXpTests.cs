@@ -85,4 +85,15 @@ public sealed class ExerciseXpTests
         into.Should().Be(70);
         span.Should().Be(150);
     }
+
+    [Fact]
+    public void GameBadges_earned_by_first_xp_and_streak_thresholds()
+    {
+        GameBadges.EarnedFor(earnedXp: false, streak: 0).Should().BeEmpty();
+        GameBadges.EarnedFor(earnedXp: false, streak: 6).Should().BeEmpty();
+        GameBadges.EarnedFor(earnedXp: true, streak: 0).Should().Equal(GameBadges.FirstSteps);
+        GameBadges.EarnedFor(earnedXp: false, streak: 7).Should().Equal(GameBadges.Streak7);
+        GameBadges.EarnedFor(earnedXp: true, streak: 30)
+            .Should().Equal(GameBadges.FirstSteps, GameBadges.Streak7, GameBadges.Streak30);
+    }
 }

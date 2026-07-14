@@ -6,5 +6,6 @@ public enum XpSourceType
     Attendance = 2,
     Manual = 3,
     TaskGrading = 4,
-    Exercise = 5
+    Exercise = 5,
+    Badge = 6
 }
