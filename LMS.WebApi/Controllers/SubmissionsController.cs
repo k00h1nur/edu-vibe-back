@@ -65,6 +65,17 @@ public sealed class SubmissionsController(ISender sender, ISubmissionFileStore f
         return r.ToApiResult();
     }
 
+    /// <summary>Richer grade: score out of an optional max, plus optional written feedback
+    /// (e.g. for a writing task). Body: {"score":8,"maxScore":10,"feedback":"…"}.</summary>
+    [HttpPost("{id:guid}/grade")]
+    [PermissionAuthorize(Permissions.Submissions.Grade)]
+    public async Task<ActionResult<ApiResponse<SubmissionDto>>> GradeWithFeedback(
+        Guid id, [FromBody] GradeRequest body, CancellationToken ct)
+    {
+        var r = await sender.Send(new GradeSubmissionCommand(id, body.Score, body.MaxScore, body.Feedback), ct);
+        return r.ToApiResult();
+    }
+
     // ---- File submissions -------------------------------------------------
 
     /// <summary>
@@ -176,5 +187,7 @@ public sealed class SubmissionsController(ISender sender, ISubmissionFileStore f
 }
 
 public sealed record SetLockRequest(bool Locked);
+
+public sealed record GradeRequest(decimal Score, decimal? MaxScore, string? Feedback);
 
 public sealed record SaveDraftRequest(string? Content);

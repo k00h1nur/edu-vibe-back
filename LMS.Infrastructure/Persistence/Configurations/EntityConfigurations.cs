@@ -254,6 +254,8 @@ public sealed class SubmissionConfiguration : IEntityTypeConfiguration<Submissio
         b.ToTable("submissions");
         b.HasKey(x => x.Id);
         b.Property(x => x.Score).HasPrecision(10, 2);
+        b.Property(x => x.MaxScore).HasPrecision(10, 2);
+        b.Property(x => x.Feedback).HasMaxLength(4000);
         b.HasIndex(x => new { x.AssignmentId, x.StudentProfileId }).IsUnique();
         b.HasMany(x => x.Files).WithOne(f => f.Submission)
             .HasForeignKey(f => f.SubmissionId).OnDelete(DeleteBehavior.Cascade);

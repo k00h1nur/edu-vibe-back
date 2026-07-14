@@ -1832,8 +1832,16 @@ namespace LMS.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Feedback")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
                     b.Property<bool>("IsLocked")
                         .HasColumnType("boolean");
+
+                    b.Property<decimal?>("MaxScore")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
 
                     b.Property<decimal?>("Score")
                         .HasPrecision(10, 2)

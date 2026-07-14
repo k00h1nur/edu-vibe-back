@@ -29,6 +29,12 @@ public sealed class Submission : BaseEntity
     public SubmissionStatus Status { get; private set; }
     public decimal? Score { get; private set; }
 
+    /// <summary>The scale the teacher graded on (e.g. 10 for "8/10", or a band). Null ⇒ raw score / not set.</summary>
+    public decimal? MaxScore { get; private set; }
+
+    /// <summary>Teacher's written feedback the student sees with the grade (e.g. on a writing task).</summary>
+    public string? Feedback { get; private set; }
+
     /// <summary>
     /// When true the student can no longer add or remove files — either the
     /// student finalised it, or a teacher locked it. Grading still works.
@@ -56,11 +62,18 @@ public sealed class Submission : BaseEntity
         Touch();
     }
 
-    public void Grade(decimal score)
+    public void Grade(decimal score, decimal? maxScore = null, string? feedback = null)
     {
         if (score < 0) throw new DomainException("Score cannot be negative.");
+        if (maxScore is { } max)
+        {
+            if (max <= 0) throw new DomainException("Max score must be greater than zero.");
+            if (score > max) throw new DomainException("Score cannot exceed the max score.");
+        }
 
         Score = score;
+        MaxScore = maxScore;
+        Feedback = string.IsNullOrWhiteSpace(feedback) ? null : feedback.Trim();
         Status = SubmissionStatus.Graded;
         Touch();
     }

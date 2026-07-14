@@ -46,7 +46,7 @@ public sealed class SubmissionsHandlers(
 
         var items = await query
             .Select(s => new SubmissionDto(s.Id, s.AssignmentId, s.StudentProfileId, s.Content, s.Status, s.Score,
-                s.IsLocked, s.Files.Count))
+                s.IsLocked, s.Files.Count, s.MaxScore, s.Feedback))
             .ToListAsync(cancellationToken);
 
         return Result<IReadOnlyCollection<SubmissionDto>>.Ok(items);
@@ -69,7 +69,7 @@ public sealed class SubmissionsHandlers(
             .AsNoTracking()
             .Where(x => x.StudentProfileId == request.StudentProfileId)
             .Select(s => new SubmissionDto(s.Id, s.AssignmentId, s.StudentProfileId, s.Content, s.Status, s.Score,
-                s.IsLocked, s.Files.Count))
+                s.IsLocked, s.Files.Count, s.MaxScore, s.Feedback))
             .ToListAsync(cancellationToken));
     }
 
@@ -78,8 +78,9 @@ public sealed class SubmissionsHandlers(
         var s = await db.Submissions.Include(x => x.Files)
             .FirstOrDefaultAsync(x => x.Id == request.SubmissionId, cancellationToken);
         if (s is null) return Result<SubmissionDto>.Fail("NOT_FOUND", "Submission not found.");
-        s.Grade(request.Score);
-        db.SubmissionAudits.Add(new SubmissionAudit(s.Id, currentUser.UserId, "graded", $"score={request.Score}"));
+        s.Grade(request.Score, request.MaxScore, request.Feedback);
+        var scoreText = request.MaxScore is { } max ? $"{request.Score}/{max}" : $"{request.Score}";
+        db.SubmissionAudits.Add(new SubmissionAudit(s.Id, currentUser.UserId, "graded", $"score={scoreText}"));
         await db.SaveChangesAsync(cancellationToken);
 
         // Telegram DM the student (via the platform bot) that their work is graded.
@@ -90,7 +91,7 @@ public sealed class SubmissionsHandlers(
         if (studentUserId != Guid.Empty)
             await notifications.NotifyUserAsync(
                 studentUserId,
-                $"✅ Your submission was graded: {request.Score}.\nOpen EduVibe to see feedback.",
+                $"✅ Your submission was graded: {scoreText}.\nOpen EduVibe to see feedback.",
                 cancellationToken);
 
         return Result<SubmissionDto>.Ok(Map(s));
@@ -330,7 +331,8 @@ public sealed class SubmissionsHandlers(
     }
 
     private static SubmissionDto Map(Submission s) =>
-        new(s.Id, s.AssignmentId, s.StudentProfileId, s.Content, s.Status, s.Score, s.IsLocked, s.Files?.Count ?? 0);
+        new(s.Id, s.AssignmentId, s.StudentProfileId, s.Content, s.Status, s.Score, s.IsLocked, s.Files?.Count ?? 0,
+            s.MaxScore, s.Feedback);
 
     private static SubmissionFileDto MapFile(SubmissionFile f) =>
         new(f.Id, f.SubmissionId, f.OriginalFileName, f.MimeType, f.FileSize, f.IsDuplicateAcrossStudents, f.CreatedAt);
