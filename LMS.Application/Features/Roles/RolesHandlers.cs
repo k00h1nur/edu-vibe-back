@@ -28,14 +28,21 @@ public sealed class RolesHandlers(IApplicationDbContext db) :
 
     public async Task<Result<IReadOnlyCollection<RoleDto>>> Handle(GetRolesQuery request, CancellationToken cancellationToken)
     {
-        var roles = await db.Roles.AsNoTracking()
-            .OrderBy(r => r.Name)
-            .Select(r => new RoleDto(r.Id, r.Code, r.Name,
-                db.RolePermissions.Where(x => x.RoleId == r.Id).Select(x => x.PermissionId).ToList())
-            {
-                IsBuiltIn = RoleCodes.BuiltIn.Contains(r.Code),
-            }).ToListAsync(cancellationToken);
-        return Result<IReadOnlyCollection<RoleDto>>.Ok(roles);
+        // Two flat queries (roles + all grant pairs), grouped in memory — avoids a
+        // correlated subquery per role.
+        var roles = await db.Roles.AsNoTracking().OrderBy(r => r.Name)
+            .Select(r => new { r.Id, r.Code, r.Name }).ToListAsync(cancellationToken);
+        var grantsByRole = (await db.RolePermissions.AsNoTracking()
+                .Select(rp => new { rp.RoleId, rp.PermissionId }).ToListAsync(cancellationToken))
+            .GroupBy(x => x.RoleId)
+            .ToDictionary(g => g.Key, g => (IReadOnlyCollection<Guid>)g.Select(x => x.PermissionId).ToList());
+
+        var result = roles.Select(r => new RoleDto(r.Id, r.Code, r.Name,
+                grantsByRole.GetValueOrDefault(r.Id, Array.Empty<Guid>()))
+        {
+            IsBuiltIn = RoleCodes.BuiltIn.Contains(r.Code),
+        }).ToList();
+        return Result<IReadOnlyCollection<RoleDto>>.Ok(result);
     }
 
     public async Task<Result<IReadOnlyCollection<PermissionDto>>> Handle(GetPermissionsQuery request, CancellationToken cancellationToken)
@@ -51,31 +58,31 @@ public sealed class RolesHandlers(IApplicationDbContext db) :
 
     public async Task<Result<IReadOnlyCollection<UserAccessDto>>> Handle(GetAccessOverviewQuery request, CancellationToken cancellationToken)
     {
-        // Per-user roles (codes) + the distinct permission codes those roles
-        // grant, so a SuperAdmin can audit "who can access what" in one screen.
-        var users = await db.Users.AsNoTracking()
-            .OrderBy(u => u.Email)
-            .Select(u => new
-            {
-                u.Id,
-                u.Email,
-                u.Status,
-                Roles = db.UserRoles.Where(ur => ur.UserId == u.Id)
-                    .Join(db.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => r.Code).ToList(),
-                Permissions = db.UserRoles.Where(ur => ur.UserId == u.Id)
-                    .Join(db.RolePermissions, ur => ur.RoleId, rp => rp.RoleId, (ur, rp) => rp.PermissionId)
-                    .Join(db.Permissions, pid => pid, p => p.Id, (pid, p) => p.Code)
-                    .Distinct().ToList(),
-            })
-            .ToListAsync(cancellationToken);
+        // Three flat queries assembled in memory — a fixed cost regardless of the
+        // user count, instead of two correlated subqueries per user row.
+        var users = await db.Users.AsNoTracking().OrderBy(u => u.Email)
+            .Select(u => new { u.Id, u.Email, u.Status }).ToListAsync(cancellationToken);
 
+        var rolesByUser = (await db.UserRoles.AsNoTracking()
+                .Join(db.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => new { ur.UserId, r.Code })
+                .ToListAsync(cancellationToken))
+            .GroupBy(x => x.UserId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Code).OrderBy(c => c).ToList());
+
+        var permsByUser = (await db.UserRoles.AsNoTracking()
+                .Join(db.RolePermissions, ur => ur.RoleId, rp => rp.RoleId, (ur, rp) => new { ur.UserId, rp.PermissionId })
+                .Join(db.Permissions, x => x.PermissionId, p => p.Id, (x, p) => new { x.UserId, p.Code })
+                .ToListAsync(cancellationToken))
+            .GroupBy(x => x.UserId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Code).Distinct().OrderBy(c => c).ToList());
+
+        var empty = new List<string>();
         var overview = users.Select(u =>
         {
-            var isSuper = u.Roles.Contains(RoleCodes.SuperAdmin, StringComparer.OrdinalIgnoreCase);
-            return new UserAccessDto(u.Id, u.Email, u.Status,
-                u.Roles.OrderBy(x => x).ToList(),
-                u.Permissions.OrderBy(x => x).ToList(),
-                isSuper);
+            var codes = rolesByUser.GetValueOrDefault(u.Id, empty);
+            var perms = permsByUser.GetValueOrDefault(u.Id, empty);
+            var isSuper = codes.Contains(RoleCodes.SuperAdmin, StringComparer.OrdinalIgnoreCase);
+            return new UserAccessDto(u.Id, u.Email, u.Status, codes, perms, isSuper);
         }).ToList();
 
         return Result<IReadOnlyCollection<UserAccessDto>>.Ok(overview);
