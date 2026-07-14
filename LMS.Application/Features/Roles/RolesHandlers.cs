@@ -170,18 +170,38 @@ public sealed class RolesHandlers(IApplicationDbContext db) :
 
     public async Task<Result> Handle(AssignRolePermissionsCommand request, CancellationToken cancellationToken)
     {
-        var role = await db.Roles.FirstOrDefaultAsync(x => x.Id == request.RoleId, cancellationToken);
-        if (role is null) return Result.Fail("NOT_FOUND", "Role not found.");
+        var roleExists = await db.Roles.AnyAsync(x => x.Id == request.RoleId, cancellationToken);
+        if (!roleExists) return Result.Fail("NOT_FOUND", "Role not found.");
 
-        var current = await db.RolePermissions.Where(x => x.RoleId == role.Id).ToListAsync(cancellationToken);
-        db.RolePermissions.RemoveRange(current);
+        var desired = request.PermissionIds.Distinct().ToHashSet();
 
-        foreach (var pid in request.PermissionIds.Distinct())
+        // Reject unknown ids up front so a stale/garbage id surfaces as a clean
+        // validation error instead of a raw FK violation (500) at SaveChanges.
+        if (desired.Count > 0)
         {
-            await db.RolePermissions.AddAsync(new RolePermission(role.Id, pid), cancellationToken);
+            var known = await db.Permissions
+                .Where(p => desired.Contains(p.Id))
+                .Select(p => p.Id)
+                .ToListAsync(cancellationToken);
+            if (known.Count != desired.Count)
+                return Result.Fail("VALIDATION", "One or more permission ids don't exist.");
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        // Diff against the current grants — only revoke what's removed and add
+        // what's new, instead of deleting and re-inserting the whole set on every
+        // save (a one-checkbox change used to churn every row).
+        var current = await db.RolePermissions.Where(x => x.RoleId == request.RoleId).ToListAsync(cancellationToken);
+        var currentIds = current.Select(x => x.PermissionId).ToHashSet();
+
+        var toRemove = current.Where(x => !desired.Contains(x.PermissionId)).ToList();
+        if (toRemove.Count > 0) db.RolePermissions.RemoveRange(toRemove);
+
+        var toAdd = desired.Where(id => !currentIds.Contains(id))
+            .Select(id => new RolePermission(request.RoleId, id)).ToList();
+        if (toAdd.Count > 0) await db.RolePermissions.AddRangeAsync(toAdd, cancellationToken);
+
+        if (toRemove.Count > 0 || toAdd.Count > 0)
+            await db.SaveChangesAsync(cancellationToken);
         return Result.Ok("Role permissions updated.");
     }
 }
