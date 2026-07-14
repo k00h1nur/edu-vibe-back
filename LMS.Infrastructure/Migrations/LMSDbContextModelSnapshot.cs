@@ -1786,6 +1786,9 @@ namespace LMS.Infrastructure.Migrations
                     b.Property<string>("FirstName")
                         .HasColumnType("text");
 
+                    b.Property<DateOnly?>("LastActivityOn")
+                        .HasColumnType("date");
+
                     b.Property<string>("LastName")
                         .HasColumnType("text");
 

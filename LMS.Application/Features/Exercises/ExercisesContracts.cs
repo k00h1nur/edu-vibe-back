@@ -24,7 +24,10 @@ public sealed record ExerciseWithResultDto(
     Guid Id, string Type, string Title, int OrderIndex, JsonNode? Content, ExerciseResultDto? Result);
 
 /// <summary>Outcome of checking a submitted answer.</summary>
-public sealed record SubmitResultDto(int Score, int Total);
+/// <summary>Self-check result + the game rewards this submit produced: <paramref name="XpAwarded"/>
+/// (0 unless a perfect first completion), the student's <paramref name="NewStreak"/> and current
+/// numeric <paramref name="Level"/> (all 0/1 for non-students).</summary>
+public sealed record SubmitResultDto(int Score, int Total, int XpAwarded, int NewStreak, int Level);
 
 // ===== Use cases ===========================================================
 

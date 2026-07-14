@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using LMS.Application.Common;
 using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Models;
 using LMS.Domain.Entities;
@@ -125,8 +126,57 @@ public sealed class ExercisesHandlers(IApplicationDbContext db) :
                 sub.Apply(answersJson, score, total);
             }
 
+            // Game rewards: advance the daily streak on any activity, and grant XP
+            // ONCE for a perfect completion (2/slot, 5..40). Both flush in the
+            // SaveChanges below so they can never drift from the submission row.
+            // Non-students (no profile) are skipped cleanly.
+            var awardedXp = 0;
+            var sp = await db.StudentProfiles.FirstOrDefaultAsync(p => p.UserId == request.UserId, ct);
+            if (sp is not null)
+            {
+                sp.RegisterDailyActivity(SchoolCalendar.Today(DateTime.UtcNow));
+                if (!sub.XpAwarded && total > 0 && score == total)
+                {
+                    var xp = ExerciseXp.ForCompletion(total);
+                    if (xp > 0)
+                    {
+                        sp.AddXp(xp);
+                        await db.XpLedger.AddAsync(
+                            XpLedger.CreateEntry(sp.Id, xp, XpSourceType.Exercise, "Exercise complete"), ct);
+                        sub.MarkXpAwarded();
+                        awardedXp = xp;
+                    }
+                }
+
+                // Auto-badges: award each milestone the student now qualifies for but
+                // doesn't yet hold (once each). Badge XP counts toward their total too.
+                var earnedCodes = GameBadges.EarnedFor(awardedXp > 0, sp.Streak).ToList();
+                if (earnedCodes.Count > 0)
+                {
+                    var held = await db.StudentBadges.Where(x => x.StudentProfileId == sp.Id).ToListAsync(ct);
+                    var heldIds = held.Select(x => x.BadgeId).ToHashSet();
+                    var toAward = await db.Badges
+                        .Where(bd => earnedCodes.Contains(EF.Property<string>(bd, "Code")))
+                        .Select(bd => new { bd.Id, bd.XpReward })
+                        .ToListAsync(ct);
+                    foreach (var badge in toAward.Where(bd => !heldIds.Contains(bd.Id)))
+                    {
+                        await db.StudentBadges.AddAsync(StudentBadge.Award(sp.Id, badge.Id, held), ct);
+                        if (badge.XpReward > 0)
+                        {
+                            sp.AddXp(badge.XpReward);
+                            await db.XpLedger.AddAsync(
+                                XpLedger.CreateEntry(sp.Id, badge.XpReward, XpSourceType.Badge, "Badge"), ct);
+                        }
+                    }
+                }
+            }
+
             await db.SaveChangesAsync(ct);
-            return Result<SubmitResultDto>.Ok(new SubmitResultDto(score, total));
+            // The game shows the real reward: XP granted now, the fresh streak, and
+            // the numeric level derived from the (possibly just-bumped) total XP.
+            return Result<SubmitResultDto>.Ok(new SubmitResultDto(
+                score, total, awardedXp, sp?.Streak ?? 0, LevelCurve.LevelFor(sp?.XP ?? 0)));
         }, ct);
     }
 
