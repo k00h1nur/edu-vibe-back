@@ -40,6 +40,10 @@ public sealed class LessonExerciseSubmission : BaseEntity
     public bool IsCompleted { get; private set; }
     public DateTime? CompletedAt { get; private set; }
 
+    /// <summary>True once XP has been granted for fully completing this exercise. Sticky —
+    /// <see cref="Apply"/> does NOT clear it, so re-submitting a solved exercise can't farm XP.</summary>
+    public bool XpAwarded { get; private set; }
+
     // ---- teacher grading (open-ended types like writing) --------------------
 
     /// <summary>Teacher-awarded score, out of <see cref="TeacherMaxScore"/>. Null ⇒ not graded.</summary>
@@ -86,6 +90,13 @@ public sealed class LessonExerciseSubmission : BaseEntity
         TeacherFeedback = string.IsNullOrWhiteSpace(feedback) ? null : feedback.Trim();
         GradedByUserId = gradedByUserId;
         GradedAt = DateTime.UtcNow;
+        Touch();
+    }
+
+    /// <summary>Marks XP as granted for this exercise so it's never awarded twice.</summary>
+    public void MarkXpAwarded()
+    {
+        XpAwarded = true;
         Touch();
     }
 }

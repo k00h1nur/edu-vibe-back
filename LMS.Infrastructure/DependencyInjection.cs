@@ -40,7 +40,6 @@ public static class DependencyInjection
                 CoreEventId.RowLimitingOperationWithoutOrderByWarning));
         });
         services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<LMSDbContext>());
-        services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         // No per-request state — singleton avoids per-request key allocation.
         services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();

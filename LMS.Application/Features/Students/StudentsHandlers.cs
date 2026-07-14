@@ -183,7 +183,7 @@ public sealed class GetMyStudentProfileQueryHandler(IApplicationDbContext db, IC
             return Result<StudentDto>.Fail("UNAUTHENTICATED", "No authenticated user.");
 
         // Prefer the JWT claim (free lookup); fall back to UserId scan if not yet enriched.
-        var query = db.StudentProfiles
+        var query = db.StudentProfiles.AsNoTracking()
             .Join(db.Users, s => s.UserId, u => u.Id, (s, u) => new { s, u });
 
         var match = currentUser.StudentProfileId is { } profileId

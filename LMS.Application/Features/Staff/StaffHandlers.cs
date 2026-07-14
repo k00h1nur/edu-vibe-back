@@ -130,7 +130,7 @@ public sealed class GetMyStaffProfileQueryHandler(IApplicationDbContext db, ICur
         if (currentUser.UserId is null)
             return Result<StaffDto>.Fail("UNAUTHENTICATED", "No authenticated user.");
 
-        var query = db.StaffProfiles
+        var query = db.StaffProfiles.AsNoTracking()
             .Join(db.Users, s => s.UserId, u => u.Id,
                 (s, u) => new { s, u });
 

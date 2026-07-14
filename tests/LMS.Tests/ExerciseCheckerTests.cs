@@ -236,4 +236,34 @@ public sealed class ExerciseCheckerTests
         // No minWords → any non-empty text completes it.
         ExerciseChecker.Check("writing", """{"instructions":"Free write."}""", El("""{"text":"Hello"}""")).Should().Be((1, 1));
     }
+
+    // ---- multi : composite of several sub-exercises, answers keyed by section index ----
+
+    [Fact]
+    public void Multi_sums_scores_across_sections_keyed_by_index()
+    {
+        var content = """
+        {"sections":[
+          {"type":"fill_blank","content":{"items":[{"id":"1","answer":"am"},{"id":"2","answer":"is"}]}},
+          {"type":"true_false","content":{"items":[{"id":"1","answer":"True"}]}}
+        ]}
+        """;
+        var answers = El("""{"0":{"1":"am","2":"is"},"1":{"1":"True"}}""");
+        ExerciseChecker.Check("multi", content, answers).Should().Be((3, 3));
+    }
+
+    [Fact]
+    public void Multi_counts_a_partly_wrong_and_an_unanswered_section()
+    {
+        var content = """
+        {"sections":[
+          {"type":"fill_blank","content":{"items":[{"id":"1","answer":"am"},{"id":"2","answer":"is"}]}},
+          {"type":"matching","content":{"items":[{"id":"1","answer":"a"}]}}
+        ]}
+        """;
+        // Section 0: one right, one wrong. Section 1: not answered at all.
+        var (score, total) = ExerciseChecker.Check("multi", content, El("""{"0":{"1":"am","2":"WRONG"}}"""));
+        score.Should().Be(1);
+        total.Should().Be(3);
+    }
 }

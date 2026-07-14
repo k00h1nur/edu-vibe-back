@@ -12,7 +12,11 @@ public sealed record SubmissionDto(
     SubmissionStatus Status,
     decimal? Score,
     bool IsLocked,
-    int FileCount);
+    int FileCount,
+    // Teacher grade detail: the scale graded on and any written feedback (both null
+    // until a teacher grades with them). Score alone stays back-compatible.
+    decimal? MaxScore = null,
+    string? Feedback = null);
 
 public sealed record SubmissionFileDto(
     Guid Id,
@@ -49,7 +53,9 @@ public sealed record SubmitAssignmentCommand(Guid AssignmentId, Guid StudentProf
 public sealed record SaveSubmissionDraftCommand(Guid AssignmentId, string Content)
     : IRequest<Result<SubmissionDto>>;
 
-public sealed record GradeSubmissionCommand(Guid SubmissionId, decimal Score) : IRequest<Result<SubmissionDto>>;
+public sealed record GradeSubmissionCommand(
+    Guid SubmissionId, decimal Score, decimal? MaxScore = null, string? Feedback = null)
+    : IRequest<Result<SubmissionDto>>;
 
 public sealed record GetAssignmentSubmissionsQuery(Guid AssignmentId)
     : IRequest<Result<IReadOnlyCollection<SubmissionDto>>>;

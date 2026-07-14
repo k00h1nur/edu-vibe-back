@@ -107,9 +107,10 @@ public sealed class AttendanceHandlers(IApplicationDbContext db, ICurrentUserSer
             x => x.SessionId == request.SessionId && x.StudentProfileId == request.StudentProfileId, cancellationToken);
         if (existing is null)
         {
-            var list = await db.Attendance.Where(x => x.SessionId == request.SessionId).ToListAsync(cancellationToken);
+            // Uniqueness was already established by the targeted lookup above, so
+            // skip loading the whole session's roster just to re-check it in memory.
             existing = Domain.Entities.Attendance.Create(request.ClassId, request.SessionId, request.StudentProfileId,
-                list);
+                Array.Empty<Domain.Entities.Attendance>());
             await db.Attendance.AddAsync(existing, cancellationToken);
         }
 
