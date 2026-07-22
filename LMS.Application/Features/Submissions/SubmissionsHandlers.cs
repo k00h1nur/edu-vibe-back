@@ -124,6 +124,7 @@ public sealed class SubmissionsHandlers(
             existing.Submit(request.Content, isLate);
             db.SubmissionAudits.Add(new SubmissionAudit(existing.Id, currentUser.UserId, "resubmitted", null));
             await db.SaveChangesAsync(cancellationToken);
+            await NotifyTeacherOfSubmissionAsync(assignment, callerStudentProfileId.Value, cancellationToken);
             return Result<SubmissionDto>.Ok(Map(existing));
         }
 
@@ -133,7 +134,34 @@ public sealed class SubmissionsHandlers(
         await db.Submissions.AddAsync(s, cancellationToken);
         db.SubmissionAudits.Add(new SubmissionAudit(s.Id, currentUser.UserId, "created", isLate ? "late" : null));
         await db.SaveChangesAsync(cancellationToken);
+        await NotifyTeacherOfSubmissionAsync(assignment, callerStudentProfileId.Value, cancellationToken);
         return Result<SubmissionDto>.Ok(Map(s));
+    }
+
+    /// <summary>
+    /// Fire-and-forget Telegram DM to the class's teacher (or, if the class has
+    /// no teacher assigned, whoever created the assignment) that a student has
+    /// submitted homework. No-op if the teacher hasn't linked Telegram.
+    /// </summary>
+    private async Task NotifyTeacherOfSubmissionAsync(Assignment assignment, Guid studentProfileId, CancellationToken ct)
+    {
+        var classTeacher = await db.Classes
+            .Where(c => c.Id == assignment.ClassId)
+            .Select(c => c.TeacherUserId)
+            .FirstOrDefaultAsync(ct);
+        var recipient = classTeacher ?? assignment.CreatedByTeacherId;
+        if (recipient == Guid.Empty) return;
+
+        var name = await db.StudentProfiles
+            .Where(sp => sp.Id == studentProfileId)
+            .Select(sp => ((sp.FirstName ?? "") + " " + (sp.LastName ?? "")).Trim())
+            .FirstOrDefaultAsync(ct);
+        var who = string.IsNullOrWhiteSpace(name) ? "A student" : name;
+
+        await notifications.NotifyUserAsync(
+            recipient,
+            $"📝 {who} submitted homework: {assignment.Title}.\nOpen EduVibe to review.",
+            ct);
     }
 
     public async Task<Result<SubmissionDto>> Handle(SaveSubmissionDraftCommand request,
