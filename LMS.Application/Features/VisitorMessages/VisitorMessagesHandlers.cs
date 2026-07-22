@@ -1,5 +1,6 @@
 using LMS.Application.Common.Abstractions;
 using LMS.Application.Common.Models;
+using LMS.Application.Common.Security;
 using LMS.Domain.Entities;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +11,7 @@ namespace LMS.Application.Features.VisitorMessages;
 public sealed class CreateVisitorMessageCommandHandler(
     IApplicationDbContext db,
     ITelegramNotifier telegram,
+    INotificationService notifications,
     ILogger<CreateVisitorMessageCommandHandler> logger)
     : IRequestHandler<CreateVisitorMessageCommand, Result<VisitorMessageDto>>
 {
@@ -40,7 +42,44 @@ public sealed class CreateVisitorMessageCommandHandler(
         // background sender handles retries, backoff and Telegram 429 throttling.
         await telegram.SendAsync(BuildTelegramMessage(entity), CancellationToken.None);
 
+        // Also DM every admin who's linked their Telegram — a personal ping via
+        // the platform bot, on top of the shared group notice. Fire-and-forget.
+        await NotifyAdminsAsync(entity, cancellationToken);
+
         return Result<VisitorMessageDto>.Ok(Map(entity), "Message received.");
+    }
+
+    private static readonly string[] AdminRoleCodes =
+        { RoleCodes.Admin, RoleCodes.SuperAdmin, RoleCodes.AcademyDirector, RoleCodes.OfficeAdmin };
+
+    private async Task NotifyAdminsAsync(VisitorMessage m, CancellationToken ct)
+    {
+        var adminRoleIds = await db.Roles
+            .Where(r => AdminRoleCodes.Contains(r.Code)).Select(r => r.Id).ToListAsync(ct);
+        var adminUserIds = await db.UserRoles
+            .Where(ur => adminRoleIds.Contains(ur.RoleId))
+            .Select(ur => ur.UserId).Distinct().ToListAsync(ct);
+        if (adminUserIds.Count == 0) return;
+        await notifications.NotifyUsersAsync(adminUserIds, BuildAdminDm(m), ct);
+    }
+
+    private static string BuildAdminDm(VisitorMessage m)
+    {
+        var label = m.Source switch
+        {
+            VisitorMessageSource.DemoLesson => "🎓 New demo lesson request",
+            VisitorMessageSource.MockTest   => "📝 New mock test registration",
+            VisitorMessageSource.LevelCheck => "🎯 New level check request",
+            VisitorMessageSource.Contact    => "✉️ New contact message",
+            _                               => "📥 New visitor message",
+        };
+        var lines = new List<string> { label, $"Name: {m.Name}", $"Phone: {m.Phone}" };
+        if (!string.IsNullOrWhiteSpace(m.Course)) lines.Add($"Course: {m.Course}");
+        if (!string.IsNullOrWhiteSpace(m.PreferredTime)) lines.Add($"When: {m.PreferredTime}");
+        if (!string.IsNullOrWhiteSpace(m.Message)) { lines.Add(""); lines.Add(m.Message); }
+        lines.Add("");
+        lines.Add("Open EduVibe → Inquiries");
+        return string.Join("\n", lines);
     }
 
     private static string BuildTelegramMessage(VisitorMessage m)
