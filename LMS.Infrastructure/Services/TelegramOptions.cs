@@ -41,6 +41,27 @@ public sealed class TelegramOptions
     public string? MiniAppUrl { get; init; }
 
     /// <summary>
+    /// Public marketing site the bot's <c>/start</c> welcome links to.
+    /// Default https://edu-vibe.uz.
+    /// </summary>
+    public string WebsiteUrl { get; init; } = "https://edu-vibe.uz";
+
+    /// <summary>
+    /// Shared secret registered with <c>setWebhook</c> and echoed back by Telegram
+    /// in the <c>X-Telegram-Bot-Api-Secret-Token</c> header. The <c>/webhook</c>
+    /// endpoint rejects any request whose header doesn't match — so the webhook is
+    /// disabled (fails closed) until this is set.
+    /// </summary>
+    public string? WebhookSecret { get; init; }
+
+    /// <summary>
+    /// Public HTTPS URL of the webhook endpoint, e.g.
+    /// https://api.edu-vibe.uz/api/Telegram/webhook. When set alongside a bot token
+    /// and <see cref="WebhookSecret"/>, the bot self-registers its webhook on startup.
+    /// </summary>
+    public string? WebhookUrl { get; init; }
+
+    /// <summary>
     /// Bounded in-memory queue depth. New writes drop the oldest message when
     /// full so a Telegram outage can never block the API thread or balloon
     /// memory. Default 256 ≈ a few minutes of normal traffic.
