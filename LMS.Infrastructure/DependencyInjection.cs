@@ -70,6 +70,9 @@ public static class DependencyInjection
         // On boot, point the bot's default menu button at the production Mini App
         // ({MiniAppUrl}/tg) via setChatMenuButton — no @BotFather step needed.
         services.AddHostedService<TelegramMenuButtonHostedService>();
+        // On boot, register the bot's webhook (setWebhook) so /start gets a live
+        // welcome. No-op unless Telegram:WebhookUrl + WebhookSecret are configured.
+        services.AddHostedService<TelegramWebhookRegistrationHostedService>();
         services.AddSingleton<ITelegramInitDataValidator, TelegramInitDataValidator>();
         // Universal per-user notifier: resolves a user → their linked Telegram
         // and DMs via the platform bot. Scoped (depends on the scoped DbContext).
