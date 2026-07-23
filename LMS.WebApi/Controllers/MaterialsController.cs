@@ -17,9 +17,10 @@ namespace LMS.WebApi.Controllers;
 /// visibility check applies on every request.
 ///
 /// The multipart upload format mirrors what the LMS admin frontend posts:
-///   title, description, visibility ("Public"|"Private"|"1"|"2"),
+///   title, description, visibility ("Public"|"Private"|"AdminsOnly"|
+///   "TeachersOnly"|"StudentsOnly", or the numeric enum value),
 ///   classIds (comma-separated list — easier on the FormData wire than
-///   repeating the field), file.
+///   repeating the field; only used when visibility is Private), file.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
@@ -122,7 +123,8 @@ public sealed class MaterialsController(
             return BadRequest(ApiResponse<MaterialDto>.Fail("Title is required."));
 
         if (!TryParseVisibility(form.Visibility, out var visibility))
-            return BadRequest(ApiResponse<MaterialDto>.Fail("Visibility must be Public or Private."));
+            return BadRequest(ApiResponse<MaterialDto>.Fail(
+                "Visibility must be one of Public, Private, AdminsOnly, TeachersOnly or StudentsOnly."));
 
         var classIds = ParseClassIds(form.ClassIds);
 

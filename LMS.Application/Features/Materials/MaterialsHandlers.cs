@@ -12,11 +12,14 @@ namespace LMS.Application.Features.Materials;
 /// Materials CQRS handlers.
 ///
 /// Visibility rules — implemented uniformly in <see cref="VisibleMaterialIds"/>:
-///   • Admin / Office Admin / Director — see everything (returns null filter).
-///   • Teachers — Public + Private uploaded by them + Private linked to a
-///     class they teach.
-///   • Students — Public + Private linked to a class they're enrolled in.
+///   • Admin / Office Admin / Director — see everything (returns null filter),
+///     including AdminsOnly / TeachersOnly / StudentsOnly materials.
+///   • Teachers — Public + TeachersOnly + Private uploaded by them + Private
+///     linked to a class they teach.
+///   • Students — Public + StudentsOnly + Private linked to a class they're
+///     enrolled in.
 ///   • Everyone else (unknown role with Materials.Read) — Public only.
+///   • AdminsOnly materials are seen by admins alone.
 ///
 /// Filtering happens before projection so EF translates it to a single SQL
 /// query with a CTE / sub-select per branch.
@@ -224,21 +227,25 @@ public sealed class MaterialsHandlers(IApplicationDbContext db, ICurrentUserServ
             .Where(m => m.Visibility == MaterialVisibility.Public)
             .Select(m => m.Id);
 
-        // Stays null when the caller is neither teacher nor student —
-        // avoids `publicIds.Concat(Enumerable.Empty<Guid>().AsQueryable())`,
-        // which EF Core 8 can't translate ("Empty collections are not
-        // supported as inline query roots").
-        IQueryable<Guid>? privateIds = null;
+        // Role-scoped (TeachersOnly / StudentsOnly) + class-private ids for
+        // this caller. Stays null when the caller is neither teacher nor
+        // student — avoids `publicIds.Concat(Enumerable.Empty<Guid>()
+        // .AsQueryable())`, which EF Core 8 can't translate ("Empty
+        // collections are not supported as inline query roots"). AdminsOnly
+        // materials never appear here — only privileged callers (short-
+        // circuited above) ever see them.
+        IQueryable<Guid>? scopedIds = null;
 
         if (isTeacher)
         {
             var teachingClassIds = db.Classes
                 .Where(c => c.TeacherUserId == userId)
                 .Select(c => c.Id);
-            privateIds = db.Materials
-                .Where(m => m.Visibility == MaterialVisibility.Private)
-                .Where(m => m.UploadedByUserId == userId
-                            || m.ClassLinks.Any(l => teachingClassIds.Contains(l.ClassId)))
+            scopedIds = db.Materials
+                .Where(m => m.Visibility == MaterialVisibility.TeachersOnly
+                            || (m.Visibility == MaterialVisibility.Private
+                                && (m.UploadedByUserId == userId
+                                    || m.ClassLinks.Any(l => teachingClassIds.Contains(l.ClassId)))))
                 .Select(m => m.Id);
         }
         else if (isStudent)
@@ -251,13 +258,14 @@ public sealed class MaterialsHandlers(IApplicationDbContext db, ICurrentUserServ
                             && db.StudentProfiles.Any(sp =>
                                 sp.UserId == userId && sp.Id == e.StudentProfileId))
                 .Select(e => e.ClassId);
-            privateIds = db.Materials
-                .Where(m => m.Visibility == MaterialVisibility.Private)
-                .Where(m => m.ClassLinks.Any(l => studentClassIds.Contains(l.ClassId)))
+            scopedIds = db.Materials
+                .Where(m => m.Visibility == MaterialVisibility.StudentsOnly
+                            || (m.Visibility == MaterialVisibility.Private
+                                && m.ClassLinks.Any(l => studentClassIds.Contains(l.ClassId))))
                 .Select(m => m.Id);
         }
 
-        var combined = privateIds is null ? publicIds : publicIds.Concat(privateIds).Distinct();
+        var combined = scopedIds is null ? publicIds : publicIds.Concat(scopedIds).Distinct();
         var ids = await combined.ToListAsync(ct);
         return new HashSet<Guid>(ids);
     }
