@@ -540,8 +540,46 @@ public sealed class LessonExerciseConfiguration : IEntityTypeConfiguration<Lesso
             .HasDatabaseName("ix_lesson_exercises_lesson_order");
         b.HasOne<CurriculumLesson>().WithMany().HasForeignKey(x => x.LessonId)
             .OnDelete(DeleteBehavior.Cascade);
+        // Second (mutually-exclusive) owner: a reusable ExerciseSet. Nullable — exactly one
+        // of LessonId / ExerciseSetId is set (DB CHECK enforces the XOR). Its own upsert
+        // index mirrors the lesson one so bulk-add-to-set is keyed the same way.
+        b.HasIndex(x => new { x.ExerciseSetId, x.OrderIndex }).IsUnique()
+            .HasDatabaseName("ix_lesson_exercises_set_order");
+        b.HasOne<ExerciseSet>().WithMany().HasForeignKey(x => x.ExerciseSetId)
+            .OnDelete(DeleteBehavior.Cascade);
         b.HasMany(x => x.Submissions).WithOne(x => x.LessonExercise)
             .HasForeignKey(x => x.LessonExerciseId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public sealed class ExerciseSetConfiguration : IEntityTypeConfiguration<ExerciseSet>
+{
+    public void Configure(EntityTypeBuilder<ExerciseSet> b)
+    {
+        b.ToTable("exercise_sets");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Title).IsRequired().HasMaxLength(200);
+        b.Property(x => x.Description).HasMaxLength(2000);
+        b.HasIndex(x => x.CreatedByUserId);
+        b.HasOne<User>().WithMany().HasForeignKey(x => x.CreatedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+        b.HasMany(x => x.ClassLinks).WithOne().HasForeignKey(x => x.ExerciseSetId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public sealed class ExerciseSetClassConfiguration : IEntityTypeConfiguration<ExerciseSetClass>
+{
+    public void Configure(EntityTypeBuilder<ExerciseSetClass> b)
+    {
+        b.ToTable("exercise_set_classes");
+        b.HasKey(x => x.Id);
+        b.HasIndex(x => new { x.ExerciseSetId, x.ClassId }).IsUnique()
+            .HasDatabaseName("ix_exercise_set_classes_set_class");
+        b.HasIndex(x => x.ClassId);
+        // ExerciseSet FK is configured via ExerciseSet.ClassLinks above.
+        b.HasOne<Class>().WithMany().HasForeignKey(x => x.ClassId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
 
