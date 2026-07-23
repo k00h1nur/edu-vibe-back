@@ -52,6 +52,11 @@ public sealed class CreateVisitorMessageCommandHandler(
     private static readonly string[] AdminRoleCodes =
         { RoleCodes.Admin, RoleCodes.SuperAdmin, RoleCodes.AcademyDirector, RoleCodes.OfficeAdmin };
 
+    // Admin panel Inquiries page. Telegram auto-links the raw URL, giving the
+    // DM a one-tap jump straight to the inbox. Hardcoded (not host config) so
+    // the Application layer keeps no dependency on Infrastructure options.
+    private const string AdminInquiriesUrl = "https://admin.edu-vibe.uz/admin/inquiries";
+
     private async Task NotifyAdminsAsync(VisitorMessage m, CancellationToken ct)
     {
         var adminRoleIds = await db.Roles
@@ -78,7 +83,8 @@ public sealed class CreateVisitorMessageCommandHandler(
         if (!string.IsNullOrWhiteSpace(m.PreferredTime)) lines.Add($"When: {m.PreferredTime}");
         if (!string.IsNullOrWhiteSpace(m.Message)) { lines.Add(""); lines.Add(m.Message); }
         lines.Add("");
-        lines.Add("Open EduVibe → Inquiries");
+        lines.Add("🔗 Open in EduVibe → Inquiries:");
+        lines.Add(AdminInquiriesUrl);
         return string.Join("\n", lines);
     }
 
