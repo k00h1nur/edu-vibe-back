@@ -223,11 +223,11 @@ public sealed class TemplateBuilderHandlers(IApplicationDbContext db) :
         // can see which lessons already have exercises (and confirm a save landed).
         var lessonIds = lessons.Select(l => l.Id).ToList();
         var exerciseCounts = (await db.LessonExercises.AsNoTracking()
-                .Where(e => lessonIds.Contains(e.LessonId))
+                .Where(e => e.LessonId != null && lessonIds.Contains(e.LessonId.Value))
                 .GroupBy(e => e.LessonId)
                 .Select(g => new { LessonId = g.Key, Count = g.Count() })
                 .ToListAsync(ct))
-            .ToDictionary(x => x.LessonId, x => x.Count);
+            .ToDictionary(x => x.LessonId!.Value, x => x.Count);
 
         // Lessons referenced by this template's teaching plan — the ONLY lessons a
         // student can reach in their journey. A lesson with exercises but not in the
