@@ -21,9 +21,7 @@ public sealed class LessonExercise : BaseEntity
     public LessonExercise(Guid lessonId, string type, string title, int orderIndex, string contentJson)
     {
         if (lessonId == Guid.Empty) throw new DomainException("Lesson id is required.");
-        if (string.IsNullOrWhiteSpace(type)) throw new DomainException("Exercise type is required.");
-        if (orderIndex < 0) throw new DomainException("Order index must be non-negative.");
-        if (string.IsNullOrWhiteSpace(contentJson)) throw new DomainException("Content is required.");
+        ValidateCore(type, orderIndex, contentJson);
 
         LessonId = lessonId;
         Type = type.Trim();
@@ -32,8 +30,41 @@ public sealed class LessonExercise : BaseEntity
         ContentJson = contentJson;
     }
 
-    /// <summary>The curriculum lesson (e.g. "1A — People and places") this exercise belongs to.</summary>
-    public Guid LessonId { get; private set; }
+    /// <summary>
+    /// Create an exercise owned by an <see cref="ExerciseSet"/> instead of a curriculum
+    /// lesson. Exactly one of <see cref="LessonId"/> / <see cref="ExerciseSetId"/> is ever
+    /// set (a DB CHECK enforces the XOR). Everything downstream — submissions, checker,
+    /// XP, grading — is owner-blind, so set exercises reuse the lesson engine untouched.
+    /// </summary>
+    public static LessonExercise ForSet(Guid exerciseSetId, string type, string title, int orderIndex, string contentJson)
+    {
+        if (exerciseSetId == Guid.Empty) throw new DomainException("Exercise set id is required.");
+        ValidateCore(type, orderIndex, contentJson);
+
+        return new LessonExercise
+        {
+            ExerciseSetId = exerciseSetId,
+            Type = type.Trim(),
+            Title = title?.Trim() ?? string.Empty,
+            OrderIndex = orderIndex,
+            ContentJson = contentJson,
+        };
+    }
+
+    private static void ValidateCore(string type, int orderIndex, string contentJson)
+    {
+        if (string.IsNullOrWhiteSpace(type)) throw new DomainException("Exercise type is required.");
+        if (orderIndex < 0) throw new DomainException("Order index must be non-negative.");
+        if (string.IsNullOrWhiteSpace(contentJson)) throw new DomainException("Content is required.");
+    }
+
+    /// <summary>The curriculum lesson this exercise belongs to — null when it belongs to an
+    /// <see cref="ExerciseSet"/> instead (exactly one owner; DB CHECK enforces the XOR).</summary>
+    public Guid? LessonId { get; private set; }
+
+    /// <summary>The reusable exercise set this exercise belongs to — null when it belongs to a
+    /// curriculum lesson instead.</summary>
+    public Guid? ExerciseSetId { get; private set; }
 
     /// <summary>Free-string discriminator: "mcq", "mcq_ab", "error_correction", "transform",
     /// "fill_blank", "word_bank_gap", "paragraph_cloze", "dialogue", … (extensible).</summary>

@@ -46,8 +46,23 @@ public sealed class XpHandlers(IApplicationDbContext db, ICurrentUserService cur
     public async Task<Result<IReadOnlyCollection<LeaderboardDto>>> Handle(GetLeaderboardQuery request,
         CancellationToken cancellationToken)
     {
-        return Result<IReadOnlyCollection<LeaderboardDto>>.Ok(await db.StudentProfiles.OrderByDescending(x => x.XP)
-            .Take(request.Top).Select(x => new LeaderboardDto(x.Id, x.XP)).ToListAsync(cancellationToken));
+        // Names are resolved here (server-side) so the leaderboard needs no
+        // separate students-list call the caller may lack permission for — that
+        // gap is why teacher leaderboards rendered "Student #<id>" instead of
+        // names. Concat + trim is done in memory to yield null (not "") for
+        // profiles with no name set, so the client falls back cleanly.
+        var rows = await db.StudentProfiles.OrderByDescending(x => x.XP)
+            .Take(request.Top)
+            .Select(x => new { x.Id, x.FirstName, x.LastName, x.Level, x.Streak, x.XP })
+            .ToListAsync(cancellationToken);
+
+        var dtos = rows.Select(x =>
+        {
+            var name = $"{x.FirstName} {x.LastName}".Trim();
+            return new LeaderboardDto(x.Id, string.IsNullOrWhiteSpace(name) ? null : name, x.Level, x.Streak, x.XP);
+        }).ToList();
+
+        return Result<IReadOnlyCollection<LeaderboardDto>>.Ok(dtos);
     }
 
     public async Task<Result<IReadOnlyCollection<XpLedgerDto>>> Handle(GetStudentXpLedgerQuery request,
