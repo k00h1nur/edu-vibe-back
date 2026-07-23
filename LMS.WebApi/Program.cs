@@ -35,23 +35,17 @@ builder.Services.AddSwagger();
 // ---- Hosted services (boot order matters) ---------------------------------
 // DatabaseInitializerHostedService applies any pending EF migrations first
 // (Development default) so the rest of the chain doesn't query a schema that
-// doesn't exist yet. PermissionDiscoveryHostedService follows so the
-// Permission rows exist before RolePermissionSeederHostedService maps
-// role→permission. The demo-user seeder runs last so role + permission
-// lookups succeed.
+// doesn't exist yet. PermissionDiscoveryHostedService follows so the Permission
+// rows exist before RolePermissionSeederHostedService maps role→permission.
+// SuperAdminSeederHostedService then promotes the configured SuperAdmin:Email
+// account. These are reference/config seeders ONLY — no demo or sample data is
+// created (the demo-user and sample mock-test-slot seeders were removed; real
+// accounts, mock-test slots and marketing content are managed in the admin UI).
 builder.Services.AddHostedService<DatabaseInitializerHostedService>();
 builder.Services.AddHostedService<PermissionDiscoveryHostedService>();
 builder.Services.AddHostedService<RolePermissionSeederHostedService>();
-builder.Services.AddHostedService<DemoUsersSeederHostedService>();
-// Promotes a configured account (SuperAdmin:Email) to SuperAdmin — runs after
-// the demo seeder so a freshly-seeded dev account can be the target.
+// Promotes a configured account (SuperAdmin:Email) to SuperAdmin.
 builder.Services.AddHostedService<SuperAdminSeederHostedService>();
-// Mock-test slots reference data — idempotent (seeds only when the table is
-// empty), so admin edits are never overwritten. Marketing courses and the
-// built-in curriculum-template library are intentionally NOT seeded: courses
-// are managed in the CMS (with a static marketing fallback) and templates are
-// authored in the admin curriculum editor / loaded as SQL.
-builder.Services.AddHostedService<MockTestSlotsSeederHostedService>();
 
 // ---- CORS -----------------------------------------------------------------
 // Browser clients (marketing site at :5173, LMS admin at :3000) need the API
