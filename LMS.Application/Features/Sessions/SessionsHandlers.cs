@@ -123,8 +123,13 @@ public sealed class SessionsHandlers(IApplicationDbContext db, ICurrentUserServi
             .Where(c => c.TeacherUserId == userId)
             .Select(c => c.Id);
 
-        return await enrolledClassIds
-            .Union(teachingClassIds)
+        var touched = enrolledClassIds.Union(teachingClassIds);
+
+        // Archived (Cancelled) classes never surface on a schedule, even if an
+        // enrolment or teacher link still points at them (cancel is a soft-delete).
+        return await db.Classes
+            .Where(c => touched.Contains(c.Id) && c.Status != ClassStatus.Cancelled)
+            .Select(c => c.Id)
             .ToListAsync(cancellationToken);
     }
 
@@ -196,6 +201,7 @@ public sealed class SessionsHandlers(IApplicationDbContext db, ICurrentUserServi
             from s in db.ClassSessions.AsNoTracking()
             join c in db.Classes.AsNoTracking() on s.ClassId equals c.Id
             where s.SessionDate >= request.From && s.SessionDate <= request.To
+                  && c.Status != ClassStatus.Cancelled
             orderby s.SessionDate, s.StartsAt
             select new ScheduleEntryDto(
                 s.Id, s.ClassId, c.Title, c.TeacherUserId,
@@ -221,6 +227,7 @@ public sealed class SessionsHandlers(IApplicationDbContext db, ICurrentUserServi
             from sp in sps.DefaultIfEmpty()
             where s.SessionDate >= request.From && s.SessionDate <= request.To
                   && !s.IsBackfilled
+                  && c.Status != ClassStatus.Cancelled
                   && (request.TeacherId == null || c.TeacherUserId == request.TeacherId)
                   && (request.ClassId == null || s.ClassId == request.ClassId)
             orderby s.SessionDate, s.StartsAt
