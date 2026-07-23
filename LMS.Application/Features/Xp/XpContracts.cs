@@ -11,7 +11,7 @@ public sealed record XpLedgerDto(
     string? Note,
     DateTime CreatedAt);
 
-public sealed record LeaderboardDto(Guid StudentProfileId, int Xp);
+public sealed record LeaderboardDto(Guid StudentProfileId, string? Name, string? Level, int Streak, int Xp);
 
 public sealed record AddManualXpCommand(Guid StudentProfileId, int Amount, string? Note) : IRequest<Result>;
 
